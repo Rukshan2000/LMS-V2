@@ -6,6 +6,7 @@ import classRoutes from './modules/classes/routes.js';
 import feeRoutes from './modules/fees/routes.js';
 import identityRoutes from './modules/identity/routes.js';
 import portalRoutes from './modules/portal/routes.js';
+import reportRoutes from './modules/reports/routes.js';
 import slipRoutes from './modules/slips/routes.js';
 import { inviteRoutes, staffRoutes } from './modules/staff/routes.js';
 import studentRoutes from './modules/students/routes.js';
@@ -52,6 +53,7 @@ export async function buildApp({
   await app.register(feeRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(portalRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(slipRoutes, { prefix: '/api/v1/tenants/:tenantId' });
+  await app.register(reportRoutes, { prefix: '/api/v1/tenants/:tenantId/reports' });
   await app.register(inviteRoutes, { prefix: '/api/v1/invites' });
 
   return app;

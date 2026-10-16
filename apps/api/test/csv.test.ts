@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCsv } from '../src/lib/csv.js';
+import { parseCsv, toCsv } from '../src/lib/csv.js';
 
 describe('parseCsv', () => {
   it('parses plain rows with CRLF and a BOM', () => {
@@ -25,5 +25,22 @@ describe('parseCsv', () => {
 
   it('reads a last line without a newline, and Sinhala text', () => {
     expect(parseCsv('name\nකසුන් පෙරේරා')).toEqual([['name'], ['කසුන් පෙරේරා']]);
+  });
+});
+
+describe('toCsv', () => {
+  it('round-trips through parseCsv and blocks formulas but keeps negative numbers', () => {
+    const rows = [
+      ['name', 'note', 'amount'],
+      ['Perera, Kasun', 'He said "hi"\nthere', '-1250.00'],
+      ['=HYPERLINK("x")', '+94771234567', '@SUM(A1)'],
+    ];
+    const text = toCsv(rows);
+    expect(text.startsWith('\uFEFF')).toBe(true);
+    expect(parseCsv(text)).toEqual([
+      rows[0],
+      rows[1],
+      ['\'=HYPERLINK("x")', "'+94771234567", "'@SUM(A1)"],
+    ]);
   });
 });

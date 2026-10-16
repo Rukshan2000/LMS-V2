@@ -356,6 +356,20 @@ const ta: Dictionary = {
       rejected: 'நிராகரிக்கப்பட்டது',
     },
   },
+  reports: {
+    from: 'இருந்து',
+    to: 'வரை',
+    feesByMonth: 'மாத வாரியான கட்டணங்கள்',
+    invoices: 'விலைப்பட்டியல்கள்',
+    received: 'பெறப்பட்ட பணம்',
+    attendance: 'வகுப்பு வாரியான வருகை',
+    class: 'வகுப்பு',
+    sessions: 'நடைபெற்ற வகுப்புகள்',
+    enrolled: 'மாணவர்கள்',
+    rate: 'வருகை',
+    exports: 'Excel க்கு பதிவிறக்கு (CSV)',
+    csv: { payments: 'கொடுப்பனவுகள்', unpaid: 'செலுத்தப்படாத கட்டணங்கள்', students: 'மாணவர்கள்' },
+  },
   calendar: {
     weekdays: ['திங்கள்', 'செவ்வாய்', 'புதன்', 'வியாழன்', 'வெள்ளி', 'சனி', 'ஞாயிறு'],
     months: [

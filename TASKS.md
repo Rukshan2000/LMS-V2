@@ -8,7 +8,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 8 (Reports + CSV export). Pilot 1 can start now.
+**Next up:** Step 5 slice 9 (Plans: free cap 50, manual plan activation). Pilot 1 can start now.
 
 ---
 
@@ -192,6 +192,7 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Fixed: editing/archiving a class reset its mode to "physical" (Zod default applied on partial update)
   - "Live classes" menu item removed: parents/students have everything on the overview
   - Tests: 3 API (paid vs unpaid, time window, https + mode kept; mutation-checked); checked in browser (set link → parent sees Join during class)
+  - Released to production (commit d0446db, migration 010 applied by pipeline)
 - [x] 7. Student/parent portal (web push → later)
   - Migration 008: portal invites on `tenant_invites` (`student_id`, roles student/parent), `portal_access` (which students each parent/student account sees); RLS
   - Student page: "Parent / student app" → WhatsApp link per mobile (student's own or a guardian's only; only that mobile can accept; 14 days, single use)
@@ -201,7 +202,10 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Released to production (with slice 5, commit 6e51f94)
   - [ ] Web push notifications (needs VAPID keys + service worker; add when parents ask for reminders beyond WhatsApp)
   - [ ] Staff can remove a parent's portal access (today: mark student inactive stops new invites only)
-- [ ] 8. Reports + CSV export
+- [x] 8. Reports + CSV export (owner/admin)
+  - Reports page: month range (max 24): fees by month (billed / collected / outstanding), money received per month by method, attendance per class (classes held, present/late/absent, rate)
+  - CSV for Excel: payments (range), unpaid fees (with guardian phones), students (guardians + classes); UTF-8 BOM so Sinhala/Tamil open correctly; cells starting with = + - @ are prefixed so Excel never runs them as formulas
+  - Tests: 3 API + CSV writer; checked in browser (si)
 - [ ] 9. Plans: free cap 50, manual plan activation
 - [ ] **Beta: 3–5 teachers**
 - [ ] **v1.0 release checklist passes ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md))**

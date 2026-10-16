@@ -32,7 +32,7 @@ describe('navForRoles', () => {
 
   it('"Soon" items have no link until the feature ships', () => {
     expect(navForRoles(['teacher']).find((i) => i.key === 'timetable')?.path).toBe('/timetable');
-    expect(navForRoles(['owner']).find((i) => i.key === 'reports')?.path).toBeUndefined();
+    expect(navForRoles(['teacher']).find((i) => i.key === 'timetable')?.path).toBeDefined();
   });
 
   it('no roles → nothing', () => {

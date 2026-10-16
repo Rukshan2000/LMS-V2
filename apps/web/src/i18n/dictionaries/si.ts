@@ -347,6 +347,20 @@ const si: Dictionary = {
     duplicateReference: 'මෙම බැංකු යොමු අංකය කලින් භාවිතා කර ඇත',
     status: { pending: 'පරීක්ෂාව සඳහා රැඳී ඇත', verified: 'තහවුරුයි', rejected: 'ප්‍රතික්ෂේපිතයි' },
   },
+  reports: {
+    from: 'සිට',
+    to: 'දක්වා',
+    feesByMonth: 'මාසය අනුව ගාස්තු',
+    invoices: 'ඉන්වොයිස්',
+    received: 'ලැබුණු මුදල්',
+    attendance: 'පන්තිය අනුව පැමිණීම',
+    class: 'පන්තිය',
+    sessions: 'පැවැත්වූ පන්ති',
+    enrolled: 'සිසුන්',
+    rate: 'පැමිණීම',
+    exports: 'Excel සඳහා බාගන්න (CSV)',
+    csv: { payments: 'ගෙවීම්', unpaid: 'නොගෙවූ ගාස්තු', students: 'සිසුන්' },
+  },
   calendar: {
     weekdays: ['සඳුදා', 'අඟහරුවාදා', 'බදාදා', 'බ්‍රහස්පතින්දා', 'සිකුරාදා', 'සෙනසුරාදා', 'ඉරිදා'],
     months: [

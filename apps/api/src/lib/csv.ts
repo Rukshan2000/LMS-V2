@@ -43,3 +43,16 @@ export function parseCsv(text: string): string[][] {
   // Drop blank lines (a row with one empty field).
   return rows.filter((r) => r.length > 1 || r[0]!.trim() !== '');
 }
+
+/**
+ * Rows → CSV text with a BOM so Excel opens Sinhala/Tamil correctly. Text starting with
+ * = + - @ is prefixed with ' so a spreadsheet never runs it as a formula (numbers are kept).
+ */
+export function toCsv(rows: (string | number | null | undefined)[][]): string {
+  const cell = (v: string | number | null | undefined) => {
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return `\uFEFF${rows.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n`;
+}
