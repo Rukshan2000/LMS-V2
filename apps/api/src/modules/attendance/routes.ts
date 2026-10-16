@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Knex } from 'knex';
 import { z } from 'zod';
 import { HttpError, notFound } from '../../lib/http-error.js';
+import { toCents } from '../../lib/money.js';
 import { colomboToday } from '../../lib/time.js';
 import { ensureSessions } from '../classes/schedule.js';
 
@@ -200,12 +201,19 @@ export default async function attendanceRoutes(app: FastifyInstance) {
         (await trx('attendance_records')
           .where({ session_id: session.id, student_id: student.id })
           .first('status', 'marked_at as markedAt'));
+      // Warning only: fees never block entry.
+      const due = await trx('invoices')
+        .where({ student_id: student.id })
+        .whereIn('status', ['issued', 'part_paid'])
+        .where('due_date', '<=', today)
+        .first(trx.raw('sum(total - paid) AS amount'));
       return {
         student: who,
         session: sessionInfo,
         attendance,
         duplicate: inserted.length === 0,
         guardians: await guardiansOf(trx, student.id),
+        feeDue: due?.amount && toCents(due.amount) > 0 ? due.amount : null,
       };
     });
   });

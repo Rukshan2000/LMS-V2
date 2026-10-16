@@ -29,7 +29,12 @@ export const NAV: NavItem[] = [
     pathRoles: [...STAFF, 'receptionist', 'teacher'],
     roles: [...STAFF, 'receptionist', 'teacher', 'student', 'parent'],
   },
-  { key: 'fees', roles: [...STAFF, 'receptionist', 'student', 'parent'] },
+  {
+    key: 'fees',
+    path: '/fees',
+    pathRoles: [...STAFF, 'receptionist'],
+    roles: [...STAFF, 'receptionist', 'student', 'parent'],
+  },
   { key: 'slips', roles: [...STAFF, 'receptionist'] },
   {
     key: 'timetable',

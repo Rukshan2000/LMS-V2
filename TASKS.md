@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 69/97
+**Progress:** Step 0: 15/25 · Steps 1–6: 70/97
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 4 (Fees, concessions, invoices, cash payment, receipt, not-paid list, reminder links). Pilot 1 can start now.
+**Next up:** Step 5 slice 5 (Bank slip upload + verify + duplicate flag + access unlock). Pilot 1 can start now.
 
 ---
 
@@ -170,7 +170,14 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Cards: printable A4 sheet (bank-card size, QR + name + number), print one card, replace lost card
   - Tests: 10 API (incl. 20 simultaneous scans → 1 record); checked in browser (cards, scan, duplicate, register)
 - [ ] **Pilot 1: first friendly teacher starts using it**
-- [ ] 4. Fees, concessions, invoices, cash payment, receipt PDF, not-paid list, reminder links
+- [x] 4. Fees, concessions, invoices, cash payment, receipt PDF, not-paid list, reminder links
+  - Migration 007: `batch_fees` (class/AC/tute), `student_concessions` (free card, half card, %), `invoices` (one per student per month, DB check `paid <= total`), `invoice_lines`, `payments` (client_ref = no double submit), `payment_allocations`; all RLS
+  - Money never uses floating point: numeric(12,2) in DB, integer cents in JS, amounts in JSON cast to text
+  - Monthly billing safe to re-run (mid-month class joins add only new lines); concessions on class fee only
+  - Payments: oldest invoice first, student row + invoice rows locked, `paid` incremented in SQL; overpayment refused; one-off admission/other invoices; void only if unpaid
+  - UI: fees month (summary, create invoices, not-paid list + WhatsApp reminder), class fee editor, student fees (concessions, invoices, take payment), printable receipt + WhatsApp receipt, "fees due" warning on scan
+  - Tests: 12 API (incl. 5 simultaneous payments → 1, mutation-checked) + money helpers; checked in browser (fees → invoices → partial payment → receipt)
+  - Found + fixed in browser test: invoice line amounts arrived as JSON numbers (floats)
 - [ ] 5. Bank slip upload + verify + duplicate flag + access unlock
 - [ ] 6. Live class links per session (paid students only)
 - [ ] 7. Student/parent portal + web push

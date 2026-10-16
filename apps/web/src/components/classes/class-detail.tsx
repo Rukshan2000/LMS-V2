@@ -10,6 +10,7 @@ import { useTenantData } from '../dashboard-shell';
 import { FormError } from '../ui';
 import type { StudentRow } from '../students/types';
 import type { BatchDetail, Session } from './types';
+import { ClassFees } from '../fees/class-fees';
 import { SessionActions } from './session-actions';
 
 const input = 'rounded-lg border border-zinc-300 bg-white px-2 py-1.5';
@@ -120,6 +121,8 @@ export function ClassDetail() {
         )}
       </div>
       <FormError message={error} />
+
+      {manager && <ClassFees batchId={batch.id} />}
 
       <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
         <h2 className="font-medium">{c.schedule}</h2>

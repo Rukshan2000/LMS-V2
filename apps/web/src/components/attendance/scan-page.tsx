@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, errorMessage, fmt } from '@/lib/api';
 import { colomboTime } from '@/lib/datetime';
+import { fmtMoney } from '@/lib/money';
 import { waLink } from '@/lib/whatsapp';
 import { useTenantData } from '../dashboard-shell';
 
@@ -14,6 +15,7 @@ interface ScanResult {
   attendance: { status: 'present' | 'late'; markedAt: string };
   duplicate: boolean;
   guardians: { fullName: string; phone: string }[];
+  feeDue: string | null;
 }
 type Outcome = { ok: true; result: ScanResult } | { ok: false; message: string; name?: string };
 
@@ -169,6 +171,11 @@ export function ScanPage() {
                 {last.result.student.studentNumber} · {last.result.session.batchName} ·{' '}
                 {last.result.duplicate ? sc.already : sc[last.result.attendance.status]}
               </p>
+              {last.result.feeDue && (
+                <p className="mt-2 rounded-lg bg-red-100 px-3 py-1.5 font-medium text-red-800">
+                  {fmt(t.fees.feeDue, { amount: fmtMoney(last.result.feeDue) })}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {last.result.guardians.map((g) => (
                   <a
