@@ -15,7 +15,9 @@ export default fp(async (app) => {
       });
     }
     if (err instanceof HttpError) {
-      return reply.status(err.statusCode).send({ code: err.code, message: err.message, requestId });
+      return reply
+        .status(err.statusCode)
+        .send({ code: err.code, message: err.message, requestId, details: err.details });
     }
     // Fastify's own client errors (bad JSON, 415, 429, ...).
     const status = (err as { statusCode?: number }).statusCode;

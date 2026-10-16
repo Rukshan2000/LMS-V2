@@ -2,7 +2,8 @@ import { withUser } from '@lms/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { HttpError, isUniqueViolation } from '../../lib/http-error.js';
-import { hashPassword, normalizePhone, verifyPassword } from './service.js';
+import { normalizePhone } from '../../lib/phone.js';
+import { hashPassword, verifyPassword } from './service.js';
 
 const signupBody = z.object({
   phone: z.string().min(9).max(20),

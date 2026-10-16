@@ -2,6 +2,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Knex } from 'knex';
 import identityRoutes from './modules/identity/routes.js';
+import studentRoutes from './modules/students/routes.js';
 import tenancyRoutes from './modules/tenancy/routes.js';
 import authPlugin from './plugins/auth.js';
 import dbPlugin from './plugins/db.js';
@@ -38,6 +39,7 @@ export async function buildApp({
 
   await app.register(identityRoutes, { prefix: '/api/v1/auth', authRateLimitMax });
   await app.register(tenancyRoutes, { prefix: '/api/v1/tenants' });
+  await app.register(studentRoutes, { prefix: '/api/v1/tenants/:tenantId/students' });
 
   return app;
 }

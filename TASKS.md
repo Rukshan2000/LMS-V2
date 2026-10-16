@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 62/94
+**Progress:** Step 0: 15/25 · Steps 1–6: 66/96
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 1 (Students & guardians + CSV import).
+**Next up:** Step 5 slice 2 (Subjects, batches, enrollments, timetable/sessions).
 
 ---
 
@@ -121,6 +121,8 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [x] Migrations in deploy.sh as `tuition_lms_owner` (new image, before restart; owner creds only in `migrate.env`)
 - [x] Post-deploy smoke check: `https://lms.kwingsmedia.com/api/health` and `/` must return 200, else fail
 - [x] Rollback: previous SHA via `.env` + `docker compose up -d` (documented in runbook)
+- [x] Fix: compose network pinned to `172.16.10.0/24` (Docker pool on server exhausted; other ranges cannot reach host Postgres)
+- [x] Step 3 release live: migrations 001–002 applied on production DB
 - [x] First successful pipeline deploy (2026-10-16, commit c7c845c)
 
 ### Backups and logs
@@ -133,21 +135,26 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 Web: `apps/web/src` — routes under `app/[lang]` (`si` default, `ta`, `en`), data loaded in the browser from same-origin `/api`.
 - [x] Next.js app (TS + Tailwind + App Router) — Next.js 16 in `apps/web`
 - [x] i18n with `si`, `ta`, `en`: locale routes, `proxy.ts` redirect (cookie → browser language → Sinhala), language switcher, Noto Sans fonts
-- [ ] Sinhala/Tamil wording reviewed by native speakers (drafted by Claude)
 - [x] Login / signup pages (API error messages translated)
 - [x] Create institute page (link name auto-filled from the name)
 - [x] Dashboard shell with role-based sidebar (`lib/nav.ts`, unbuilt items shown as "Soon")
 - [x] Tenant switcher (+ "New institute"), last institute remembered
 - [x] Tests: role menu + locale choice (9)
 - [x] Full flow checked in a real browser, desktop + phone width: signup → create institute → dashboard → language switch → mobile menu → logout → wrong-login error (Tamil)
-- [ ] Full flow on production `lms.kwingsmedia.com` after release
+- [x] Step 4 released to production (pipeline deploy, smoke check incl. `/si/login`)
+- [ ] **You:** sign up on https://lms.kwingsmedia.com on your phone + laptop and create an institute (Claude does not create accounts on production)
 
 ## Step 5: Feature slices
 Each slice is complete only when it has: migration + RLS → repo → service → route → tests → UI → released via `production` branch.
 No staging server yet: test locally, then release. Add staging when pilot users depend on production.
 
 #### v1.0 (no business registration needed)
-- [ ] 1. Students & guardians + CSV import
+- [x] 1. Students & guardians + CSV import
+  - Migration 003: `students`, `guardians` (shared by siblings via phone), `student_guardians`, `tenant_counters`; all RLS
+  - API: list (search name / number / parent phone, cursor paging, active/inactive), create (duplicate warning + "add anyway"), view, edit (guardians, status), CSV import (preview → all-or-nothing commit, duplicates skipped)
+  - UI: list, add, detail/edit, import (template download, per-line report) in si/ta/en
+  - Tests: 17 new API tests (incl. tenant isolation, roles, import) + CSV parser; checked in browser (desktop + phone)
+  - Teachers get read access to their batch students in slice 2
 - [ ] 2. Subjects, batches, enrollments, timetable/sessions
 - [ ] 3. QR class cards (PDF) + scan attendance + click-to-WhatsApp attendance message
 - [ ] **Pilot 1: first friendly teacher starts using it**
@@ -166,7 +173,7 @@ No staging server yet: test locally, then release. Add staging when pilot users 
 - [ ] 12. Exams: MCQ, paper marks, ranks
 - [ ] 13. Tutes handout
 - [ ] 14. Teacher payout rules + statements
-- [ ] 15. Tamil UI
+- [~] 15. Tamil UI (current screens translated; new screens + review pending)
 
 #### v2.0 (needs business accounts)
 - [ ] 16. PayHere checkout + webhook auto-unlock
@@ -176,7 +183,7 @@ No staging server yet: test locally, then release. Add staging when pilot users 
 - [ ] Load test: scan burst + month-start billing (k6)
 - [ ] Restore drill with real pilot data (procedure in [docs/runbooks/deploy.md](docs/runbooks/deploy.md), empty-DB restore already tested)
 - [x] Structured JSON logs (Fastify/pino) + Docker log rotation. Sentry in v1.1, uptime check in v2
-- [ ] Sinhala/Tamil translation review by native speaker
+- [ ] Sinhala/Tamil translation review by native speaker (all UI text in `apps/web/src/i18n/dictionaries/` was drafted by Claude)
 - [ ] Privacy notice, parent consent, data deletion process
 - [ ] Lawyer review of PDPA obligations
 - [ ] Pilot with 2–5 institutes (1 online A/L teacher)

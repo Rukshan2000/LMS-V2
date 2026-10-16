@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, type Me, type Role } from '@/lib/api';
@@ -29,6 +29,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const { lang, t } = useI18n();
   const { tenantId } = useParams<{ tenantId: string }>();
   const router = useRouter();
+  const pathname = usePathname();
   const [data, setData] = useState<TenantData | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -60,6 +61,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   const base = `/${lang}/t/${tenantId}`;
+  // Overview ('') only on exact match; other sections also for their sub-pages.
+  const isActive = (path: string) =>
+    path === ''
+      ? pathname === base
+      : pathname === `${base}${path}` || pathname.startsWith(`${base}${path}/`);
   const sidebar = (
     <nav className="flex flex-col gap-1 p-3">
       {navForRoles(data.roles).map((item) =>
@@ -68,7 +74,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             key={item.key}
             href={`${base}${item.path}`}
             onClick={() => setMenuOpen(false)}
-            className="rounded-lg bg-indigo-50 px-3 py-2 font-medium text-indigo-700"
+            aria-current={isActive(item.path) ? 'page' : undefined}
+            className={`rounded-lg px-3 py-2 font-medium ${
+              isActive(item.path)
+                ? 'bg-indigo-50 text-indigo-700'
+                : 'text-zinc-700 hover:bg-zinc-50'
+            }`}
           >
             {t.nav[item.key]}
           </Link>

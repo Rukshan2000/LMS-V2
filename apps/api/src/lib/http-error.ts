@@ -3,6 +3,8 @@ export class HttpError extends Error {
     readonly statusCode: number,
     readonly code: string,
     message: string,
+    /** Extra JSON sent to the client, e.g. the existing record on a duplicate. */
+    readonly details?: unknown,
   ) {
     super(message);
   }

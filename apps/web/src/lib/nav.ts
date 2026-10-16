@@ -18,7 +18,8 @@ export const NAV: NavItem[] = [
     roles: ['owner', 'admin', 'teacher', 'receptionist', 'student', 'parent'],
   },
   { key: 'scan', roles: [...STAFF, 'receptionist'] },
-  { key: 'students', roles: [...STAFF, 'receptionist', 'teacher'] },
+  // Teachers join in slice 2 (they will see only their own batches' students).
+  { key: 'students', path: '/students', roles: [...STAFF, 'receptionist'] },
   { key: 'classes', roles: [...STAFF, 'teacher'] },
   { key: 'attendance', roles: [...STAFF, 'receptionist', 'teacher', 'student', 'parent'] },
   { key: 'fees', roles: [...STAFF, 'receptionist', 'student', 'parent'] },
