@@ -5,6 +5,8 @@ export interface NavItem {
   key: keyof Dictionary['nav'];
   /** Path under /t/:tenantId. Items without a path are not built yet ("Soon"). */
   path?: string;
+  /** Roles the page works for today; other roles in `roles` still see it as "Soon". */
+  pathRoles?: Role[];
   roles: Role[];
 }
 
@@ -20,15 +22,25 @@ export const NAV: NavItem[] = [
   { key: 'scan', roles: [...STAFF, 'receptionist'] },
   // Teachers join in slice 2 (they will see only their own batches' students).
   { key: 'students', path: '/students', roles: [...STAFF, 'receptionist'] },
-  { key: 'classes', roles: [...STAFF, 'teacher'] },
+  { key: 'classes', path: '/classes', roles: [...STAFF, 'receptionist', 'teacher'] },
   { key: 'attendance', roles: [...STAFF, 'receptionist', 'teacher', 'student', 'parent'] },
   { key: 'fees', roles: [...STAFF, 'receptionist', 'student', 'parent'] },
   { key: 'slips', roles: [...STAFF, 'receptionist'] },
-  { key: 'timetable', roles: ['teacher', 'student', 'parent'] },
+  {
+    key: 'timetable',
+    path: '/timetable',
+    // Student/parent view arrives with the portal (slice 7).
+    pathRoles: [...STAFF, 'receptionist', 'teacher'],
+    roles: [...STAFF, 'receptionist', 'teacher', 'student', 'parent'],
+  },
   { key: 'liveClasses', roles: ['student', 'parent'] },
   { key: 'reports', roles: STAFF },
   { key: 'settings', roles: ['owner'] },
 ];
 
 export const navForRoles = (roles: Role[]): NavItem[] =>
-  NAV.filter((item) => item.roles.some((r) => roles.includes(r)));
+  NAV.filter((item) => item.roles.some((r) => roles.includes(r))).map((item) =>
+    item.pathRoles && !item.pathRoles.some((r) => roles.includes(r))
+      ? { ...item, path: undefined }
+      : item,
+  );

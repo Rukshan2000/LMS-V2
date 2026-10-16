@@ -17,6 +17,7 @@ export interface Student {
   status: 'active' | 'inactive';
   notes: string | null;
   guardians: Guardian[];
+  classes: { id: string; name: string; subjectName: string }[];
 }
 
 export interface StudentRow {

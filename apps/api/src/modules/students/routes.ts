@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { Knex } from 'knex';
 import { z } from 'zod';
 import { HttpError, notFound } from '../../lib/http-error.js';
 import { importStudents } from './import.js';
@@ -27,10 +28,23 @@ function decodeCursor(cursor: string): [string, string] {
 }
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
+/** Desk staff see every student; a teacher only students enrolled in a class they teach. */
+function visibleStudents(req: FastifyRequest, q: Knex.QueryBuilder, column = 's.id') {
+  if (req.tenant!.roles.some((r) => r === 'owner' || r === 'admin' || r === 'receptionist')) return;
+  q.whereExists((sub) =>
+    sub
+      .select(sub.client.raw('1'))
+      .from('enrollments as te')
+      .join('batches as tb', 'tb.id', 'te.batch_id')
+      .whereRaw(`te.student_id = ${column}`)
+      .where({ 'te.status': 'active', 'tb.teacher_membership_id': req.tenant!.membershipId }),
+  );
+}
+
 export default async function studentRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.loadTenant);
-  // Teachers get read access to their own batches' students in slice 2.
   const staff = app.requireRole('owner', 'admin', 'receptionist');
+  const viewers = app.requireRole('owner', 'admin', 'receptionist', 'teacher');
 
   app.addContentTypeParser(
     'text/csv',
@@ -38,7 +52,7 @@ export default async function studentRoutes(app: FastifyInstance) {
     (_req, body, done) => done(null, body),
   );
 
-  app.get('/', { preHandler: staff }, async (req) => {
+  app.get('/', { preHandler: viewers }, async (req) => {
     const query = listQuery.parse(req.query);
     type Row = { id: string; sort_name: string; [key: string]: unknown };
     const rows: Row[] = await req.withTenant((trx) =>
@@ -55,6 +69,7 @@ export default async function studentRoutes(app: FastifyInstance) {
                     WHERE sg.student_id = s.id ORDER BY g.full_name LIMIT 1) AS "guardianPhone"`),
         )
         .modify((q) => {
+          visibleStudents(req, q);
           if (query.status !== 'all') q.where('s.status', query.status);
           if (query.q) {
             const term = query.q;
@@ -130,10 +145,16 @@ export default async function studentRoutes(app: FastifyInstance) {
     return reply.status(result.errors.length ? 400 : 200).send({ result });
   });
 
-  app.get('/:studentId', { preHandler: staff }, async (req) => {
+  app.get('/:studentId', { preHandler: viewers }, async (req) => {
     const { studentId } = req.params as { studentId: string };
     if (!UUID.safeParse(studentId).success) throw notFound();
-    const student = await req.withTenant((trx) => getStudent(trx, studentId));
+    const student = await req.withTenant(async (trx) => {
+      const visible = await trx('students as s')
+        .where('s.id', studentId)
+        .modify((q) => visibleStudents(req, q))
+        .first('s.id');
+      return visible ? getStudent(trx, studentId) : undefined;
+    });
     if (!student) throw notFound();
     return { student };
   });

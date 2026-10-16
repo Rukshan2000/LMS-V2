@@ -151,5 +151,11 @@ export async function getStudent(trx: Knex.Transaction, id: string) {
     .where('sg.student_id', id)
     .orderBy('g.full_name')
     .select('g.id', 'g.full_name as fullName', 'g.phone', 'sg.relationship');
-  return { ...student, guardians };
+  const classes = await trx('enrollments as e')
+    .join('batches as b', 'b.id', 'e.batch_id')
+    .join('subjects as su', 'su.id', 'b.subject_id')
+    .where({ 'e.student_id': id, 'e.status': 'active' })
+    .orderBy('b.name')
+    .select('b.id', 'b.name', 'su.name as subjectName');
+  return { ...student, guardians, classes };
 }

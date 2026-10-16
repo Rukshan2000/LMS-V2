@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 66/96
+**Progress:** Step 0: 15/25 · Steps 1–6: 67/97
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 2 (Subjects, batches, enrollments, timetable/sessions).
+**Next up:** Staff invitations, then Step 5 slice 3 (QR class cards + scan attendance).
 
 ---
 
@@ -154,8 +154,14 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - API: list (search name / number / parent phone, cursor paging, active/inactive), create (duplicate warning + "add anyway"), view, edit (guardians, status), CSV import (preview → all-or-nothing commit, duplicates skipped)
   - UI: list, add, detail/edit, import (template download, per-line report) in si/ta/en
   - Tests: 17 new API tests (incl. tenant isolation, roles, import) + CSV parser; checked in browser (desktop + phone)
-  - Teachers get read access to their batch students in slice 2
-- [ ] 2. Subjects, batches, enrollments, timetable/sessions
+  - Released to production (migration 003 applied by pipeline)
+- [x] 2. Subjects, batches, enrollments, timetable/sessions
+  - Migration 004: `subjects`, `batches` (classes), `enrollments` (one active per class, history kept), `schedule_rules` (weekly, Sri Lanka time), `class_sessions`; all RLS
+  - Sessions generated idempotently from weekly rules; one class can be cancelled/restored/moved without touching the rule; ending a slot keeps past sessions
+  - Roles: owner/admin manage classes; receptionist enrolls; teacher sees only own classes, sessions and students, can cancel/move own classes
+  - UI: classes list, new class, class detail (schedule, students, next classes), week timetable, "add to class" on student page; day/month names from our dictionaries (browser Sinhala/Tamil date support is unreliable)
+  - Tests: 13 API (incl. teacher scoping, mutation-checked) + 5 web; checked in browser (create → schedule → enroll → cancel → restore → move)
+  - [ ] Staff invitations (add teachers/receptionists) — needed before real teachers can be assigned
 - [ ] 3. QR class cards (PDF) + scan attendance + click-to-WhatsApp attendance message
 - [ ] **Pilot 1: first friendly teacher starts using it**
 - [ ] 4. Fees, concessions, invoices, cash payment, receipt PDF, not-paid list, reminder links

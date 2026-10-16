@@ -56,6 +56,27 @@ export default async function tenancyRoutes(app: FastifyInstance) {
       return { tenant, roles: req.tenant!.roles };
     });
 
+    // Staff list for pickers (e.g. choosing a class teacher).
+    scoped.get(
+      '/:tenantId/members',
+      { preHandler: app.requireRole('owner', 'admin') },
+      async (req) => ({
+        members: await req.withTenant((trx) =>
+          trx('tenant_memberships as m')
+            .join('users as u', 'u.id', 'm.user_id')
+            .where('m.status', 'active')
+            .orderBy('u.full_name')
+            .select(
+              'm.id as membershipId',
+              'u.full_name as fullName',
+              trx.raw(
+                `ARRAY(SELECT r.role FROM membership_roles r WHERE r.membership_id = m.id ORDER BY r.role) AS roles`,
+              ),
+            ),
+        ),
+      }),
+    );
+
     scoped.get(
       '/:tenantId/branches',
       { preHandler: app.requireRole('owner', 'admin') },

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { FormError } from '../ui';
+import { StudentClasses } from './student-classes';
 import { StudentForm } from './student-form';
 import type { Student } from './types';
 
@@ -55,7 +56,10 @@ export function StudentDetail() {
         </>
       }
     >
-      <StudentForm key={student.id} student={student} />
+      <div className="space-y-6">
+        <StudentClasses studentId={student.id} initial={student.classes} />
+        <StudentForm key={student.id} student={student} />
+      </div>
     </Page>
   );
 }
