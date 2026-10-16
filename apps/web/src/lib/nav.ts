@@ -26,7 +26,6 @@ export const NAV: NavItem[] = [
   { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist'] },
   { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'] },
   { key: 'timetable', path: '/timetable', roles: [...STAFF, 'receptionist', 'teacher'] },
-  { key: 'liveClasses', roles: ['student', 'parent'] },
   { key: 'reports', roles: STAFF },
   { key: 'settings', path: '/settings', roles: STAFF },
 ];

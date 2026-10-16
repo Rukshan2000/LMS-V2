@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { colomboToday } from '../src/lib/time.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -137,5 +138,67 @@ describe('portal', () => {
       role: 'teacher',
     });
     expect(res.statusCode).toBe(201);
+  });
+});
+
+describe('live class links', () => {
+  const ZOOM = 'https://us02web.zoom.us/j/123456789?pwd=abc';
+  let mother: string;
+  let liveBatch: string;
+
+  const session = (minutesFromNow: number) =>
+    call('POST', `/batches/${liveBatch}/sessions`, {
+      startsAt: new Date(Date.now() + minutesFromNow * 60_000).toISOString(),
+      endsAt: new Date(Date.now() + (minutesFromNow + 120) * 60_000).toISOString(),
+    });
+  const sessions = async () =>
+    (await call('GET', '/portal', undefined, mother)).json().children[0].sessions as {
+      liveUrl: string | null;
+      feeDue: boolean;
+      online: boolean;
+    }[];
+
+  beforeEach(async () => {
+    liveBatch = (
+      await call('POST', '/batches', {
+        name: 'Online Revision',
+        subjectName: 'Maths',
+        mode: 'online',
+        liveUrl: ZOOM,
+      })
+    ).json().batch.id;
+    await call('PUT', `/batches/${liveBatch}/fees`, { class: '1000' });
+    await call('POST', `/batches/${liveBatch}/enrollments`, { studentIds: [kid1] });
+    mother = await signup('0722222222');
+    await accept(await invite(kid1, '0722222222'), mother);
+  });
+
+  it('shows the link around class time only after this month is paid', async () => {
+    await session(-10);
+    await call('POST', '/invoices/generate', { period: colomboToday().slice(0, 7) });
+    let [now] = await sessions();
+    expect(now).toMatchObject({ online: true, feeDue: true, liveUrl: null });
+
+    const due = (await call('GET', `/students/${kid1}/fees`)).json().outstanding;
+    await call('POST', '/payments', {
+      studentId: kid1,
+      amount: due,
+      clientRef: crypto.randomUUID(),
+    });
+    [now] = await sessions();
+    expect(now).toMatchObject({ feeDue: false, liveUrl: ZOOM });
+  });
+
+  it('never shows the link long before the class', async () => {
+    await session(24 * 60);
+    const [later] = await sessions();
+    expect(later).toMatchObject({ online: true, liveUrl: null });
+  });
+
+  it('accepts only https links, and editing a class keeps its mode', async () => {
+    const bad = await call('PATCH', `/batches/${liveBatch}`, { liveUrl: 'http://zoom.us/j/1' });
+    expect(bad.statusCode).toBe(400);
+    const res = await call('PATCH', `/batches/${liveBatch}`, { status: 'archived' });
+    expect(res.json().batch).toMatchObject({ mode: 'online', liveUrl: ZOOM, status: 'archived' });
   });
 });

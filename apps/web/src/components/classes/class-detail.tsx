@@ -122,6 +122,43 @@ export function ClassDetail() {
       </div>
       <FormError message={error} />
 
+      {manager ? (
+        <form
+          key={batch.liveUrl ?? ''}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const liveUrl = String(new FormData(e.currentTarget).get('liveUrl')).trim() || null;
+            void run(api(url, { method: 'PATCH', body: { liveUrl } }));
+          }}
+          className="space-y-2 rounded-xl border border-zinc-200 bg-white p-4 text-sm"
+        >
+          <label className="block">
+            <span className="font-medium">{c.liveUrl}</span>
+            <span className="block text-zinc-500">{c.liveUrlHint}</span>
+            <input
+              name="liveUrl"
+              type="url"
+              pattern="https://.*"
+              defaultValue={batch.liveUrl ?? ''}
+              placeholder="https://zoom.us/j/…"
+              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 font-medium"
+          >
+            {c.saveLink}
+          </button>
+        </form>
+      ) : (
+        batch.liveUrl && (
+          <a href={batch.liveUrl} target="_blank" rel="noreferrer" className="text-indigo-600">
+            {c.liveUrl}
+          </a>
+        )
+      )}
+
       {manager && <ClassFees batchId={batch.id} />}
 
       <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">

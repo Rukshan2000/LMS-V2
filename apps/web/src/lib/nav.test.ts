@@ -9,8 +9,9 @@ describe('navForRoles', () => {
   });
 
   it('student sees only their own areas', () => {
-    expect(keys(['student'])).toEqual(['overview', 'liveClasses']);
-    expect(keys(['parent'])).toEqual(['overview', 'liveClasses']);
+    // Classes, live links, attendance and fees are all on their overview (portal).
+    expect(keys(['student'])).toEqual(['overview']);
+    expect(keys(['parent'])).toEqual(['overview']);
   });
 
   it('admins manage staff in settings', () => {
@@ -31,7 +32,7 @@ describe('navForRoles', () => {
 
   it('"Soon" items have no link until the feature ships', () => {
     expect(navForRoles(['teacher']).find((i) => i.key === 'timetable')?.path).toBe('/timetable');
-    expect(navForRoles(['student']).find((i) => i.key === 'liveClasses')?.path).toBeUndefined();
+    expect(navForRoles(['owner']).find((i) => i.key === 'reports')?.path).toBeUndefined();
   });
 
   it('no roles → nothing', () => {

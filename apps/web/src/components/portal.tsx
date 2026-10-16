@@ -21,6 +21,9 @@ interface Child {
     endsAt: string;
     status: 'scheduled' | 'cancelled';
     room: string | null;
+    online: boolean;
+    feeDue: boolean;
+    liveUrl: string | null;
   }[];
   attendance: { status: 'present' | 'late' | 'absent'; batchName: string; startsAt: string }[];
   invoices: {
@@ -160,6 +163,23 @@ export function Portal() {
                     {s.room && <span className="text-zinc-500"> · {s.room}</span>}
                     {s.status === 'cancelled' && (
                       <span className="ml-2 no-underline">({p.cancelled})</span>
+                    )}
+                    {s.status === 'scheduled' && s.liveUrl ? (
+                      <a
+                        href={s.liveUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ml-2 inline-block rounded-lg bg-green-600 px-3 py-1 font-medium text-white"
+                      >
+                        {p.join}
+                      </a>
+                    ) : (
+                      s.status === 'scheduled' &&
+                      s.online && (
+                        <span className={`ml-2 ${s.feeDue ? 'text-red-700' : 'text-zinc-500'}`}>
+                          ({s.feeDue ? p.payToJoin : p.linkSoon})
+                        </span>
+                      )
                     )}
                   </li>
                 ))}

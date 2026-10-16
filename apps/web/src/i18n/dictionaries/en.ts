@@ -49,7 +49,6 @@ const en = {
     reports: 'Reports',
     settings: 'Settings',
     timetable: 'Timetable',
-    liveClasses: 'Live classes',
   },
   roles: {
     owner: 'Owner',
@@ -115,6 +114,10 @@ const en = {
     },
   },
   classes: {
+    liveUrl: 'Live class link (Zoom, Meet…)',
+    liveUrlHint:
+      'Students see it 30 minutes before each class, only after paying that month’s fee.',
+    saveLink: 'Save link',
     title: 'Classes',
     add: 'New class',
     empty: 'No classes yet. Create your first class.',
@@ -308,6 +311,9 @@ const en = {
     saved: 'Saved',
   },
   portal: {
+    join: 'Join live class',
+    payToJoin: 'pay this month’s fee to join',
+    linkSoon: 'link opens 30 min before class',
     noChildren:
       'No students are linked to your account yet. Ask the institute to send you a new link.',
     allPaid: 'All fees are paid.',

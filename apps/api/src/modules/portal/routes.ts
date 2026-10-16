@@ -8,6 +8,7 @@ import { addDays, colomboToday, TIME_ZONE } from '../../lib/time.js';
 import { ensureSessions } from '../classes/schedule.js';
 
 const INVITE_DAYS = 14;
+const LINK_EARLY_MINUTES = 30;
 const uuid = z.uuid();
 
 /** Prefix /api/v1/tenants/:tenantId */
@@ -93,6 +94,25 @@ export default async function portalRoutes(app: FastifyInstance) {
               'cs.ends_at as endsAt',
               'cs.status',
               'r.room',
+              trx.raw('(b.live_url IS NOT NULL) AS "online"'),
+              // Unpaid = an issued/part-paid invoice for the class's month. Free cards and
+              // months not billed yet are not blocked.
+              trx.raw(
+                `EXISTS (SELECT 1 FROM invoices i WHERE i.student_id = ?
+                   AND i.period = to_char(cs.starts_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM')
+                   AND i.status IN ('issued', 'part_paid')) AS "feeDue"`,
+                [s.id],
+              ),
+              // The link itself only from 30 min before start until the end, never otherwise.
+              trx.raw(
+                `CASE WHEN cs.status = 'scheduled'
+                   AND now() BETWEEN cs.starts_at - interval '${LINK_EARLY_MINUTES} minutes' AND cs.ends_at
+                   AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.student_id = ?
+                     AND i.period = to_char(cs.starts_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM')
+                     AND i.status IN ('issued', 'part_paid'))
+                 THEN b.live_url END AS "liveUrl"`,
+                [s.id],
+              ),
             );
           const attendance = await trx('attendance_records as a')
             .join('class_sessions as cs', 'cs.id', 'a.session_id')

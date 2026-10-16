@@ -8,7 +8,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 6 (Live class links per session, paid students only). Pilot 1 can start now.
+**Next up:** Step 5 slice 8 (Reports + CSV export). Pilot 1 can start now.
 
 ---
 
@@ -184,13 +184,21 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Desk: Bank slips page (waiting / verified / rejected), photo, outstanding, flags for same photo or same bank reference seen before; verify (amount can be corrected) → allocated like cash + receipt; reject with reason
   - Tests: 8 API (incl. 3 simultaneous verifies → 1, wrong file type, parent limited to own children; mutation-checked); checked in browser (upload → verify → receipt)
   - Fixed: migration `down` failed when portal/slip rows existed (broke CI db tests for slice 7)
-- [ ] 6. Live class links per session (paid students only)
+  - Released to production together with slice 7 (2026-10-17, commit 6e51f94; migrations 008 + 009 applied by pipeline)
+- [x] 6. Live class links (paid students only)
+  - Migration 010: `batches.live_url` (https only, DB check); one link per class (Zoom/Meet recurring link)
+  - Class page: managers set the link; teachers see it
+  - Portal: "Join live class" only from 30 min before start until the end, only if the student has no unpaid invoice for that class month (free cards and unbilled months are not blocked); otherwise "pay this month's fee to join" / "link opens 30 min before class". The link is never sent to the browser outside that window
+  - Fixed: editing/archiving a class reset its mode to "physical" (Zod default applied on partial update)
+  - "Live classes" menu item removed: parents/students have everything on the overview
+  - Tests: 3 API (paid vs unpaid, time window, https + mode kept; mutation-checked); checked in browser (set link → parent sees Join during class)
 - [x] 7. Student/parent portal (web push → later)
   - Migration 008: portal invites on `tenant_invites` (`student_id`, roles student/parent), `portal_access` (which students each parent/student account sees); RLS
   - Student page: "Parent / student app" → WhatsApp link per mobile (student's own or a guardian's only; only that mobile can accept; 14 days, single use)
   - Portal home: per child — outstanding fees + unpaid months, recent payments, next classes (2 weeks, cancelled shown), recent attendance; si/ta/en
   - Parents/students get only the overview (staff pages 403); not listed as staff; a parent can still be invited as staff
   - Tests: 6 API (access limited to invited children, mutation-checked) + money helper; checked in browser (invite → WhatsApp link → sign up on join page → portal, si)
+  - Released to production (with slice 5, commit 6e51f94)
   - [ ] Web push notifications (needs VAPID keys + service worker; add when parents ask for reminders beyond WhatsApp)
   - [ ] Staff can remove a parent's portal access (today: mark student inactive stops new invites only)
 - [ ] 8. Reports + CSV export

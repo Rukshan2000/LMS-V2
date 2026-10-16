@@ -23,6 +23,7 @@ export interface BatchDetail {
   name: string;
   mode: 'physical' | 'online' | 'hybrid';
   status: 'active' | 'archived';
+  liveUrl: string | null;
   subjectId: string;
   subjectName: string;
   teacherMembershipId: string | null;

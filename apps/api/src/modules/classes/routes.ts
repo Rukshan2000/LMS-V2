@@ -18,6 +18,10 @@ const batchInput = z.object({
   subjectName: z.string().trim().min(1).max(100).optional(),
   teacherMembershipId: uuid.nullish(),
   mode: z.enum(MODES).default('physical'),
+  liveUrl: z
+    .url({ protocol: /^https$/ })
+    .max(500)
+    .nullish(),
 });
 
 const param = (req: FastifyRequest, name: string) => {
@@ -57,6 +61,7 @@ async function getBatch(trx: Knex.Transaction, req: FastifyRequest, id: string) 
       'b.name',
       'b.mode',
       'b.status',
+      'b.live_url as liveUrl',
       's.id as subjectId',
       's.name as subjectName',
       'b.teacher_membership_id as teacherMembershipId',
@@ -169,6 +174,7 @@ export default async function classRoutes(app: FastifyInstance) {
             name: body.name,
             teacher_membership_id: body.teacherMembershipId ?? null,
             mode: body.mode,
+            live_url: body.liveUrl ?? null,
           })
           .returning('id');
         return getBatch(trx, req, row.id);
@@ -195,7 +201,8 @@ export default async function classRoutes(app: FastifyInstance) {
     const body = batchInput
       .omit({ subjectName: true })
       .partial()
-      .extend({ status: z.enum(['active', 'archived']).optional() })
+      // No default on update: otherwise every edit would reset the mode to 'physical'.
+      .extend({ mode: z.enum(MODES).optional(), status: z.enum(['active', 'archived']).optional() })
       .parse(req.body);
     try {
       const batch = await req.withTenant(async (trx) => {
@@ -204,6 +211,7 @@ export default async function classRoutes(app: FastifyInstance) {
           subject_id: body.subjectId,
           teacher_membership_id: body.teacherMembershipId,
           mode: body.mode,
+          live_url: body.liveUrl,
           status: body.status,
         };
         const changes = Object.fromEntries(
