@@ -2,6 +2,7 @@ import { setContext } from '@lms/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { HttpError, isUniqueViolation } from '../../lib/http-error.js';
+import { planUsage } from '../../lib/plans.js';
 
 const createTenantBody = z.object({
   name: z.string().trim().min(1).max(200),
@@ -53,7 +54,8 @@ export default async function tenancyRoutes(app: FastifyInstance) {
         .db('tenants')
         .where({ id: req.tenant!.id })
         .first('id', 'slug', 'name', 'status', 'plan');
-      return { tenant, roles: req.tenant!.roles };
+      const usage = await req.withTenant((trx) => planUsage(trx, req.tenant!.id));
+      return { tenant, roles: req.tenant!.roles, usage };
     });
 
     // Staff list for pickers (e.g. choosing a class teacher).

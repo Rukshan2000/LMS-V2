@@ -105,6 +105,7 @@ const en = {
     imported: '{count} students imported',
     invalidValue: 'check this value',
     issues: {
+      plan_limit: 'over your plan’s student limit (Settings → Plan)',
       invalid_phone: 'invalid mobile number',
       missing_name_column: 'The file needs a Name column',
       too_many_rows: 'Max 2000 rows per file',
@@ -358,6 +359,18 @@ const en = {
     exports: 'Download for Excel (CSV)',
     csv: { payments: 'Payments', unpaid: 'Unpaid fees', students: 'Students' },
   },
+  plans: {
+    title: 'Plan',
+    names: { free: 'Free', teacher: 'Teacher', institute: 'Institute' },
+    students: '{active} of {limit} active students',
+    studentsUnlimited: '{active} active students (no limit)',
+    paidUntil: '{plan} plan paid until {date}',
+    expired:
+      '{plan} plan ended on {date}. Free limits apply until it is renewed; no data is deleted.',
+    full: 'Student limit reached: new students cannot be added. Make old students inactive or upgrade.',
+    upgrade:
+      'Upgrade: Teacher LKR 2,900/month (400 students), Institute LKR 9,900/month (no limit). Pay by bank transfer and send us the slip on WhatsApp; we switch the plan on the same day.',
+  },
   calendar: {
     weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -371,6 +384,7 @@ const en = {
     unknown_phone: 'Use the student’s or a parent’s mobile number',
     invalid_file: 'Upload a photo (JPG/PNG) or PDF of the slip',
     file_too_large: 'File is too large (max 3 MB)',
+    plan_limit: 'Your plan’s student limit is reached. See Settings → Plan.',
     slug_taken: 'This link name is already taken',
     validation_error: 'Please check the fields and try again.',
     possible_duplicate: 'This student may already exist',

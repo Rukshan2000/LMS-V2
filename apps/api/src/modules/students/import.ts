@@ -1,5 +1,7 @@
 import type { Knex } from 'knex';
 import { parseCsv } from '../../lib/csv.js';
+import { HttpError } from '../../lib/http-error.js';
+import { assertStudentCapacity } from '../../lib/plans.js';
 import {
   createStudent,
   findDuplicate,
@@ -41,7 +43,7 @@ export interface ImportIssue {
   /** 1-based line number in the file (header = line 1). */
   line: number;
   field?: string;
-  code: 'invalid' | 'duplicate_in_db' | 'duplicate_in_file';
+  code: 'invalid' | 'duplicate_in_db' | 'duplicate_in_file' | 'plan_limit';
   message: string;
 }
 
@@ -147,6 +149,13 @@ export async function importStudents(
     prepared.push({ line, input });
   }
   result.ready = prepared.length;
+  try {
+    await assertStudentCapacity(trx, tenantId, prepared.length);
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    const { limit, active } = err.details as { limit: number; active: number };
+    result.errors.push({ line: 1, code: 'plan_limit', message: `${active}/${limit}` });
+  }
 
   if (!dryRun && result.errors.length === 0) {
     for (const { input } of prepared) await createStudent(trx, tenantId, input);

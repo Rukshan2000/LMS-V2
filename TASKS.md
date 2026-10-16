@@ -8,7 +8,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 9 (Plans: free cap 50, manual plan activation). Pilot 1 can start now.
+**Next up:** Beta with 3–5 teachers + v1.0 release checklist ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md)). All v1.0 slices are built. Pilot 1 can start now.
 
 ---
 
@@ -206,7 +206,14 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Reports page: month range (max 24): fees by month (billed / collected / outstanding), money received per month by method, attendance per class (classes held, present/late/absent, rate)
   - CSV for Excel: payments (range), unpaid fees (with guardian phones), students (guardians + classes); UTF-8 BOM so Sinhala/Tamil open correctly; cells starting with = + - @ are prefixed so Excel never runs them as formulas
   - Tests: 3 API + CSV writer; checked in browser (si)
-- [ ] 9. Plans: free cap 50, manual plan activation
+  - Released to production (commit 59b316e)
+- [x] 9. Plans: free cap 50, manual plan activation
+  - Migration 011: `tenants.plan` limited to free/teacher/institute, `plan_expires_at` (paid plans must have one); expired paid plan = Free limits, no data deleted
+  - Limits (`apps/api/src/lib/plans.ts`): Free 50, Teacher 400 (**guess — confirm in pilot**), Institute no limit; counts active students only
+  - Enforced on add student, CSV import (whole file refused), re-activating a student; per-tenant lock so two desks cannot both take the last place
+  - Settings → Plan: plan, usage bar, paid-until / ended, how to upgrade (bank transfer)
+  - Manual activation: [docs/runbooks/plans.md](docs/runbooks/plans.md) (one SQL on the server; extending adds to the current expiry)
+  - Tests: 5 API (51st blocked, inactive not counted, import, expiry, 3 simultaneous adds → 1; mutation-checked); checked in browser (si)
 - [ ] **Beta: 3–5 teachers**
 - [ ] **v1.0 release checklist passes ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md))**
 

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Knex } from 'knex';
 import { z } from 'zod';
 import { HttpError, notFound } from '../../lib/http-error.js';
+import { assertStudentCapacity } from '../../lib/plans.js';
 import { importStudents } from './import.js';
 import { createStudent, findDuplicate, getStudent, setGuardians, studentInput } from './service.js';
 
@@ -125,6 +126,7 @@ export default async function studentRoutes(app: FastifyInstance) {
           );
         }
       }
+      await assertStudentCapacity(trx, tenantId);
       const { id } = await createStudent(trx, tenantId, body);
       return getStudent(trx, id);
     });
@@ -177,6 +179,10 @@ export default async function studentRoutes(app: FastifyInstance) {
         status: body.status,
       };
       const changes = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      if (body.status === 'active') {
+        const current = await trx('students').where({ id: studentId }).first('status');
+        if (current?.status === 'inactive') await assertStudentCapacity(trx, tenantId);
+      }
       const updated = await trx('students')
         .where({ id: studentId })
         .update({ ...changes, updated_at: trx.fn.now() });
