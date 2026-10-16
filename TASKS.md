@@ -4,7 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 29/88
+**Progress:** Step 0: 15/25 · Steps 1–6: 32/87
+
+**Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
+
+**Next up:** Step 2 (Database foundation), then finish Step 3 (auth + tenants).
 
 ---
 
@@ -55,7 +59,6 @@ Needed for v2.0 (start in parallel, slow approvals):
 - [x] TypeScript strict, ESLint, Prettier
 - [x] `.env.example`, `.gitignore`, Zod env validation (`apps/api/src/env.ts`)
 - [x] Push docs to GitHub
-- [ ] Protect `main` branch on GitHub
 
 ## Step 2: Database foundation
 - [ ] Create `app_user` role with grants (`lms_owner` already created)
@@ -105,14 +108,14 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [ ] Protect `main` and `production`: require CI to pass before merge
 
 ### CD (GitHub Actions)
-- [ ] GitHub secret `DEPLOY_SSH_KEY` (private key from `~/.ssh/lms_deploy_ed25519`) — **you add this**
+- [x] GitHub secret `DEPLOY_SSH_KEY`
 - [x] Build + push images to GHCR tagged with git SHA
 - [x] Deploy **production** automatically on push to the `production` branch only
 - [x] Deploy step on server: `docker compose pull` → `docker compose up -d` (deploy.sh)
 - [ ] Run migrations in deploy.sh as `tuition_lms_owner` (when Step 2 adds migrations)
 - [x] Post-deploy smoke check: `https://lms.kwingsmedia.com/api/health` and `/` must return 200, else fail
 - [x] Rollback: previous SHA via `.env` + `docker compose up -d` (documented in runbook)
-- [ ] First successful pipeline deploy (push `production` after the secret is added)
+- [x] First successful pipeline deploy (2026-10-16, commit c7c845c)
 
 ### Backups and logs
 - [x] Daily `pg_dump` at 02:30 (`/etc/cron.d/tuition-lms-backup`), keep 14 days
@@ -127,10 +130,11 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [ ] Create institute page
 - [ ] Dashboard shell with role-based sidebar
 - [ ] Tenant switcher
-- [ ] Full flow works on staging (phone + desktop)
+- [ ] Full flow works on production `lms.kwingsmedia.com` (phone + desktop)
 
 ## Step 5: Feature slices
-Each slice is complete only when it has: migration + RLS → repo → service → route → tests → UI → deployed to staging.
+Each slice is complete only when it has: migration + RLS → repo → service → route → tests → UI → released via `production` branch.
+No staging server yet: test locally, then release. Add staging when pilot users depend on production.
 
 #### v1.0 (no business registration needed)
 - [ ] 1. Students & guardians + CSV import
@@ -160,8 +164,8 @@ Each slice is complete only when it has: migration + RLS → repo → service �
 
 ## Step 6: Hardening and pilot
 - [ ] Load test: scan burst + month-start billing (k6)
-- [ ] Restore drill + `docs/runbooks/restore.md`
-- [ ] Structured logs (Sentry in v1.1, uptime check in v2)
+- [ ] Restore drill with real pilot data (procedure in [docs/runbooks/deploy.md](docs/runbooks/deploy.md), empty-DB restore already tested)
+- [x] Structured JSON logs (Fastify/pino) + Docker log rotation. Sentry in v1.1, uptime check in v2
 - [ ] Sinhala/Tamil translation review by native speaker
 - [ ] Privacy notice, parent consent, data deletion process
 - [ ] Lawyer review of PDPA obligations
