@@ -3,6 +3,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Knex } from 'knex';
 import classRoutes from './modules/classes/routes.js';
 import identityRoutes from './modules/identity/routes.js';
+import { inviteRoutes, staffRoutes } from './modules/staff/routes.js';
 import studentRoutes from './modules/students/routes.js';
 import tenancyRoutes from './modules/tenancy/routes.js';
 import authPlugin from './plugins/auth.js';
@@ -42,6 +43,8 @@ export async function buildApp({
   await app.register(tenancyRoutes, { prefix: '/api/v1/tenants' });
   await app.register(studentRoutes, { prefix: '/api/v1/tenants/:tenantId/students' });
   await app.register(classRoutes, { prefix: '/api/v1/tenants/:tenantId' });
+  await app.register(staffRoutes, { prefix: '/api/v1/tenants/:tenantId' });
+  await app.register(inviteRoutes, { prefix: '/api/v1/invites' });
 
   return app;
 }

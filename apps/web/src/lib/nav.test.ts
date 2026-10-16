@@ -18,6 +18,10 @@ describe('navForRoles', () => {
     ]);
   });
 
+  it('admins manage staff in settings', () => {
+    expect(keys(['admin'])).toContain('settings');
+  });
+
   it('receptionist cannot see reports or settings', () => {
     expect(keys(['receptionist'])).not.toContain('reports');
     expect(keys(['receptionist'])).not.toContain('settings');

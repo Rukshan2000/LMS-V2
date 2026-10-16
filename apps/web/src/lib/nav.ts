@@ -35,7 +35,7 @@ export const NAV: NavItem[] = [
   },
   { key: 'liveClasses', roles: ['student', 'parent'] },
   { key: 'reports', roles: STAFF },
-  { key: 'settings', roles: ['owner'] },
+  { key: 'settings', path: '/settings', roles: STAFF },
 ];
 
 export const navForRoles = (roles: Role[]): NavItem[] =>

@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 67/97
+**Progress:** Step 0: 15/25 · Steps 1–6: 68/97
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Staff invitations, then Step 5 slice 3 (QR class cards + scan attendance).
+**Next up:** Step 5 slice 3 (QR class cards + scan attendance + click-to-WhatsApp attendance message).
 
 ---
 
@@ -161,7 +161,7 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Roles: owner/admin manage classes; receptionist enrolls; teacher sees only own classes, sessions and students, can cancel/move own classes
   - UI: classes list, new class, class detail (schedule, students, next classes), week timetable, "add to class" on student page; day/month names from our dictionaries (browser Sinhala/Tamil date support is unreliable)
   - Tests: 13 API (incl. teacher scoping, mutation-checked) + 5 web; checked in browser (create → schedule → enroll → cancel → restore → move)
-  - [ ] Staff invitations (add teachers/receptionists) — needed before real teachers can be assigned
+  - [x] Staff invitations: owner/admin invite admin/teacher/receptionist by mobile → WhatsApp link (hashed token, 14 days, single use, only the invited mobile can accept); join page signs up/logs in in place; remove staff (not owner/self); 8 API tests; checked in browser
 - [ ] 3. QR class cards (PDF) + scan attendance + click-to-WhatsApp attendance message
 - [ ] **Pilot 1: first friendly teacher starts using it**
 - [ ] 4. Fees, concessions, invoices, cash payment, receipt PDF, not-paid list, reminder links

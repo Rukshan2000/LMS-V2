@@ -7,7 +7,22 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { Button, Card, Field, FormError } from './ui';
 
-export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
+export function AuthForm({
+  mode,
+  phone,
+  fullName,
+  onDone,
+  onSwitch,
+}: {
+  mode: 'login' | 'signup';
+  /** Prefill and lock the mobile number (invite links). */
+  phone?: string;
+  fullName?: string;
+  /** Called after login/signup instead of going to the app. */
+  onDone?: () => void;
+  /** Switch login ↔ signup in place instead of navigating. */
+  onSwitch?: () => void;
+}) {
   const { lang, t } = useI18n();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +35,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     setError(null);
     try {
       await api(`/auth/${mode}`, { method: 'POST', body: Object.fromEntries(form) });
-      router.replace(`/${lang}/app`);
+      if (onDone) onDone();
+      else router.replace(`/${lang}/app`);
     } catch (err) {
       setError(errorMessage(t, err));
       setBusy(false);
@@ -34,7 +50,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         {signup ? t.auth.signupTitle : t.auth.loginTitle}
       </h1>
       <form onSubmit={onSubmit} className="space-y-4">
-        {signup && <Field label={t.auth.fullName} name="fullName" required autoComplete="name" />}
+        {signup && (
+          <Field
+            label={t.auth.fullName}
+            name="fullName"
+            required
+            autoComplete="name"
+            defaultValue={fullName}
+          />
+        )}
         <Field
           label={t.auth.phone}
           name="phone"
@@ -43,6 +67,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           placeholder="077 123 4567"
           required
           autoComplete="tel"
+          defaultValue={phone}
+          readOnly={phone !== undefined}
         />
         <Field
           label={t.auth.password}
@@ -60,12 +86,18 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       </form>
       <p className="mt-6 text-center text-sm text-zinc-600">
         {signup ? t.auth.haveAccount : t.auth.noAccount}{' '}
-        <Link
-          href={`/${lang}/${signup ? 'login' : 'signup'}`}
-          className="font-medium text-indigo-600"
-        >
-          {signup ? t.landing.login : t.landing.signup}
-        </Link>
+        {onSwitch ? (
+          <button type="button" onClick={onSwitch} className="font-medium text-indigo-600">
+            {signup ? t.landing.login : t.landing.signup}
+          </button>
+        ) : (
+          <Link
+            href={`/${lang}/${signup ? 'login' : 'signup'}`}
+            className="font-medium text-indigo-600"
+          >
+            {signup ? t.landing.login : t.landing.signup}
+          </Link>
+        )}
       </p>
     </Card>
   );
