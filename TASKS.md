@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 45/89
+**Progress:** Step 0: 15/25 · Steps 1–6: 55/91
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 3 (Fastify structure, auth, tenants), then production migrations in deploy.sh.
+**Next up:** Step 4 (frontend: i18n, login/signup, create institute, dashboard shell).
 
 ---
 
@@ -75,14 +75,17 @@ Local DB: Homebrew Postgres 16 on 5432, databases `LMS_V2` (dev) and `LMS_V2_tes
 - [x] Migrations run up and down cleanly (`npm run migrate -- check`)
 
 ## Step 3: Backend skeleton
-- [ ] Fastify app structure (`plugins/`, `modules/`)
-- [ ] Plugins: db, auth, tenant, errors
-- [x] `GET /api/health` (Fastify)
-- [ ] Signup, login, logout (Argon2id + session cookie)
-- [ ] `POST /tenants` (tenant + owner membership in one transaction)
-- [ ] Tenant plugin: membership check + `withTenant`
-- [ ] `requireRole()` helper
-- [ ] API tests: 401 no cookie, 404 other tenant, 403 wrong role
+API: `apps/api/src` — `plugins/` (db, auth, tenant, errors), `modules/` (identity, tenancy). Bundled with esbuild.
+- [x] Fastify app structure (`plugins/`, `modules/`, `lib/`)
+- [x] Plugins: db, auth (session cookie), tenant (membership check), errors (`{code, message, requestId}`)
+- [x] `GET /api/health` (checks DB)
+- [x] Signup, login, logout, me (`/api/v1/auth/*`): Argon2id, hashed session tokens, HttpOnly cookie, SL phone normalisation
+- [x] Login/signup rate limit (10/min per IP)
+- [x] `POST /api/v1/tenants` (tenant + owner membership + Main branch in one transaction)
+- [x] Tenant plugin: `/tenants/:tenantId/*` requires active membership, `req.withTenant()`
+- [x] `requireRole()` helper (`GET /tenants/:tenantId/branches` = owner/admin)
+- [x] API tests (13): 401 no cookie, 404 other/random/malformed tenant, 403 wrong role, logout revokes, rate limit, hashes only
+- [x] Mutation-checked: removing the role or membership check makes tests fail
 
 ## Step 3b: Deployment and CI/CD (Docker on server only)
 Flow: push to `production` → Actions checks → build images → GHCR → SSH (forced command) → deploy.sh → smoke check.
@@ -115,7 +118,7 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [x] Build + push images to GHCR tagged with git SHA
 - [x] Deploy **production** automatically on push to the `production` branch only
 - [x] Deploy step on server: `docker compose pull` → `docker compose up -d` (deploy.sh)
-- [ ] Run migrations in deploy.sh as `tuition_lms_owner` (when the API starts using the DB in Step 3)
+- [x] Migrations in deploy.sh as `tuition_lms_owner` (new image, before restart; owner creds only in `migrate.env`)
 - [x] Post-deploy smoke check: `https://lms.kwingsmedia.com/api/health` and `/` must return 200, else fail
 - [x] Rollback: previous SHA via `.env` + `docker compose up -d` (documented in runbook)
 - [x] First successful pipeline deploy (2026-10-16, commit c7c845c)

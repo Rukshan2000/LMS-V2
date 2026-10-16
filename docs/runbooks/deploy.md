@@ -9,7 +9,7 @@ git push origin production
   → GitHub Actions "CI/CD": format, lint, typecheck, build
   → build images ghcr.io/rukshan2000/lms-v2-{api,web}:<git-sha>
   → ssh deploy@164.68.97.187 "<sha> <actor>"   (key can ONLY run deploy.sh)
-  → deploy.sh: docker login → compose pull → (migrations) → compose up -d
+  → deploy.sh: docker login → compose pull → migrate (new image, owner role) → compose up -d
   → smoke check https://lms.kwingsmedia.com/api/health
 ```
 
@@ -22,13 +22,23 @@ git push origin production
 |---|---|
 | `/var/www/tuition-lms/docker-compose.yml` | Stack (root-owned, copy of `deploy/docker-compose.yml`) |
 | `/var/www/tuition-lms/deploy.sh` | Forced command for the deploy key (root-owned, copy of `deploy/deploy.sh`) |
-| `/var/www/tuition-lms/app.env` | Secrets: DB URLs (`root:deploy 640`, never in git) |
+| `/var/www/tuition-lms/app.env` | API runtime env: `DATABASE_URL` (restricted role) (`root:deploy 640`, never in git) |
+| `/var/www/tuition-lms/migrate.env` | `MIGRATION_DATABASE_URL` (owner role), used only by the migration step (`root:deploy 640`) |
 | `/var/www/tuition-lms/.env` | `IMAGE_TAG=<sha>` currently running (written by deploy.sh) |
 | `/var/www/tuition-lms/deploy.log` | History: `time previous-sha -> new-sha` |
 | `/etc/nginx/sites-available/lms.kwingsmedia.com` | `/api/` → 127.0.0.1:4006, rest → 127.0.0.1:3013 |
 | `/root/scripts/backup-tuition-lms.sh` + `/etc/cron.d/tuition-lms-backup` | Daily 02:30 `pg_dump`, 14 days, `/root/backups/tuition-lms/` |
 
 Database: host PostgreSQL 16, database `tuition_lms`, roles `tuition_lms_owner` (migrations) and `tuition_lms_app` (runtime). Containers reach it via `host.docker.internal`.
+
+## Migrations
+
+`deploy.sh` runs `node dist/migrate.js latest` in a one-off container of the **new** image before restarting the API. If a migration fails, the deploy stops and the old version keeps running.
+
+Rules:
+- Never edit a migration that has reached production. Add a new one.
+- Keep migrations compatible with the code that is still running (expand → migrate → contract).
+- Manual run on the server: `cd /var/www/tuition-lms && set -a && . ./migrate.env && set +a && docker compose run --rm --no-deps -e MIGRATION_DATABASE_URL api node dist/migrate.js status`
 
 ## Changing deploy.sh or docker-compose.yml
 

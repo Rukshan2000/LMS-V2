@@ -19,7 +19,11 @@ trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 PREVIOUS=$(sed -n 's/^IMAGE_TAG=//p' .env 2>/dev/null || true)
 IMAGE_TAG="$TAG" docker compose pull
 
-# Migrations run here once Step 2 adds them.
+# Migrate with the NEW image before switching traffic. Owner credentials come from
+# migrate.env and are passed only to this one-off container, never to the running API.
+# Migrations must stay compatible with the old code still running (expand → contract).
+set -a; . ./migrate.env; set +a
+IMAGE_TAG="$TAG" docker compose run --rm --no-deps -e MIGRATION_DATABASE_URL api node dist/migrate.js latest
 
 echo "IMAGE_TAG=$TAG" > .env
 echo "$(date -u +%FT%TZ) $PREVIOUS -> $TAG" >> deploy.log

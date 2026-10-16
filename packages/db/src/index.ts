@@ -1,2 +1,3 @@
 export { createKnex } from './knex.js';
-export { withTenant, withUser } from './context.js';
+export { setContext, withTenant, withUser } from './context.js';
+export { migrateLatest } from './migrations.js';
