@@ -4,7 +4,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 14/25 · Steps 1–6: 2/63
+**Progress:** Step 0: 15/25 · Steps 1–6: 29/88
 
 ---
 
@@ -31,7 +31,7 @@ Needed for v1.0 ([docs/RELEASE_V1.md](docs/RELEASE_V1.md)):
 - [x] GitHub repo ([Rukshan2000/LMS-V2](https://github.com/Rukshan2000/LMS-V2))
 - [x] Domain (subdomain on existing domain)
 - [x] Hosting
-- [ ] Confirm hosting can run Node.js + Docker + PostgreSQL 16
+- [x] Confirm hosting is a VPS with SSH + sudo (Ubuntu 24.04, 6 CPU, 11 GB RAM, shared with other apps)
 - [x] Gmail account with 2-Step Verification + App Password (email via SMTP)
 
 Needed for v1.1:
@@ -49,16 +49,16 @@ Needed for v2.0 (start in parallel, slow approvals):
 ---
 
 ## Step 1: Repository and tooling
-- [x] Install Node.js 22 LTS + npm, Docker, Git
-- [ ] Create monorepo (`apps/web`, `apps/api`, `packages/db`) + npm `workspaces` in root `package.json`
-- [ ] `docker-compose.yml` with Postgres 16 (Redis in v2)
-- [ ] TypeScript strict, ESLint, Prettier
-- [ ] `.env.example`, `.gitignore`, Zod env validation
+- [x] Install Node.js 22 LTS + npm, Git, PostgreSQL 16 (Homebrew). No Docker locally
+- [x] Create monorepo (`apps/web` Next.js 16, `apps/api`, `packages/db`) + npm `workspaces` in root `package.json`
+- [x] Local database `tuition_lms` + role `lms_owner` (Homebrew Postgres 16)
+- [x] TypeScript strict, ESLint, Prettier
+- [x] `.env.example`, `.gitignore`, Zod env validation (`apps/api/src/env.ts`)
 - [x] Push docs to GitHub
 - [ ] Protect `main` branch on GitHub
 
 ## Step 2: Database foundation
-- [ ] Create `owner` and `app_user` roles with grants
+- [ ] Create `app_user` role with grants (`lms_owner` already created)
 - [ ] Knex setup in `packages/db`
 - [ ] Migration `001_extensions_and_users` (pgcrypto, users, auth_sessions)
 - [ ] Migration `002_tenants_memberships_roles` with RLS forced
@@ -71,18 +71,57 @@ Needed for v2.0 (start in parallel, slow approvals):
 ## Step 3: Backend skeleton
 - [ ] Fastify app structure (`plugins/`, `modules/`)
 - [ ] Plugins: db, auth, tenant, errors
-- [ ] `GET /health`
+- [x] `GET /api/health` (Fastify)
 - [ ] Signup, login, logout (Argon2id + session cookie)
 - [ ] `POST /tenants` (tenant + owner membership in one transaction)
 - [ ] Tenant plugin: membership check + `withTenant`
 - [ ] `requireRole()` helper
 - [ ] API tests: 401 no cookie, 404 other tenant, 403 wrong role
-- [ ] GitHub Actions CI: typecheck, lint, test, build
-- [ ] Deploy staging + run migrations in CI
-- [ ] Daily DB backup on staging
+
+## Step 3b: Deployment and CI/CD (Docker on server only)
+Flow: push to `production` → Actions checks → build images → GHCR → SSH (forced command) → deploy.sh → smoke check.
+Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms.kwingsmedia.com (shared server `164.68.97.187`).
+
+### Server setup (once)
+- [x] Docker Engine + Compose plugin on server (already installed: Docker 29.4, Compose 5.1)
+- [x] Create `deploy` user (password locked, SSH key only, `docker` group, key forced to `deploy.sh`)
+- [x] Firewall: ufw active, Postgres blocked on public interface; app ports bound to 127.0.0.1 only
+- [x] DNS: `lms.kwingsmedia.com` → server (wildcard `*.kwingsmedia.com`)
+- [x] Reverse proxy with HTTPS: existing host nginx + certbot webroot; `/api/` → api :4006, rest → web :3013
+- [x] PostgreSQL 16 (existing host server): `tuition_lms` DB, `tuition_lms_owner` + `tuition_lms_app` roles, random passwords
+- [x] Server `app.env` for production (never in git, `root:deploy 640`)
+
+### Docker images
+- [x] `apps/api/Dockerfile` (multi-stage, Node 22 alpine, non-root `node` user)
+- [x] `apps/web/Dockerfile` (Next.js `output: 'standalone'`, non-root `node` user)
+- [x] `.dockerignore`
+- [x] `deploy/docker-compose.yml` for server: api + web (host nginx + host Postgres, so no proxy/db containers)
+- [x] Healthchecks: api `GET /api/health`, web `/` (both images test-built and run on server)
+
+### CI (GitHub Actions: `.github/workflows/ci-cd.yml`)
+- [x] Checks on pull request + push to `main`/`production`: `npm ci`, format, lint, typecheck, build
+- [ ] Run tests against a Postgres 16 service container in CI (when Step 2 adds tests)
+- [ ] Migration check: run migrations up on empty DB in CI (when Step 2 adds migrations)
+- [ ] Protect `main` and `production`: require CI to pass before merge
+
+### CD (GitHub Actions)
+- [ ] GitHub secret `DEPLOY_SSH_KEY` (private key from `~/.ssh/lms_deploy_ed25519`) — **you add this**
+- [x] Build + push images to GHCR tagged with git SHA
+- [x] Deploy **production** automatically on push to the `production` branch only
+- [x] Deploy step on server: `docker compose pull` → `docker compose up -d` (deploy.sh)
+- [ ] Run migrations in deploy.sh as `tuition_lms_owner` (when Step 2 adds migrations)
+- [x] Post-deploy smoke check: `https://lms.kwingsmedia.com/api/health` and `/` must return 200, else fail
+- [x] Rollback: previous SHA via `.env` + `docker compose up -d` (documented in runbook)
+- [ ] First successful pipeline deploy (push `production` after the secret is added)
+
+### Backups and logs
+- [x] Daily `pg_dump` at 02:30 (`/etc/cron.d/tuition-lms-backup`), keep 14 days
+- [ ] Copy backups off-server
+- [x] Restore tested into a temporary database
+- [x] Docker log rotation (10 MB × 5 files per container)
 
 ## Step 4: Frontend skeleton
-- [ ] Next.js app (TS + Tailwind + App Router)
+- [x] Next.js app (TS + Tailwind + App Router) — Next.js 16 in `apps/web`
 - [ ] i18n with `si`, `ta`, `en`
 - [ ] Login / signup pages
 - [ ] Create institute page

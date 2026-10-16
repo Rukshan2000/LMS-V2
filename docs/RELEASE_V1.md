@@ -107,7 +107,7 @@ Estimates are for **one developer**. Each slice ships to staging when done.
 
 | Week | Work | Release point |
 |---|---|---|
-| 1 | Repo, Docker, CI, DB roles, migrations 001–002, isolation tests | |
+| 1 | Repo, local Postgres, CI, DB roles, migrations 001–002, isolation tests | |
 | 2 | API skeleton, auth (phone + password), tenant plugin, staging deploy | |
 | 3 | Next.js shell, si/en i18n, signup → create class → dashboard | **Internal alpha** |
 | 4–5 | Students, guardians, CSV import, batches, enrollments, timetable/sessions | |

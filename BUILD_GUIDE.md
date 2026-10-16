@@ -61,7 +61,8 @@ Write ADRs for: monolith, shared DB + RLS, session cookies, Knex, PayHere.
 ## Step 1: Repository and tooling (Week 1–2)
 
 ### 1.1 Install
-- Node.js 22 LTS (includes npm), Docker Desktop, Git, VS Code.
+- Node.js 22 LTS (includes npm), PostgreSQL 16 (Homebrew), Git, VS Code.
+- **No Docker locally.** Docker is used only on the server to run the app.
 
 ### 1.2 Create the monorepo
 ```bash
@@ -83,25 +84,14 @@ Run `npm install` once at the root. It installs every workspace and links `packa
 
 Start with only **3 packages**: `apps/api`, `apps/web`, `packages/db`. Add `apps/worker`, `packages/contracts` etc. only when you need them.
 
-### 1.3 Local services
-`docker-compose.yml`:
-```yaml
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: owner
-      POSTGRES_PASSWORD: owner
-      POSTGRES_DB: lms
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-  # Redis is added in v2 with the background worker
-volumes:
-  pgdata:
-```
+### 1.3 Local database (Homebrew PostgreSQL 16)
 ```bash
-docker compose up -d
+brew install postgresql@16
+brew services start postgresql@16
+psql -d postgres -c "CREATE ROLE lms_owner LOGIN PASSWORD 'lms_owner';"
+psql -d postgres -c "CREATE DATABASE tuition_lms OWNER lms_owner;"
 ```
+Use the database name `tuition_lms`, **not** `lms`. A different project already uses `lms` on this machine.
 
 ### 1.4 Code quality from day one
 - TypeScript `strict: true` everywhere.
@@ -114,7 +104,7 @@ docker compose up -d
 - One branch per feature: `feat/attendance-scan`.
 - Small commits. Open a PR to yourself and read the diff before merging.
 
-**Done when:** `docker compose up` works, `npm run build --workspaces --if-present` passes, repo pushed to GitHub.
+**Done when:** local Postgres accepts `lms_owner` on `tuition_lms`, `npm run typecheck`, `npm run lint` and `npm run build` pass, repo pushed to GitHub.
 
 ---
 
@@ -127,15 +117,15 @@ Migrations run as owner; the app runs as a restricted role so RLS applies.
 ```sql
 -- run once, as superuser
 CREATE ROLE app_user LOGIN PASSWORD 'app_user';
-GRANT CONNECT ON DATABASE lms TO app_user;
+GRANT CONNECT ON DATABASE tuition_lms TO app_user;
 GRANT USAGE ON SCHEMA public TO app_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE owner IN SCHEMA public
+ALTER DEFAULT PRIVILEGES FOR ROLE lms_owner IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
 ```
 `.env`:
 ```bash
-MIGRATION_DATABASE_URL=postgres://owner:owner@localhost:5432/lms
-DATABASE_URL=postgres://app_user:app_user@localhost:5432/lms
+MIGRATION_DATABASE_URL=postgres://lms_owner:lms_owner@localhost:5432/tuition_lms
+DATABASE_URL=postgres://app_user:app_user@localhost:5432/tuition_lms
 ```
 
 ### 2.2 Knex setup (`packages/db`)
@@ -190,7 +180,7 @@ test('no tenant context returns nothing', async () => {
   expect(rows).toHaveLength(0);
 });
 ```
-Use Vitest. Run against the real Postgres in Docker, not mocks.
+Use Vitest. Run against the real local Postgres (`tuition_lms`), not mocks.
 
 **Done when:** migrations run up and down cleanly, the isolation tests pass as `app_user`.
 

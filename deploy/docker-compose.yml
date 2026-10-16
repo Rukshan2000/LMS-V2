@@ -1,0 +1,26 @@
+# Production stack on the server, in /var/www/tuition-lms.
+# IMAGE_TAG comes from ./.env (written by deploy.sh). App secrets live in ./app.env.
+name: tuition-lms
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: '10m', max-file: '5' }
+
+services:
+  api:
+    <<: *common
+    image: ghcr.io/rukshan2000/lms-v2-api:${IMAGE_TAG:?IMAGE_TAG not set}
+    container_name: tuition-lms-api
+    env_file: app.env
+    ports: ['127.0.0.1:4006:4000']
+    # Host PostgreSQL is reachable from Docker bridges only (see pg_hba / ufw).
+    extra_hosts: ['host.docker.internal:host-gateway']
+
+  web:
+    <<: *common
+    image: ghcr.io/rukshan2000/lms-v2-web:${IMAGE_TAG:?IMAGE_TAG not set}
+    container_name: tuition-lms-web
+    ports: ['127.0.0.1:3013:3000']
+    depends_on: [api]

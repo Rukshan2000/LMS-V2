@@ -1,0 +1,85 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main, production]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/production' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+
+  deploy:
+    # Only the production branch deploys. main and PRs stop after checks.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+    needs: check
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io/rukshan2000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/lms-v2-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/lms-v2-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Deploy on server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          echo "164.68.97.187 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFg2V8qaAnDYIUUTFfQos9ufJXfhuydCJnQ17NHAcmki" > ~/.ssh/known_hosts
+          # Server forces deploy.sh for this key; the "command" is only "<sha> <actor>".
+          echo "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key deploy@164.68.97.187 "${{ github.sha }} ${{ github.actor }}"
+
+      - name: Smoke check
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS https://lms.kwingsmedia.com/api/health && curl -fsS -o /dev/null https://lms.kwingsmedia.com/ && exit 0
+            sleep 5
+          done
+          echo "Health check failed after deploy" >&2
+          exit 1
