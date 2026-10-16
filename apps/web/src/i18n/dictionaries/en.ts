@@ -8,6 +8,7 @@ const en = {
     signup: 'Create free account',
   },
   auth: {
+    acceptPrivacy: 'I have read and agree to the',
     phone: 'Mobile number',
     password: 'Password',
     passwordHint: 'At least 8 characters',
@@ -334,6 +335,7 @@ const en = {
       'Hello {name}, see {student}’s classes, attendance and fees at {institute} here: {link}',
   },
   slips: {
+    done: 'Done',
     upload: 'Paid at the bank? Send the slip',
     photo: 'Photo of the bank slip',
     send: 'Send slip',
@@ -346,6 +348,7 @@ const en = {
     status: { pending: 'Waiting for check', verified: 'Verified', rejected: 'Rejected' },
   },
   reports: {
+    daily: 'Daily collection',
     from: 'From',
     to: 'To',
     feesByMonth: 'Fees by month',
@@ -371,6 +374,37 @@ const en = {
     upgrade:
       'Upgrade: Teacher LKR 2,900/month (400 students), Institute LKR 9,900/month (no limit). Pay by bank transfer and send us the slip on WhatsApp; we switch the plan on the same day.',
   },
+  privacy: {
+    title: 'Privacy notice',
+    intro:
+      'Tuition LMS is software that your class or institute uses to run classes. The institute decides what is recorded; we store and protect it for them.',
+    sections: [
+      {
+        heading: 'What we keep',
+        body: 'Names, mobile numbers, school and grade, classes, attendance, fees and payments, bank slip photos, and your login. Passwords are stored only in a protected (hashed) form.',
+      },
+      {
+        heading: 'Why',
+        body: 'To run classes: attendance, fees, receipts, live class links and messages to parents. We do not sell your data or show advertising.',
+      },
+      {
+        heading: 'Who can see it',
+        body: 'Staff of the institute, according to their role; the parent or student linked to that student; and our team only when needed to keep the service working. Each institute’s data is kept separate from every other institute.',
+      },
+      {
+        heading: 'Children',
+        body: 'For students under 18, a parent or guardian gives consent by joining with their own mobile number or by giving the details to the institute.',
+      },
+      {
+        heading: 'How long',
+        body: 'While the institute uses Tuition LMS. Daily backups are kept for 14 days.',
+      },
+      {
+        heading: 'Your rights',
+        body: 'You can ask to see, correct or delete your data, or withdraw consent. Ask your institute first; they will contact us if needed.',
+      },
+    ],
+  },
   calendar: {
     weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -385,6 +419,7 @@ const en = {
     invalid_file: 'Upload a photo (JPG/PNG) or PDF of the slip',
     file_too_large: 'File is too large (max 3 MB)',
     plan_limit: 'Your plan’s student limit is reached. See Settings → Plan.',
+    privacy_not_accepted: 'Please agree to the privacy notice',
     slug_taken: 'This link name is already taken',
     validation_error: 'Please check the fields and try again.',
     possible_duplicate: 'This student may already exist',

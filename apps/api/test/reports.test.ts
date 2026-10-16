@@ -19,7 +19,7 @@ async function signup(phone: string) {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', fullName: `User ${phone}` },
+    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
   });
   return {
     cookie: `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`,
@@ -104,6 +104,7 @@ describe('reports', () => {
     expect(r.received).toEqual([
       { month: thisMonth, method: 'cash', payments: 2, amount: '3500.00' },
     ]);
+    expect(r.daily).toEqual([{ day: colomboToday(), payments: 2, amount: '3500.00' }]);
     expect(r.attendance).toEqual([
       expect.objectContaining({ name: 'Theory', sessions: 1, present: 1, absent: 1, enrolled: 2 }),
     ]);

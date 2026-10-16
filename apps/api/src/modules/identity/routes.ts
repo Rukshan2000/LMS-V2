@@ -9,6 +9,10 @@ const signupBody = z.object({
   phone: z.string().min(9).max(20),
   password: z.string().min(8).max(200),
   fullName: z.string().trim().min(1).max(200),
+  // Checkbox "on" from the form, or true from JSON clients.
+  acceptPrivacy: z.union([z.literal(true), z.literal('on')], {
+    error: 'privacy_not_accepted',
+  }),
 });
 const loginBody = z.object({
   phone: z.string().min(9).max(20),
@@ -32,6 +36,7 @@ export default async function identityRoutes(
           phone,
           full_name: body.fullName,
           password_hash: await hashPassword(body.password),
+          privacy_accepted_at: app.db.fn.now(),
         })
         .returning(['id', 'phone', 'full_name']);
     } catch (err) {

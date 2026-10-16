@@ -61,6 +61,18 @@ export default async function reportRoutes(app: FastifyInstance) {
           trx.raw('count(*)::int AS payments'),
           trx.raw('sum(amount)::text AS amount'),
         );
+      // Daily collection (desk cash-up), all methods together.
+      const dayOf = `to_char(received_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD')`;
+      const daily = await trx('payments')
+        .where('status', 'verified')
+        .whereRaw(`${monthOf('received_at')} BETWEEN ? AND ?`, [from, to])
+        .groupByRaw(dayOf)
+        .orderByRaw(`${dayOf} DESC`)
+        .select(
+          trx.raw(`${dayOf} AS day`),
+          trx.raw('count(*)::int AS payments'),
+          trx.raw('sum(amount)::text AS amount'),
+        );
       // Attendance per class over finished, not cancelled classes in the range.
       const attendance = await trx('class_sessions as cs')
         .join('batches as b', 'b.id', 'cs.batch_id')
@@ -81,7 +93,7 @@ export default async function reportRoutes(app: FastifyInstance) {
             `(SELECT count(*) FROM enrollments e WHERE e.batch_id = b.id AND e.status = 'active')::int AS enrolled`,
           ),
         );
-      return { from, to, months, received, attendance };
+      return { from, to, months, received, daily, attendance };
     });
   });
 

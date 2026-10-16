@@ -11,6 +11,7 @@ import { FormError } from './ui';
 interface Summary {
   months: { period: string; invoices: number; billed: string; paid: string; outstanding: string }[];
   received: { month: string; method: string; payments: number; amount: string }[];
+  daily: { day: string; payments: number; amount: string }[];
   attendance: {
     batchId: string;
     name: string;
@@ -134,6 +135,19 @@ export function Reports() {
           ))}
         </Table>
       </section>
+
+      <details className="space-y-2">
+        <summary className="cursor-pointer font-medium">{r.daily}</summary>
+        <Table head={[f.date, f.payments, f.amount]}>
+          {data?.daily.map((d) => (
+            <tr key={d.day}>
+              <td className="px-3 py-2">{d.day}</td>
+              <Num>{d.payments}</Num>
+              <Num>{fmtMoney(d.amount)}</Num>
+            </tr>
+          ))}
+        </Table>
+      </details>
 
       <section className="space-y-2">
         <h2 className="font-medium">{r.attendance}</h2>

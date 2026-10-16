@@ -79,6 +79,21 @@ export function AuthForm({
           hint={signup ? t.auth.passwordHint : undefined}
           autoComplete={signup ? 'new-password' : 'current-password'}
         />
+        {signup && (
+          <label className="flex items-start gap-2 text-sm text-zinc-700">
+            <input type="checkbox" name="acceptPrivacy" required className="mt-1" />
+            <span>
+              {t.auth.acceptPrivacy}{' '}
+              <Link
+                href={`/${lang}/privacy`}
+                target="_blank"
+                className="font-medium text-indigo-600"
+              >
+                {t.privacy.title}
+              </Link>
+            </span>
+          </label>
+        )}
         <FormError message={error} />
         <Button type="submit" busy={busy}>
           {signup ? t.auth.signupButton : t.auth.loginButton}

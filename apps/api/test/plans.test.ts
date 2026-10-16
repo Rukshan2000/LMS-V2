@@ -46,7 +46,12 @@ beforeEach(async () => {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
-    payload: { phone: '0770000001', password: 'correct-horse', fullName: 'Owner' },
+    payload: {
+      phone: '0770000001',
+      password: 'correct-horse',
+      acceptPrivacy: true,
+      fullName: 'Owner',
+    },
   });
   owner = `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`;
   tenantId = (

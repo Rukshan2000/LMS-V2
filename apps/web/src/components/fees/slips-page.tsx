@@ -7,6 +7,8 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate, fmtTime } from '@/lib/datetime';
 import { fmtMoney } from '@/lib/money';
+import { waLink } from '@/lib/whatsapp';
+import { useTenantData } from '../dashboard-shell';
 import { displayPhone } from '../students/types';
 import { FormError } from '../ui';
 
@@ -96,21 +98,52 @@ function SlipCard({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{ receiptNumber: string; amount: string } | null>(null);
+  const { tenant } = useTenantData();
   const fileUrl = `/api/v1/tenants/${tenantId}/slips/${slip.id}/file`;
 
   async function act(action: 'verify' | 'reject') {
     setBusy(true);
     setError(null);
     try {
-      await api(`/tenants/${tenantId}/slips/${slip.id}/${action}`, {
-        method: 'POST',
-        body: action === 'verify' ? { amount } : { note },
-      });
-      onChange();
+      const res = await api<{ receipt?: { receiptNumber: string; amount: string } }>(
+        `/tenants/${tenantId}/slips/${slip.id}/${action}`,
+        { method: 'POST', body: action === 'verify' ? { amount } : { note } },
+      );
+      // After approval keep the card open for the WhatsApp message; the list reloads on "Done".
+      if (res.receipt && slip.submittedByPhone) setReceipt(res.receipt);
+      else onChange();
     } catch (err) {
       setError(errorMessage(t, err));
       setBusy(false);
     }
+  }
+
+  if (receipt) {
+    const text = fmt(t.fees.receiptMessage, {
+      amount: fmtMoney(receipt.amount),
+      student: slip.studentName,
+      number: receipt.receiptNumber,
+      institute: tenant.name,
+    });
+    return (
+      <li className="flex flex-wrap items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm">
+        <span className="mr-auto text-green-800">
+          {slip.studentName} · {fmt(t.fees.receiptNo, { number: receipt.receiptNumber })}
+        </span>
+        <a
+          href={waLink(slip.submittedByPhone!, text)}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg bg-green-600 px-3 py-1.5 font-medium text-white"
+        >
+          {t.fees.sendReceipt}
+        </a>
+        <button type="button" onClick={onChange} className="font-medium text-zinc-600">
+          {s.done}
+        </button>
+      </li>
+    );
   }
 
   return (

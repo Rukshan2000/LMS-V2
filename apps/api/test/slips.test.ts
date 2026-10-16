@@ -21,7 +21,7 @@ async function signup(phone: string) {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', fullName: `User ${phone}` },
+    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
   });
   return `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`;
 }
@@ -148,6 +148,25 @@ describe('bank slips', () => {
     const res = await upload({ file: html });
     expect(res.statusCode).toBe(400);
     expect(res.json().code).toBe('invalid_file');
+  });
+
+  it('another institute cannot see, open or verify our slips', async () => {
+    await upload();
+    const [slip] = await pending();
+    const other = await signup('0790000009');
+    const otherTenant = (
+      await call('POST', '/api/v1/tenants', { name: 'Other', slug: 'other-inst' }, other)
+    ).json().tenant.id;
+    const there = `/api/v1/tenants/${otherTenant}`;
+    expect((await call('GET', `${there}/slips`, undefined, other)).json().slips).toEqual([]);
+    expect((await call('GET', `${there}/slips/${slip.id}/file`, undefined, other)).statusCode).toBe(
+      404,
+    );
+    expect((await call('POST', `${there}/slips/${slip.id}/verify`, {}, other)).statusCode).toBe(
+      404,
+    );
+    // And our own URL with their cookie: not a member here.
+    expect((await call('GET', `/slips/${slip.id}/file`, undefined, other)).statusCode).toBe(404);
   });
 
   it('parents upload only for their own children and cannot review', async () => {

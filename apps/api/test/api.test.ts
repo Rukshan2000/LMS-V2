@@ -28,7 +28,7 @@ async function signup(phone: string, fullName = 'Test User') {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', fullName },
+    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName },
   });
   expect(res.statusCode).toBe(201);
   const sid = res.cookies.find((c) => c.name === 'sid');
@@ -61,7 +61,12 @@ describe('auth', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/signup',
-      payload: { phone: '+94771234567', password: 'another-pass', fullName: 'X' },
+      payload: {
+        phone: '+94771234567',
+        password: 'another-pass',
+        acceptPrivacy: true,
+        fullName: 'X',
+      },
     });
     expect(res.statusCode).toBe(409);
     expect(res.json().code).toBe('phone_taken');
@@ -83,6 +88,20 @@ describe('auth', () => {
       payload: { phone: '0771234567', password: 'correct-horse' },
     });
     expect(ok.statusCode).toBe(200);
+  });
+
+  it('signup requires agreeing to the privacy notice and records when', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/signup',
+      payload: { phone: '0771234567', password: 'correct-horse', fullName: 'Kasun' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(await ownerDb('users').first()).toBeUndefined();
+    await signup('0771234567');
+    expect(
+      (await ownerDb('users').first('privacy_accepted_at')).privacy_accepted_at,
+    ).toBeInstanceOf(Date);
   });
 
   it('stores only a hash of the password and session token', async () => {

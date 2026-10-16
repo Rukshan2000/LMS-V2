@@ -142,13 +142,13 @@ Start the **business registration in parallel** now. It takes weeks and unlocks 
 
 - [ ] Teacher can sign up and run a class day alone: enroll → print cards → scan → collect cash → receipt
 - [ ] Online student can upload slip → staff approves → live link unlocks in under 1 minute
-- [ ] Unpaid student cannot see the live link
-- [ ] Duplicate scan, duplicate slip and double approve are all safe
+- [x] Unpaid student cannot see the live link (API test `portal.test.ts`)
+- [x] Duplicate scan, duplicate slip and double approve are all safe (API tests: simultaneous scans/payments/verifies, slip hash + reference flags)
 - [ ] Every WhatsApp link opens with the correct parent number and message, in Sinhala and English
-- [ ] Tenant isolation tests pass: API, files, slip images
-- [ ] Free plan blocks the 51st student without deleting data
+- [x] Tenant isolation tests pass: API, files, slip images (RLS tests + `slips.test.ts` cross-institute)
+- [x] Free plan blocks the 51st student without deleting data (`plans.test.ts`)
 - [ ] Backup restored on staging, steps documented
-- [ ] Privacy notice + parent consent at signup
+- [x] Privacy notice + parent consent at signup (`/privacy`, required checkbox, `users.privacy_accepted_at`)
 - [ ] 3 pilot teachers used it for a full month of billing
 
 ---

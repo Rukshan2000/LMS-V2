@@ -214,6 +214,13 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Settings → Plan: plan, usage bar, paid-until / ended, how to upgrade (bank transfer)
   - Manual activation: [docs/runbooks/plans.md](docs/runbooks/plans.md) (one SQL on the server; extending adds to the current expiry)
   - Tests: 5 API (51st blocked, inactive not counted, import, expiry, 3 simultaneous adds → 1; mutation-checked); checked in browser (si)
+- [x] v1.0 scope gaps closed
+  - Privacy notice page (si/ta/en) + required consent checkbox at signup and on invite join; consent time stored (migration 012)
+  - After approving a bank slip: "Send receipt on WhatsApp" to the parent who uploaded it
+  - Reports: daily collection
+  - Test: another institute cannot list, open or verify our slips
+- [ ] Password reset (v1 scope: Gmail SMTP + App Password). Needs: users' email (column exists, not collected yet) + Gmail App Password in server `app.env`
+- [ ] Web push notifications (v1 scope; deferred, WhatsApp links cover messages today)
 - [ ] **Beta: 3–5 teachers**
 - [ ] **v1.0 release checklist passes ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md))**
 

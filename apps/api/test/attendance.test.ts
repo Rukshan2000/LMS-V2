@@ -17,7 +17,7 @@ async function signup(phone: string) {
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', fullName: `User ${phone}` },
+    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
   });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
