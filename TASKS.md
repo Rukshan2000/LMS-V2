@@ -8,7 +8,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 5 (Bank slip upload + verify + duplicate flag + access unlock); parents can now log in, so they can upload slips. Pilot 1 can start now.
+**Next up:** Step 5 slice 6 (Live class links per session, paid students only). Pilot 1 can start now.
 
 ---
 
@@ -178,7 +178,12 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - UI: fees month (summary, create invoices, not-paid list + WhatsApp reminder), class fee editor, student fees (concessions, invoices, take payment), printable receipt + WhatsApp receipt, "fees due" warning on scan
   - Tests: 12 API (incl. 5 simultaneous payments → 1, mutation-checked) + money helpers; checked in browser (fees → invoices → partial payment → receipt)
   - Found + fixed in browser test: invoice line amounts arrived as JSON numbers (floats)
-- [ ] 5. Bank slip upload + verify + duplicate flag + access unlock
+- [x] 5. Bank slip upload + verify + duplicate flag (access unlock = slice 6, uses paid invoices)
+  - Migration 009: `payment_slips` (file in Postgres, sha256, RLS); payments get `submitted_by_user_id`, `reviewed_at`, `review_note`; receipt number only on verify (no gaps from rejected slips)
+  - Portal: "Paid at the bank? Send the slip" (photo shrunk in browser to ≤1600px JPEG, or PDF ≤3 MB; file type checked by content, not name); pending/rejected slips with reason shown to parent
+  - Desk: Bank slips page (waiting / verified / rejected), photo, outstanding, flags for same photo or same bank reference seen before; verify (amount can be corrected) → allocated like cash + receipt; reject with reason
+  - Tests: 8 API (incl. 3 simultaneous verifies → 1, wrong file type, parent limited to own children; mutation-checked); checked in browser (upload → verify → receipt)
+  - Fixed: migration `down` failed when portal/slip rows existed (broke CI db tests for slice 7)
 - [ ] 6. Live class links per session (paid students only)
 - [x] 7. Student/parent portal (web push → later)
   - Migration 008: portal invites on `tenant_invites` (`student_id`, roles student/parent), `portal_access` (which students each parent/student account sees); RLS

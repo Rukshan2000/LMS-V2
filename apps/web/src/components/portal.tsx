@@ -1,11 +1,12 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate, fmtDay, fmtTime } from '@/lib/datetime';
 import { cents, fmtMoney, fromCents } from '@/lib/money';
+import { SlipUpload } from './slip-upload';
 import { FormError } from './ui';
 
 interface Child {
@@ -30,6 +31,13 @@ interface Child {
     paid: string;
   }[];
   payments: { receiptNumber: string; amount: string; receivedAt: string }[];
+  slips: {
+    id: string;
+    amount: string;
+    status: 'pending' | 'rejected';
+    reviewNote: string | null;
+    submittedAt: string;
+  }[];
   outstanding: string;
 }
 
@@ -56,11 +64,12 @@ export function Portal() {
   const [children, setChildren] = useState<Child[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api<{ children: Child[] }>(`/tenants/${tenantId}/portal`)
       .then((r) => setChildren(r.children))
       .catch((err) => setError(errorMessage(t, err)));
   }, [tenantId, t]);
+  useEffect(load, [load]);
 
   if (error) return <FormError message={error} />;
   if (!children) return <p className="text-zinc-500">{t.loading}</p>;
@@ -100,6 +109,23 @@ export function Portal() {
                   ))}
                 </ul>
               </>
+            )}
+            {c.slips.length > 0 && (
+              <ul className="mt-3 space-y-1 text-sm">
+                {c.slips.map((slip) => (
+                  <li
+                    key={slip.id}
+                    className={slip.status === 'pending' ? 'text-amber-700' : 'text-red-700'}
+                  >
+                    {colomboDate(slip.submittedAt)} · LKR {fmtMoney(slip.amount)} ·{' '}
+                    {t.slips.status[slip.status]}
+                    {slip.reviewNote && `: ${slip.reviewNote}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {cents(c.outstanding) > 0 && (
+              <SlipUpload studentId={c.id} outstanding={c.outstanding} onDone={load} />
             )}
             {c.payments.length > 0 && (
               <>

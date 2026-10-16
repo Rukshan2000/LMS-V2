@@ -24,7 +24,7 @@ export const NAV: NavItem[] = [
   // Parents and students see classes, attendance and fees on their overview (portal).
   { key: 'attendance', path: '/attendance', roles: [...STAFF, 'receptionist', 'teacher'] },
   { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist'] },
-  { key: 'slips', roles: [...STAFF, 'receptionist'] },
+  { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'] },
   { key: 'timetable', path: '/timetable', roles: [...STAFF, 'receptionist', 'teacher'] },
   { key: 'liveClasses', roles: ['student', 'parent'] },
   { key: 'reports', roles: STAFF },

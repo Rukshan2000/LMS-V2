@@ -97,6 +97,61 @@ export interface PaymentInput {
   invoiceIds?: string[];
 }
 
+/** Lock the student's open invoices (oldest due first) and check `cents` fits what is due. */
+async function lockOpenInvoices(
+  trx: Knex.Transaction,
+  studentId: string,
+  cents: number,
+  invoiceIds?: string[],
+) {
+  const open: { id: string; total: string; paid: string }[] = await trx('invoices')
+    .where({ student_id: studentId })
+    .whereIn('status', ['issued', 'part_paid'])
+    .modify((q) => {
+      if (invoiceIds?.length) q.whereIn('id', invoiceIds);
+    })
+    .orderBy([{ column: 'due_date' }, { column: 'created_at' }])
+    .forUpdate()
+    .select('id', 'total', 'paid');
+  const outstanding = open.reduce((sum, i) => sum + toCents(i.total) - toCents(i.paid), 0);
+  if (outstanding === 0) throw new HttpError(409, 'nothing_due', 'Nothing is due');
+  if (cents > outstanding) {
+    throw new HttpError(409, 'overpayment', 'Amount is more than what is due', {
+      outstanding: fromCents(outstanding),
+    });
+  }
+  return open;
+}
+
+/** Spread a payment over the locked open invoices. */
+async function allocate(
+  trx: Knex.Transaction,
+  tenantId: string,
+  paymentId: string,
+  open: { id: string; total: string; paid: string }[],
+  cents: number,
+) {
+  let remaining = cents;
+  for (const inv of open) {
+    if (remaining === 0) break;
+    const take = Math.min(remaining, toCents(inv.total) - toCents(inv.paid));
+    if (take === 0) continue;
+    await trx('payment_allocations').insert({
+      tenant_id: tenantId,
+      payment_id: paymentId,
+      invoice_id: inv.id,
+      amount: fromCents(take),
+    });
+    // Increment in SQL (not "set to what we read"): if locking ever failed, the
+    // paid <= total CHECK would reject an over-allocation instead of hiding it.
+    await trx('invoices')
+      .where({ id: inv.id })
+      .increment('paid', fromCents(take) as unknown as number);
+    remaining -= take;
+  }
+  await refreshInvoices(trx, { ids: open.map((i) => i.id) });
+}
+
 /**
  * Record a verified payment and allocate it to the student's open invoices, oldest due first.
  * The student row is locked so concurrent payments for one student run one at a time, and a
@@ -114,25 +169,8 @@ export async function recordPayment(
   const previous = await trx('payments').where({ client_ref: input.clientRef }).first('id');
   if (previous) return { id: previous.id as string, duplicate: true };
 
-  const open: { id: string; total: string; paid: string }[] = await trx('invoices')
-    .where({ student_id: input.studentId })
-    .whereIn('status', ['issued', 'part_paid'])
-    .modify((q) => {
-      if (input.invoiceIds?.length) q.whereIn('id', input.invoiceIds);
-    })
-    .orderBy([{ column: 'due_date' }, { column: 'created_at' }])
-    .forUpdate()
-    .select('id', 'total', 'paid');
-
-  const outstanding = open.reduce((sum, i) => sum + toCents(i.total) - toCents(i.paid), 0);
-  let remaining = toCents(input.amount);
-  if (outstanding === 0) throw new HttpError(409, 'nothing_due', 'Nothing is due');
-  if (remaining > outstanding) {
-    throw new HttpError(409, 'overpayment', 'Amount is more than what is due', {
-      outstanding: fromCents(outstanding),
-    });
-  }
-
+  const cents = toCents(input.amount);
+  const open = await lockOpenInvoices(trx, input.studentId, cents, input.invoiceIds);
   const number = await nextCounter(trx, tenantId, 'receipt', 0);
   const [payment] = await trx('payments')
     .insert({
@@ -146,26 +184,46 @@ export async function recordPayment(
       received_by_membership_id: membershipId,
     })
     .returning('id');
-
-  for (const inv of open) {
-    if (remaining === 0) break;
-    const take = Math.min(remaining, toCents(inv.total) - toCents(inv.paid));
-    if (take === 0) continue;
-    await trx('payment_allocations').insert({
-      tenant_id: tenantId,
-      payment_id: payment.id,
-      invoice_id: inv.id,
-      amount: fromCents(take),
-    });
-    // Increment in SQL (not "set to what we read"): if locking ever failed, the
-    // paid <= total CHECK would reject an over-allocation instead of hiding it.
-    await trx('invoices')
-      .where({ id: inv.id })
-      .increment('paid', fromCents(take) as unknown as number);
-    remaining -= take;
-  }
-  await refreshInvoices(trx, { ids: open.map((i) => i.id) });
+  await allocate(trx, tenantId, payment.id, open, cents);
   return { id: payment.id as string, duplicate: false };
+}
+
+/**
+ * Verify a pending bank slip: allocate it like a desk payment and give it a receipt number.
+ * `amount` corrects a mistyped slip amount. Returns false if it is not pending (any more).
+ */
+export async function verifySlip(
+  trx: Knex.Transaction,
+  tenantId: string,
+  membershipId: string,
+  paymentId: string,
+  amount?: string,
+) {
+  const pending = await trx('payments')
+    .where({ id: paymentId, status: 'pending' })
+    .first('student_id', 'amount');
+  if (!pending) return false;
+  // Same lock order as recordPayment (student first), then re-check under the lock.
+  await trx('students').where({ id: pending.student_id }).forUpdate().first('id');
+  const slip = await trx('payments')
+    .where({ id: paymentId, status: 'pending' })
+    .forUpdate()
+    .first('amount');
+  if (!slip) return false;
+  const finalAmount = amount ?? slip.amount;
+  const open = await lockOpenInvoices(trx, pending.student_id, toCents(finalAmount));
+  const number = await nextCounter(trx, tenantId, 'receipt', 0);
+  await trx('payments')
+    .where({ id: paymentId })
+    .update({
+      status: 'verified',
+      amount: finalAmount,
+      receipt_number: String(number),
+      received_by_membership_id: membershipId,
+      reviewed_at: trx.fn.now(),
+    });
+  await allocate(trx, tenantId, paymentId, open, toCents(finalAmount));
+  return true;
 }
 
 export async function getReceipt(trx: Knex.Transaction, paymentId: string) {

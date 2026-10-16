@@ -200,8 +200,9 @@ export default async function feeRoutes(app: FastifyInstance) {
               FROM invoice_lines l WHERE l.invoice_id = invoices.id) AS lines`,
           ),
         );
+      // Pending/rejected bank slips live on the slips page.
       const payments = await trx('payments')
-        .where({ student_id: studentId })
+        .where({ student_id: studentId, status: 'verified' })
         .orderBy('received_at', 'desc')
         .select(
           'id',

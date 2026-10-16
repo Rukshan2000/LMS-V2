@@ -40,6 +40,8 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTable('portal_access');
+  // Portal invites cannot exist without the portal.
+  await knex('tenant_invites').whereNotNull('student_id').delete();
   await knex.raw(`ALTER TABLE tenant_invites
     DROP CONSTRAINT tenant_invites_portal_student,
     DROP CONSTRAINT tenant_invites_role_check,

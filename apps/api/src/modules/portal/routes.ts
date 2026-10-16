@@ -117,6 +117,18 @@ export default async function portalRoutes(app: FastifyInstance) {
             .orderBy('received_at', 'desc')
             .limit(5)
             .select('receipt_number as receiptNumber', 'amount', 'received_at as receivedAt');
+          const slips = await trx('payments')
+            .where({ student_id: s.id, method: 'slip' })
+            .whereNot('status', 'verified')
+            .orderBy('received_at', 'desc')
+            .limit(5)
+            .select(
+              'id',
+              'amount',
+              'status',
+              'review_note as reviewNote',
+              'received_at as submittedAt',
+            );
           const due = invoices.reduce((sum, i) => sum + toCents(i.total) - toCents(i.paid), 0);
           return {
             ...s,
@@ -125,6 +137,7 @@ export default async function portalRoutes(app: FastifyInstance) {
             attendance,
             invoices,
             payments,
+            slips,
             outstanding: fromCents(due),
           };
         }),
