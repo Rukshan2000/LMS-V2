@@ -12,6 +12,21 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: LMS_V2_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      TEST_MIGRATION_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/LMS_V2_test
+      TEST_DATABASE_URL: postgres://lms_app:lms_app@127.0.0.1:5432/LMS_V2_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +37,15 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
+      - name: Prepare test database
+        run: |
+          psql -d postgres -c "CREATE ROLE lms_app LOGIN PASSWORD 'lms_app' NOSUPERUSER NOBYPASSRLS"
+          psql -d LMS_V2_test -v owner=postgres -v app=lms_app -f packages/db/scripts/init-database.sql
+      - name: Migrations up → down → up
+        run: npm run migrate -- check
+        env:
+          MIGRATION_DATABASE_URL: ${{ env.TEST_MIGRATION_DATABASE_URL }}
+      - run: npm test
       - run: npm run build
 
   deploy:

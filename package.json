@@ -16,7 +16,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint . && npm run lint -w apps/web",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "npm test --workspaces --if-present",
+    "migrate": "npm run migrate -w packages/db --"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

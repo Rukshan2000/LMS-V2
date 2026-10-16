@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 32/87
+**Progress:** Step 0: 15/25 · Steps 1–6: 45/89
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 2 (Database foundation), then finish Step 3 (auth + tenants).
+**Next up:** Step 3 (Fastify structure, auth, tenants), then production migrations in deploy.sh.
 
 ---
 
@@ -55,21 +55,24 @@ Needed for v2.0 (start in parallel, slow approvals):
 ## Step 1: Repository and tooling
 - [x] Install Node.js 22 LTS + npm, Git, PostgreSQL 16 (Homebrew). No Docker locally
 - [x] Create monorepo (`apps/web` Next.js 16, `apps/api`, `packages/db`) + npm `workspaces` in root `package.json`
-- [x] Local database `tuition_lms` + role `lms_owner` (Homebrew Postgres 16)
+- [x] Local databases `LMS_V2` + `LMS_V2_test` (Homebrew Postgres 16, port 5432)
 - [x] TypeScript strict, ESLint, Prettier
 - [x] `.env.example`, `.gitignore`, Zod env validation (`apps/api/src/env.ts`)
 - [x] Push docs to GitHub
 
 ## Step 2: Database foundation
-- [ ] Create `app_user` role with grants (`lms_owner` already created)
-- [ ] Knex setup in `packages/db`
-- [ ] Migration `001_extensions_and_users` (pgcrypto, users, auth_sessions)
-- [ ] Migration `002_tenants_memberships_roles` with RLS forced
-- [ ] `withTenant()` helper
-- [ ] Vitest against real Postgres
-- [ ] Test: tenant A cannot see tenant B
-- [ ] Test: no tenant context returns nothing
-- [ ] Migrations run up and down cleanly
+Local DB: Homebrew Postgres 16 on 5432, databases `LMS_V2` (dev) and `LMS_V2_test` (tests). See [BUILD_GUIDE.md Step 2](BUILD_GUIDE.md).
+- [x] Restricted app role `lms_app` (NOSUPERUSER, NOBYPASSRLS) + default grants (`packages/db/scripts/init-database.sql`)
+- [x] Knex setup in `packages/db` (`createKnex`, migrate CLI: `npm run migrate -- latest|rollback|status|check`)
+- [x] Migration `001_extensions_and_users` (users, auth_sessions)
+- [x] Migration `002_tenants_memberships_roles` with RLS forced (branches, tenant_memberships, membership_roles)
+- [x] `withTenant()` / `withUser()` helpers (`packages/db/src/context.ts`)
+- [x] Vitest against real Postgres (`npm test`)
+- [x] Test: tenant A cannot see tenant B (+ insert/update/delete blocked)
+- [x] Test: no tenant context returns nothing
+- [x] Test: context does not leak across pooled connections
+- [x] Test: every `tenant_id` table has forced RLS; app role cannot edit migration history
+- [x] Migrations run up and down cleanly (`npm run migrate -- check`)
 
 ## Step 3: Backend skeleton
 - [ ] Fastify app structure (`plugins/`, `modules/`)
@@ -103,8 +106,8 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 
 ### CI (GitHub Actions: `.github/workflows/ci-cd.yml`)
 - [x] Checks on pull request + push to `main`/`production`: `npm ci`, format, lint, typecheck, build
-- [ ] Run tests against a Postgres 16 service container in CI (when Step 2 adds tests)
-- [ ] Migration check: run migrations up on empty DB in CI (when Step 2 adds migrations)
+- [x] Run tests against a Postgres 16 service container in CI
+- [x] Migration check in CI: up → down → up on an empty DB
 - [ ] Protect `main` and `production`: require CI to pass before merge
 
 ### CD (GitHub Actions)
@@ -112,7 +115,7 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [x] Build + push images to GHCR tagged with git SHA
 - [x] Deploy **production** automatically on push to the `production` branch only
 - [x] Deploy step on server: `docker compose pull` → `docker compose up -d` (deploy.sh)
-- [ ] Run migrations in deploy.sh as `tuition_lms_owner` (when Step 2 adds migrations)
+- [ ] Run migrations in deploy.sh as `tuition_lms_owner` (when the API starts using the DB in Step 3)
 - [x] Post-deploy smoke check: `https://lms.kwingsmedia.com/api/health` and `/` must return 200, else fail
 - [x] Rollback: previous SHA via `.env` + `docker compose up -d` (documented in runbook)
 - [x] First successful pipeline deploy (2026-10-16, commit c7c845c)

@@ -84,14 +84,14 @@ Run `npm install` once at the root. It installs every workspace and links `packa
 
 Start with only **3 packages**: `apps/api`, `apps/web`, `packages/db`. Add `apps/worker`, `packages/contracts` etc. only when you need them.
 
-### 1.3 Local database (Homebrew PostgreSQL 16)
+### 1.3 Local database (Homebrew PostgreSQL 16, port 5432)
 ```bash
 brew install postgresql@16
 brew services start postgresql@16
-psql -d postgres -c "CREATE ROLE lms_owner LOGIN PASSWORD 'lms_owner';"
-psql -d postgres -c "CREATE DATABASE tuition_lms OWNER lms_owner;"
+psql -d postgres -c 'CREATE DATABASE "LMS_V2" OWNER postgres'
+psql -d postgres -c 'CREATE DATABASE "LMS_V2_test" OWNER postgres'
 ```
-Use the database name `tuition_lms`, **not** `lms`. A different project already uses `lms` on this machine.
+`LMS_V2` is for development, `LMS_V2_test` is wiped on every test run. Do **not** use the `lms` database: another project uses it.
 
 ### 1.4 Code quality from day one
 - TypeScript `strict: true` everywhere.
@@ -104,7 +104,7 @@ Use the database name `tuition_lms`, **not** `lms`. A different project already 
 - One branch per feature: `feat/attendance-scan`.
 - Small commits. Open a PR to yourself and read the diff before merging.
 
-**Done when:** local Postgres accepts `lms_owner` on `tuition_lms`, `npm run typecheck`, `npm run lint` and `npm run build` pass, repo pushed to GitHub.
+**Done when:** local Postgres has `LMS_V2`, `npm run typecheck`, `npm run lint` and `npm run build` pass, repo pushed to GitHub.
 
 ---
 
@@ -113,76 +113,61 @@ Use the database name `tuition_lms`, **not** `lms`. A different project already 
 This is the most important step. Mistakes here are expensive later.
 
 ### 2.1 Two database roles
-Migrations run as owner; the app runs as a restricted role so RLS applies.
-```sql
--- run once, as superuser
-CREATE ROLE app_user LOGIN PASSWORD 'app_user';
-GRANT CONNECT ON DATABASE tuition_lms TO app_user;
-GRANT USAGE ON SCHEMA public TO app_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE lms_owner IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
-```
-`.env`:
+Migrations run as the owner (`postgres` locally, `tuition_lms_owner` on the server). The app runs as a restricted role (`lms_app` locally, `tuition_lms_app` on the server) so RLS applies. **Superusers skip RLS**, so the app must never connect as `postgres`.
 ```bash
-MIGRATION_DATABASE_URL=postgres://lms_owner:lms_owner@localhost:5432/tuition_lms
-DATABASE_URL=postgres://app_user:app_user@localhost:5432/tuition_lms
+psql -d postgres -c "CREATE ROLE lms_app LOGIN PASSWORD 'lms_app' NOSUPERUSER NOBYPASSRLS"
+for db in LMS_V2 LMS_V2_test; do
+  psql -d "$db" -v owner=postgres -v app=lms_app -f packages/db/scripts/init-database.sql
+done
+```
+`.env` (see `.env.example`):
+```bash
+DATABASE_URL=postgres://lms_app:lms_app@127.0.0.1:5432/LMS_V2
+MIGRATION_DATABASE_URL=postgres://postgres:<password>@127.0.0.1:5432/LMS_V2
+TEST_DATABASE_URL=postgres://lms_app:lms_app@127.0.0.1:5432/LMS_V2_test
+TEST_MIGRATION_DATABASE_URL=postgres://postgres:<password>@127.0.0.1:5432/LMS_V2_test
 ```
 
-### 2.2 Knex setup (`packages/db`)
-```bash
-npm install knex pg -w packages/db
-npm install -D typescript @types/node tsx -w packages/db
+### 2.2 `packages/db` layout
+```text
+packages/db/
+  src/knex.ts          createKnex(url)
+  src/context.ts       withTenant() / withUser(): set app.tenant_id / app.user_id per transaction
+  src/rls.ts           enableTenantRls(knex, table): call for every tenant-owned table
+  src/migrations.ts    migrateLatest(): apply + lock migration history to the owner
+  src/migrate.ts       CLI: npm run migrate -- latest | rollback | status | check
+  migrations/          001_extensions_and_users.ts, 002_tenants_memberships_roles.ts
+  test/                Vitest against the real LMS_V2_test database
+  scripts/init-database.sql
 ```
-`packages/db/knexfile.ts`:
+No knexfile and no Knex CLI: `src/migrate.ts` runs migrations so TypeScript works without extra loaders. Inside `migrations/`, import other files with the `.ts` extension (Node loads them directly).
+
+### 2.3 Migrations
+- `001`: `users` (login by phone), `auth_sessions` (hashed tokens). Global tables, no RLS. `gen_random_uuid()` is built into PG 13+, so no extension is needed.
+- `002`: `app_current_tenant()` / `app_current_user()` SQL functions, `tenants` (global registry), and `branches`, `tenant_memberships`, `membership_roles` with RLS enabled and forced.
+- `tenant_memberships` has a second read policy: a user can see their own memberships in every tenant (needed before a tenant is chosen).
+- New tenant-owned table? Add `tenant_id`, then call `enableTenantRls(knex, '<table>')` in the same migration. A test fails if you forget.
+
+### 2.4 Tenant helpers
 ```ts
-import type { Knex } from 'knex';
-const config: Knex.Config = {
-  client: 'pg',
-  connection: process.env.MIGRATION_DATABASE_URL,
-  migrations: { directory: './migrations', extension: 'ts' },
-  seeds: { directory: './seeds' },
-};
-export default config;
+await withTenant(db, { tenantId, userId }, (trx) => trx('branches'));
+await withUser(db, userId, (trx) => trx('tenant_memberships')); // my institutes
 ```
+`tenantId` must come from a verified membership. Use only `trx` inside the callback.
 
-### 2.3 First migrations
-```bash
-npm exec -w packages/db -- knex migrate:make 001_extensions_and_users
-npm exec -w packages/db -- knex migrate:make 002_tenants_memberships_roles
-```
-- `001`: `pgcrypto`, `users`, `auth_sessions`.
-- `002`: `tenants`, `branches`, `tenant_memberships`, `membership_roles`, with **RLS enabled and forced on every tenant-owned table in the same migration**.
+### 2.5 Tests (`npm test`)
+`packages/db/test/tenant-isolation.test.ts` proves:
+- tenant A cannot see tenant B rows
+- no context returns nothing (fails closed)
+- context does not leak to the next query on the same pooled connection
+- cannot insert, update or delete another tenant's rows
+- a user sees only their own memberships across tenants
+- the app role cannot change migration history
+- every table with `tenant_id` has forced RLS
 
-Every tenant-owned table gets this pattern:
-```sql
-ALTER TABLE x ENABLE ROW LEVEL SECURITY;
-ALTER TABLE x FORCE ROW LEVEL SECURITY;
-CREATE POLICY x_tenant ON x
-  USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
-  WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid);
-```
+Checked: the same tests fail when the app connects as a superuser, so they really guard RLS.
 
-### 2.4 The tenant helper
-`packages/db/src/withTenant.ts`. Copy it from the plan, section 4. **Every** tenant query goes through it.
-
-### 2.5 The first and most important test
-```ts
-// packages/db/test/tenant-isolation.test.ts
-test('tenant A cannot see tenant B students', async () => {
-  const a = await createTenant('a'); const b = await createTenant('b');
-  await withTenant(appDb, b.id, (trx) => trx('students').insert({ tenant_id: b.id, ... }));
-  const rows = await withTenant(appDb, a.id, (trx) => trx('students').select());
-  expect(rows).toHaveLength(0);
-});
-
-test('no tenant context returns nothing', async () => {
-  const rows = await appDb('students').select();
-  expect(rows).toHaveLength(0);
-});
-```
-Use Vitest. Run against the real local Postgres (`tuition_lms`), not mocks.
-
-**Done when:** migrations run up and down cleanly, the isolation tests pass as `app_user`.
+**Done when:** `npm run migrate -- check` (up → down → up) and `npm test` pass locally and in CI.
 
 ---
 
@@ -193,7 +178,7 @@ Use Vitest. Run against the real local Postgres (`tuition_lms`), not mocks.
 apps/api/src/
   server.ts            # build app, register plugins, start
   plugins/
-    db.ts              # knex instance (app_user)
+    db.ts              # knex instance (restricted app role)
     auth.ts            # read session cookie → request.user
     tenant.ts          # :tenantId → check membership → request.tenantId
     errors.ts          # one error shape {code, message, requestId}
