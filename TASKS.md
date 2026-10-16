@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 68/97
+**Progress:** Step 0: 15/25 · Steps 1–6: 69/97
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 3 (QR class cards + scan attendance + click-to-WhatsApp attendance message).
+**Next up:** Step 5 slice 4 (Fees, concessions, invoices, cash payment, receipt, not-paid list, reminder links). Pilot 1 can start now.
 
 ---
 
@@ -162,7 +162,13 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - UI: classes list, new class, class detail (schedule, students, next classes), week timetable, "add to class" on student page; day/month names from our dictionaries (browser Sinhala/Tamil date support is unreliable)
   - Tests: 13 API (incl. teacher scoping, mutation-checked) + 5 web; checked in browser (create → schedule → enroll → cancel → restore → move)
   - [x] Staff invitations: owner/admin invite admin/teacher/receptionist by mobile → WhatsApp link (hashed token, 14 days, single use, only the invited mobile can accept); join page signs up/logs in in place; remove staff (not owner/self); 8 API tests; checked in browser
-- [ ] 3. QR class cards (PDF) + scan attendance + click-to-WhatsApp attendance message
+- [x] 3. QR class cards (PDF) + scan attendance + click-to-WhatsApp attendance message
+  - Migration 006: `student_cards` (random token, one active per student, replace = revoke), `attendance_records` (one per student per class), `attendance_changes` (audit); all RLS
+  - Scan by QR token or typed student number: finds the class running now (opens 60 min before start), late after 15 min, repeat scan = "already marked"; USB scanners and Android/desktop Chrome camera (BarcodeDetector); **iPhone Safari camera not supported yet**
+  - After scan: WhatsApp-to-parent button with ready message (present/late); recent scans list
+  - Attendance: day list → class register (present/late/absent, manual marks, changes audited); teachers only own classes; only desk staff scan
+  - Cards: printable A4 sheet (bank-card size, QR + name + number), print one card, replace lost card
+  - Tests: 10 API (incl. 20 simultaneous scans → 1 record); checked in browser (cards, scan, duplicate, register)
 - [ ] **Pilot 1: first friendly teacher starts using it**
 - [ ] 4. Fees, concessions, invoices, cash payment, receipt PDF, not-paid list, reminder links
 - [ ] 5. Bank slip upload + verify + duplicate flag + access unlock

@@ -99,7 +99,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   return (
     <TenantDataContext value={data}>
       <div className="flex min-h-full flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+        <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 print:hidden">
           <button
             type="button"
             onClick={() => setMenuOpen((o) => !o)}
@@ -133,7 +133,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className="flex flex-1">
-          <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-white md:block">
+          <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-white md:block print:hidden">
             {sidebar}
           </aside>
           {menuOpen && (
@@ -144,7 +144,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               </div>
             </div>
           )}
-          <main className="min-w-0 flex-1 p-4 sm:p-8">{children}</main>
+          <main className="min-w-0 flex-1 p-4 sm:p-8 print:p-0">{children}</main>
         </div>
       </div>
     </TenantDataContext>
