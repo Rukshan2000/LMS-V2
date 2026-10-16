@@ -6,9 +6,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { FormError } from '../ui';
+import { useTenantData } from '../dashboard-shell';
 import { StudentFees } from '../fees/student-fees';
 import { StudentCard } from './student-card';
 import { StudentClasses } from './student-classes';
+import { PortalInvite } from './portal-invite';
 import { StudentForm } from './student-form';
 import type { Student } from './types';
 
@@ -38,6 +40,8 @@ export function NewStudent() {
 export function StudentDetail() {
   const { t } = useI18n();
   const { tenantId, studentId } = useParams<{ tenantId: string; studentId: string }>();
+  const { roles } = useTenantData();
+  const desk = roles.some((r) => r === 'owner' || r === 'admin' || r === 'receptionist');
   const [student, setStudent] = useState<Student | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +66,7 @@ export function StudentDetail() {
         <StudentClasses studentId={student.id} initial={student.classes} />
         <StudentFees studentId={student.id} classes={student.classes} />
         <StudentCard studentId={student.id} />
+        {desk && student.status === 'active' && <PortalInvite student={student} />}
         <StudentForm key={student.id} student={student} />
       </div>
     </Page>

@@ -65,6 +65,13 @@ export default async function tenancyRoutes(app: FastifyInstance) {
           trx('tenant_memberships as m')
             .join('users as u', 'u.id', 'm.user_id')
             .where('m.status', 'active')
+            // Staff only: parents and students are members too (portal).
+            .whereExists((q) =>
+              q
+                .from('membership_roles as r')
+                .whereRaw('r.membership_id = m.id')
+                .whereIn('r.role', ['owner', 'admin', 'teacher', 'receptionist']),
+            )
             .orderBy('u.full_name')
             .select(
               'm.id as membershipId',

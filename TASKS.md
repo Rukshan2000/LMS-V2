@@ -8,7 +8,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 5 slice 5 (Bank slip upload + verify + duplicate flag + access unlock). Pilot 1 can start now.
+**Next up:** Step 5 slice 5 (Bank slip upload + verify + duplicate flag + access unlock); parents can now log in, so they can upload slips. Pilot 1 can start now.
 
 ---
 
@@ -180,7 +180,14 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - Found + fixed in browser test: invoice line amounts arrived as JSON numbers (floats)
 - [ ] 5. Bank slip upload + verify + duplicate flag + access unlock
 - [ ] 6. Live class links per session (paid students only)
-- [ ] 7. Student/parent portal + web push
+- [x] 7. Student/parent portal (web push → later)
+  - Migration 008: portal invites on `tenant_invites` (`student_id`, roles student/parent), `portal_access` (which students each parent/student account sees); RLS
+  - Student page: "Parent / student app" → WhatsApp link per mobile (student's own or a guardian's only; only that mobile can accept; 14 days, single use)
+  - Portal home: per child — outstanding fees + unpaid months, recent payments, next classes (2 weeks, cancelled shown), recent attendance; si/ta/en
+  - Parents/students get only the overview (staff pages 403); not listed as staff; a parent can still be invited as staff
+  - Tests: 6 API (access limited to invited children, mutation-checked) + money helper; checked in browser (invite → WhatsApp link → sign up on join page → portal, si)
+  - [ ] Web push notifications (needs VAPID keys + service worker; add when parents ask for reminders beyond WhatsApp)
+  - [ ] Staff can remove a parent's portal access (today: mark student inactive stops new invites only)
 - [ ] 8. Reports + CSV export
 - [ ] 9. Plans: free cap 50, manual plan activation
 - [ ] **Beta: 3–5 teachers**

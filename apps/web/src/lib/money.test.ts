@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cents, fmtMoney } from './money';
+import { cents, fmtMoney, fromCents } from './money';
 
 describe('money formatting', () => {
   it('adds thousands separators and two decimals', () => {
@@ -11,5 +11,7 @@ describe('money formatting', () => {
   it('converts to integer cents', () => {
     expect(cents('2500.50')).toBe(250050);
     expect(cents('0.1') + cents('0.2')).toBe(30);
+    expect(fromCents(250005)).toBe('2500.05');
+    expect(fromCents(cents('1250.50') - cents('0.50'))).toBe('1250.00');
   });
 });

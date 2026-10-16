@@ -33,6 +33,7 @@ export async function staffRoutes(app: FastifyInstance) {
     invites: await req.withTenant((trx) =>
       trx('tenant_invites')
         .where({ status: 'pending' })
+        .whereNull('student_id')
         .where('expires_at', '>', trx.fn.now())
         .orderBy('created_at', 'desc')
         .select('id', 'full_name as fullName', 'phone', 'role', 'expires_at as expiresAt'),
@@ -53,12 +54,15 @@ export async function staffRoutes(app: FastifyInstance) {
     const invite = await req.withTenant(async (trx) => {
       const member = await trx('tenant_memberships as m')
         .join('users as u', 'u.id', 'm.user_id')
+        .join('membership_roles as r', 'r.membership_id', 'm.id')
         .where({ 'u.phone': phone, 'm.status': 'active' })
+        .whereIn('r.role', ['owner', ...STAFF_ROLES])
         .first('m.id');
       if (member) throw new HttpError(409, 'already_member', 'This person is already staff here');
       // A new invite for the same phone replaces any older pending one.
       await trx('tenant_invites')
         .where({ phone, status: 'pending' })
+        .whereNull('student_id')
         .update({ status: 'revoked', updated_at: trx.fn.now() });
       const [row] = await trx('tenant_invites')
         .insert({
@@ -83,6 +87,7 @@ export async function staffRoutes(app: FastifyInstance) {
     const n = await req.withTenant((trx) =>
       trx('tenant_invites')
         .where({ id: inviteId, status: 'pending' })
+        .whereNull('student_id')
         .update({ status: 'revoked', updated_at: trx.fn.now() }),
     );
     if (!n) throw notFound();
@@ -126,6 +131,7 @@ export async function inviteRoutes(app: FastifyInstance) {
         'i.full_name as fullName',
         'i.phone',
         'i.role',
+        'i.student_id as studentId',
         't.id as tenantId',
         't.name as tenantName',
       );
@@ -134,7 +140,7 @@ export async function inviteRoutes(app: FastifyInstance) {
     const { tenantId, tokenHash } = parseCode(req);
     const invite = await withTenant(app.db, { tenantId }, (trx) => findInvite(trx, tokenHash));
     if (!invite) throw notFound();
-    return { invite: { ...invite, id: undefined } };
+    return { invite: { ...invite, id: undefined, studentId: undefined } };
   });
 
   app.post('/:code/accept', { config: rateLimit, preHandler: app.requireAuth }, async (req) => {
@@ -155,6 +161,16 @@ export async function inviteRoutes(app: FastifyInstance) {
         .insert({ tenant_id: tenantId, membership_id: membership.id, role: invite.role })
         .onConflict(['membership_id', 'role'])
         .ignore();
+      if (invite.studentId) {
+        await trx('portal_access')
+          .insert({
+            tenant_id: tenantId,
+            membership_id: membership.id,
+            student_id: invite.studentId,
+          })
+          .onConflict(['membership_id', 'student_id'])
+          .ignore();
+      }
       await trx('tenant_invites')
         .where({ id: invite.id })
         .update({ status: 'accepted', accepted_by_user_id: user.id, updated_at: trx.fn.now() });

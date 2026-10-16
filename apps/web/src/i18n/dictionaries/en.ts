@@ -307,6 +307,25 @@ const en = {
     saveFees: 'Save fees',
     saved: 'Saved',
   },
+  portal: {
+    noChildren:
+      'No students are linked to your account yet. Ask the institute to send you a new link.',
+    allPaid: 'All fees are paid.',
+    recentPayments: 'Recent payments',
+    upcoming: 'Next classes',
+    noUpcoming: 'No classes in the next two weeks.',
+    cancelled: 'cancelled',
+    classes: 'Classes',
+    attendance: 'Recent attendance',
+    noAttendance: 'No attendance yet.',
+    invite: 'Parent / student app',
+    inviteHint: 'Send a WhatsApp link. Only that mobile number can open it.',
+    noPhones: 'Add the student’s or a parent’s mobile number first.',
+    createLink: 'Create link',
+    openWhatsApp: 'Send on WhatsApp',
+    message:
+      'Hello {name}, see {student}’s classes, attendance and fees at {institute} here: {link}',
+  },
   calendar: {
     weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -317,6 +336,7 @@ const en = {
     invalid_credentials: 'Wrong mobile number or password',
     phone_taken: 'This mobile number is already registered',
     invalid_phone: 'Enter a Sri Lankan mobile number, e.g. 0771234567',
+    unknown_phone: 'Use the student’s or a parent’s mobile number',
     slug_taken: 'This link name is already taken',
     validation_error: 'Please check the fields and try again.',
     possible_duplicate: 'This student may already exist',

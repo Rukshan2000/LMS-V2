@@ -12,3 +12,7 @@ export const cents = (amount: string) => {
   const [int = '0', dec = ''] = amount.split('.');
   return Number(int) * 100 + Number(dec.padEnd(2, '0').slice(0, 2));
 };
+
+/** 250050 → "2500.50" */
+export const fromCents = (c: number) =>
+  `${Math.floor(c / 100)}.${String(c % 100).padStart(2, '0')}`;
