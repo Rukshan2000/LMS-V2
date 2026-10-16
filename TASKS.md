@@ -4,11 +4,11 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Step 0: 15/25 · Steps 1–6: 55/91
+**Progress:** Step 0: 15/25 · Steps 1–6: 62/94
 
 **Live:** https://lms.kwingsmedia.com · **Release:** `git checkout production && git merge --ff-only main && git push`
 
-**Next up:** Step 4 (frontend: i18n, login/signup, create institute, dashboard shell).
+**Next up:** Step 5 slice 1 (Students & guardians + CSV import).
 
 ---
 
@@ -130,13 +130,17 @@ Details: [docs/runbooks/deploy.md](docs/runbooks/deploy.md). Live at https://lms
 - [x] Docker log rotation (10 MB × 5 files per container)
 
 ## Step 4: Frontend skeleton
+Web: `apps/web/src` — routes under `app/[lang]` (`si` default, `ta`, `en`), data loaded in the browser from same-origin `/api`.
 - [x] Next.js app (TS + Tailwind + App Router) — Next.js 16 in `apps/web`
-- [ ] i18n with `si`, `ta`, `en`
-- [ ] Login / signup pages
-- [ ] Create institute page
-- [ ] Dashboard shell with role-based sidebar
-- [ ] Tenant switcher
-- [ ] Full flow works on production `lms.kwingsmedia.com` (phone + desktop)
+- [x] i18n with `si`, `ta`, `en`: locale routes, `proxy.ts` redirect (cookie → browser language → Sinhala), language switcher, Noto Sans fonts
+- [ ] Sinhala/Tamil wording reviewed by native speakers (drafted by Claude)
+- [x] Login / signup pages (API error messages translated)
+- [x] Create institute page (link name auto-filled from the name)
+- [x] Dashboard shell with role-based sidebar (`lib/nav.ts`, unbuilt items shown as "Soon")
+- [x] Tenant switcher (+ "New institute"), last institute remembered
+- [x] Tests: role menu + locale choice (9)
+- [x] Full flow checked in a real browser, desktop + phone width: signup → create institute → dashboard → language switch → mobile menu → logout → wrong-login error (Tamil)
+- [ ] Full flow on production `lms.kwingsmedia.com` after release
 
 ## Step 5: Feature slices
 Each slice is complete only when it has: migration + RLS → repo → service → route → tests → UI → released via `production` branch.

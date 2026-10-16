@@ -1,0 +1,77 @@
+import type { Dictionary } from './en';
+
+// Needs review by a native speaker before public release (TASKS Step 6).
+const si: Dictionary = {
+  appName: 'Tuition LMS',
+  loading: 'පූරණය වෙමින්…',
+  landing: {
+    headline: 'කඩදාසි වැඩ නැතිව ඔබේ ටියුෂන් පන්තිය පවත්වාගෙන යන්න',
+    sub: 'පැමිණීම, ගාස්තු සහ දෙමාපියන්ට පණිවිඩ එකම තැනක. සිසුන් 50 දක්වා නොමිලේ.',
+    login: 'ඇතුල් වන්න',
+    signup: 'නොමිලේ ගිණුමක් සාදන්න',
+  },
+  auth: {
+    phone: 'ජංගම දුරකථන අංකය',
+    password: 'මුරපදය',
+    passwordHint: 'අවම වශයෙන් අක්ෂර 8ක්',
+    fullName: 'ඔබේ නම',
+    loginTitle: 'ඇතුල් වන්න',
+    signupTitle: 'ඔබේ ගිණුම සාදන්න',
+    loginButton: 'ඇතුල් වන්න',
+    signupButton: 'ගිණුම සාදන්න',
+    noAccount: 'අලුතින්ද?',
+    haveAccount: 'දැනටමත් ගිණුමක් තිබේද?',
+  },
+  onboarding: {
+    title: 'ඔබේ ආයතනය සාදන්න',
+    name: 'ආයතනයේ හෝ පන්තියේ නම',
+    slug: 'සබැඳි නම',
+    slugHint: 'ඉංග්‍රීසි අකුරු, ඉලක්කම් සහ - පමණි, උදා. nimal-maths',
+    create: 'සාදන්න',
+  },
+  dashboard: {
+    welcome: 'ආයුබෝවන්, {name}',
+    institute: 'ආයතනය',
+    yourRole: 'ඔබේ භූමිකාව',
+    comingNext: 'සිසුන්, පන්ති සහ පැමිණීම ඊළඟ යාවත්කාලීන කිරීම්වල එකතු වේ.',
+    logout: 'පිටවන්න',
+    switchInstitute: 'ආයතනය මාරු කරන්න',
+    newInstitute: '+ නව ආයතනයක්',
+    soon: 'ළඟදීම',
+    menu: 'මෙනුව',
+    language: 'භාෂාව',
+  },
+  nav: {
+    overview: 'සාරාංශය',
+    scan: 'ස්කෑන් කරන්න',
+    students: 'සිසුන්',
+    classes: 'පන්ති',
+    attendance: 'පැමිණීම',
+    fees: 'ගාස්තු',
+    slips: 'බැංකු ස්ලිප්',
+    reports: 'වාර්තා',
+    settings: 'සැකසුම්',
+    timetable: 'කාලසටහන',
+    liveClasses: 'සජීවී පන්ති',
+  },
+  roles: {
+    owner: 'හිමිකරු',
+    admin: 'පරිපාලක',
+    teacher: 'ගුරුවරයා',
+    receptionist: 'පිළිගැනීමේ නිලධාරී',
+    student: 'සිසුවා',
+    parent: 'දෙමාපියන්',
+  },
+  errors: {
+    generic: 'යමක් වැරදී ඇත. නැවත උත්සාහ කරන්න.',
+    network: 'සම්බන්ධ විය නොහැක. ඔබේ අන්තර්ජාලය පරීක්ෂා කරන්න.',
+    invalid_credentials: 'දුරකථන අංකය හෝ මුරපදය වැරදියි',
+    phone_taken: 'මෙම දුරකථන අංකය දැනටමත් ලියාපදිංචි කර ඇත',
+    invalid_phone: 'ශ්‍රී ලංකා ජංගම අංකයක් ඇතුළත් කරන්න, උදා. 0771234567',
+    slug_taken: 'මෙම සබැඳි නම දැනටමත් භාවිතයේ ඇත',
+    validation_error: 'කරුණාකර තොරතුරු පරීක්ෂා කර නැවත උත්සාහ කරන්න.',
+    rate_limited: 'උත්සාහයන් වැඩියි. මිනිත්තුවක් රැඳී නැවත උත්සාහ කරන්න.',
+  },
+};
+
+export default si;

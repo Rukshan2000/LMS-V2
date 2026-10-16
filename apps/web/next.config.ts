@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // Local dev only: forward /api to the API on :4000. In production nginx routes /api.
+  async rewrites() {
+    return process.env.NODE_ENV === 'development'
+      ? [{ source: '/api/:path*', destination: 'http://127.0.0.1:4000/api/:path*' }]
+      : [];
+  },
 };
 
 export default nextConfig;

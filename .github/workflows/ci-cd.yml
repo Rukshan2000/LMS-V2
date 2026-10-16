@@ -102,7 +102,11 @@ jobs:
       - name: Smoke check
         run: |
           for i in $(seq 1 20); do
-            curl -fsS https://lms.kwingsmedia.com/api/health && curl -fsS -o /dev/null https://lms.kwingsmedia.com/ && exit 0
+            # API + DB, and the frontend (/ redirects to a locale, /si/login is a real page).
+            curl -fsS https://lms.kwingsmedia.com/api/health \
+              && curl -fsSL -o /dev/null https://lms.kwingsmedia.com/ \
+              && curl -fsS -o /dev/null https://lms.kwingsmedia.com/si/login \
+              && exit 0
             sleep 5
           done
           echo "Health check failed after deploy" >&2

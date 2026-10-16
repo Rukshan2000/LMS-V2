@@ -1,0 +1,77 @@
+import type { Dictionary } from './en';
+
+// Needs review by a native speaker before public release (TASKS Step 6).
+const ta: Dictionary = {
+  appName: 'Tuition LMS',
+  loading: 'ஏற்றுகிறது…',
+  landing: {
+    headline: 'காகித வேலை இல்லாமல் உங்கள் டியூஷன் வகுப்பை நடத்துங்கள்',
+    sub: 'வருகை, கட்டணம் மற்றும் பெற்றோருக்கான செய்திகள் ஒரே இடத்தில். 50 மாணவர்கள் வரை இலவசம்.',
+    login: 'உள்நுழைக',
+    signup: 'இலவச கணக்கை உருவாக்குக',
+  },
+  auth: {
+    phone: 'கைபேசி எண்',
+    password: 'கடவுச்சொல்',
+    passwordHint: 'குறைந்தது 8 எழுத்துகள்',
+    fullName: 'உங்கள் பெயர்',
+    loginTitle: 'உள்நுழைக',
+    signupTitle: 'உங்கள் கணக்கை உருவாக்குக',
+    loginButton: 'உள்நுழைக',
+    signupButton: 'கணக்கை உருவாக்குக',
+    noAccount: 'புதியவரா?',
+    haveAccount: 'ஏற்கனவே கணக்கு உள்ளதா?',
+  },
+  onboarding: {
+    title: 'உங்கள் நிறுவனத்தை உருவாக்குக',
+    name: 'நிறுவனம் அல்லது வகுப்பின் பெயர்',
+    slug: 'இணைப்புப் பெயர்',
+    slugHint: 'ஆங்கில எழுத்துகள், எண்கள் மற்றும் - மட்டும், எ.கா. nimal-maths',
+    create: 'உருவாக்குக',
+  },
+  dashboard: {
+    welcome: 'வணக்கம், {name}',
+    institute: 'நிறுவனம்',
+    yourRole: 'உங்கள் பங்கு',
+    comingNext: 'மாணவர்கள், வகுப்புகள் மற்றும் வருகை அடுத்த புதுப்பிப்புகளில் வரும்.',
+    logout: 'வெளியேறு',
+    switchInstitute: 'நிறுவனத்தை மாற்று',
+    newInstitute: '+ புதிய நிறுவனம்',
+    soon: 'விரைவில்',
+    menu: 'மெனு',
+    language: 'மொழி',
+  },
+  nav: {
+    overview: 'மேலோட்டம்',
+    scan: 'ஸ்கேன்',
+    students: 'மாணவர்கள்',
+    classes: 'வகுப்புகள்',
+    attendance: 'வருகை',
+    fees: 'கட்டணங்கள்',
+    slips: 'வங்கி சீட்டுகள்',
+    reports: 'அறிக்கைகள்',
+    settings: 'அமைப்புகள்',
+    timetable: 'கால அட்டவணை',
+    liveClasses: 'நேரலை வகுப்புகள்',
+  },
+  roles: {
+    owner: 'உரிமையாளர்',
+    admin: 'நிர்வாகி',
+    teacher: 'ஆசிரியர்',
+    receptionist: 'வரவேற்பாளர்',
+    student: 'மாணவர்',
+    parent: 'பெற்றோர்',
+  },
+  errors: {
+    generic: 'ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.',
+    network: 'இணைக்க முடியவில்லை. உங்கள் இணையத்தைச் சரிபார்க்கவும்.',
+    invalid_credentials: 'கைபேசி எண் அல்லது கடவுச்சொல் தவறு',
+    phone_taken: 'இந்த கைபேசி எண் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது',
+    invalid_phone: 'இலங்கை கைபேசி எண்ணை உள்ளிடவும், எ.கா. 0771234567',
+    slug_taken: 'இந்த இணைப்புப் பெயர் ஏற்கனவே பயன்பாட்டில் உள்ளது',
+    validation_error: 'விவரங்களைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.',
+    rate_limited: 'பல முயற்சிகள். ஒரு நிமிடம் காத்திருந்து மீண்டும் முயற்சிக்கவும்.',
+  },
+};
+
+export default ta;
