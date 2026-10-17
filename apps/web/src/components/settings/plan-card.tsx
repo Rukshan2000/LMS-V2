@@ -34,7 +34,7 @@ export function PlanCard() {
   const full = limit !== null && active >= limit;
   const expired = usage.plan !== usage.effectivePlan;
   return (
-    <section className={`${card} max-w-xl space-y-3 p-4 text-sm`}>
+    <section className={`${card} space-y-3 p-4 text-sm`}>
       <h2 className="flex items-center gap-2 text-base font-medium">
         <CreditCard aria-hidden className="size-5 text-primary" />
         {p.title}: {p.names[usage.effectivePlan]}

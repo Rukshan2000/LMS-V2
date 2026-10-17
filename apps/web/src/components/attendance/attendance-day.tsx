@@ -26,7 +26,7 @@ export function AttendanceDay() {
   }, [tenantId, date, t]);
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-semibold">{a.title}</h1>
         <label className="text-sm text-ink-muted">

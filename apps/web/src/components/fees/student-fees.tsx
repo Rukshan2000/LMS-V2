@@ -104,7 +104,7 @@ export function StudentFees({
   const label = (c: Concession) =>
     c.type === 'percent' ? `${f.percent.replace('%', '')} ${Number(c.percent)}%` : f[c.type];
   return (
-    <section className={`${card} max-w-xl space-y-4 p-4`}>
+    <section className={`${card} space-y-4 p-4`}>
       <div className="flex items-center gap-3">
         <h2 className="mr-auto flex items-center gap-2 font-medium">
           <Wallet aria-hidden className="size-5 text-primary" />

@@ -15,7 +15,7 @@ export function Overview() {
   const base = `/${lang}/t/${tenant.id}`;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">
         {t.dashboard.welcome.replace('{name}', me.user.fullName)}
       </h1>
@@ -44,7 +44,7 @@ export function Overview() {
             ))}
           </dl>
           <p className="text-ink-muted">{t.dashboard.comingNext}</p>
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {navForRoles(roles)
               .filter((item) => item.path)
               .map((item) => {

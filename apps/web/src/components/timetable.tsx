@@ -38,7 +38,7 @@ export function Timetable() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-2xl font-semibold">{tt.title}</h1>
         <button
@@ -72,49 +72,51 @@ export function Timetable() {
       ) : sessions.length === 0 ? (
         <EmptyState icon={CalendarX}>{tt.noClasses}</EmptyState>
       ) : (
-        [...byDay.entries()].map(([day, list]) => (
-          <section key={day} className={`${card} animate-fade-in overflow-hidden`}>
-            <h2 className="border-b border-line bg-surface-soft px-4 py-2 font-medium">
-              {fmtDay(list[0]!.startsAt, t.calendar)}
-            </h2>
-            <ul className="divide-y divide-line">
-              {list.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm"
-                >
-                  <span className="w-24 font-mono">
-                    {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
-                  </span>
-                  <span
-                    className={`min-w-0 flex-1 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+          {[...byDay.entries()].map(([day, list]) => (
+            <section key={day} className={`${card} animate-fade-in overflow-hidden`}>
+              <h2 className="border-b border-line bg-surface-soft px-4 py-2 font-medium">
+                {fmtDay(list[0]!.startsAt, t.calendar)}
+              </h2>
+              <ul className="divide-y divide-line">
+                {list.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm"
                   >
-                    <Link
-                      href={`/${lang}/t/${tenantId}/classes/${s.batchId}`}
-                      className="font-medium hover:underline"
-                    >
-                      {s.batchName}
-                    </Link>
-                    <span className="text-ink-subtle">
-                      {' '}
-                      ·{' '}
-                      {[s.subjectName, s.teacherName, s.room, s.isExtra ? tt.extra : null, s.note]
-                        .filter(Boolean)
-                        .join(' · ')}
+                    <span className="w-24 font-mono">
+                      {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
                     </span>
-                  </span>
-                  <SessionActions
-                    session={s}
-                    onChange={(next) =>
-                      setSessions((all) => all && all.map((x) => (x.id === next.id ? next : x)))
-                    }
-                    onError={(err) => setError(errorMessage(t, err))}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
+                    <span
+                      className={`min-w-0 flex-1 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
+                    >
+                      <Link
+                        href={`/${lang}/t/${tenantId}/classes/${s.batchId}`}
+                        className="font-medium hover:underline"
+                      >
+                        {s.batchName}
+                      </Link>
+                      <span className="text-ink-subtle">
+                        {' '}
+                        ·{' '}
+                        {[s.subjectName, s.teacherName, s.room, s.isExtra ? tt.extra : null, s.note]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                    <SessionActions
+                      session={s}
+                      onChange={(next) =>
+                        setSessions((all) => all && all.map((x) => (x.id === next.id ? next : x)))
+                      }
+                      onError={(err) => setError(errorMessage(t, err))}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

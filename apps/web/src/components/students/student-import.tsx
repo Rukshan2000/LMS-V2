@@ -66,7 +66,7 @@ export function StudentImport() {
     `${i.field ? `${i.field}: ` : ''}${s.invalidValue}`;
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       <BackLink href={`/${lang}/t/${tenantId}/students`}>{s.back}</BackLink>
       <h1 className="text-2xl font-semibold">{s.importTitle}</h1>
       <p className="text-ink-muted">{s.importHelp}</p>

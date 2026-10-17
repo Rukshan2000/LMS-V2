@@ -61,12 +61,17 @@ export function StudentDetail() {
         </>
       }
     >
-      <div className="space-y-6">
-        <StudentClasses studentId={student.id} initial={student.classes} />
-        <StudentFees studentId={student.id} classes={student.classes} />
-        <StudentCard studentId={student.id} />
-        {desk && student.status === 'active' && <PortalInvite student={student} />}
-        <StudentForm key={student.id} student={student} />
+      {/* Two columns on wide screens; on phones the order stays classes → fees → card → form. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
+          <StudentClasses studentId={student.id} initial={student.classes} />
+          <StudentFees studentId={student.id} classes={student.classes} />
+        </div>
+        <div className="space-y-6">
+          <StudentCard studentId={student.id} />
+          {desk && student.status === 'active' && <PortalInvite student={student} />}
+          <StudentForm key={student.id} student={student} />
+        </div>
       </div>
     </Page>
   );

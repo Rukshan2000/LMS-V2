@@ -58,7 +58,7 @@ export function SlipsPage() {
   useEffect(load, [load]);
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       <h1 className="text-2xl font-semibold">{t.nav.slips}</h1>
       <div className="inline-flex flex-wrap gap-1 rounded-xl bg-primary-soft/60 p-1 text-sm">
         {(
@@ -90,7 +90,7 @@ export function SlipsPage() {
       ) : slips.length === 0 ? (
         <EmptyState icon={Inbox}>{s.none}</EmptyState>
       ) : (
-        <ul className="space-y-4">
+        <ul className="grid items-start gap-4 2xl:grid-cols-2">
           {slips.map((slip) => (
             <SlipCard key={slip.id} slip={slip} onChange={load} lang={lang} tenantId={tenantId} />
           ))}

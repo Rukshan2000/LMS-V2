@@ -122,139 +122,148 @@ export function ScanPage() {
     });
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="space-y-4">
       <h1 className="text-2xl font-semibold">{sc.title}</h1>
-      <form onSubmit={onSubmit} className="relative">
-        {/* USB/Bluetooth barcode scanners type the code and press Enter. */}
-        <ScanLine
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 left-4 size-6 -translate-y-1/2 text-primary"
-        />
-        <input
-          ref={inputRef}
-          autoFocus
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder={sc.placeholder}
-          aria-label={sc.placeholder}
-          autoComplete="off"
-          className="w-full rounded-xl border-2 border-primary-ring bg-surface py-3 pr-4 pl-13 text-lg shadow-card"
-        />
-      </form>
-      <div>
-        {camera === 'on' ? (
-          <button type="button" onClick={() => setCamera('off')} className={btn('link', 'none')}>
-            <CameraOff aria-hidden className="size-4" />
-            {sc.stopCamera}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() =>
-              setCamera(window.BarcodeDetector && navigator.mediaDevices ? 'on' : 'unsupported')
-            }
-            className={btn('secondary')}
-          >
-            <Camera aria-hidden className="size-4" />
-            {sc.camera}
-          </button>
-        )}
-        {camera === 'unsupported' && (
-          <p className="mt-2 text-sm text-warning">{sc.cameraUnsupported}</p>
-        )}
-        {camera === 'on' && (
-          <video
-            ref={videoRef}
-            muted
-            playsInline
-            className="mt-2 w-full animate-fade-in rounded-xl bg-black shadow-card"
-          />
-        )}
-      </div>
-
-      {last && (
-        <div
-          key={last.id}
-          role="status"
-          className={`flex animate-pop-in gap-4 rounded-2xl p-5 shadow-card ${
-            !last.ok
-              ? 'bg-danger-soft text-danger'
-              : last.result.duplicate
-                ? 'bg-warning-soft text-warning'
-                : last.result.attendance.status === 'late'
-                  ? 'bg-late-soft text-late'
-                  : 'bg-success-soft text-success'
-          }`}
-        >
-          {(() => {
-            const Icon = !last.ok
-              ? CircleX
-              : last.result.duplicate
-                ? CircleAlert
-                : last.result.attendance.status === 'late'
-                  ? Clock
-                  : CircleCheck;
-            return <Icon aria-hidden className="size-10 shrink-0" strokeWidth={1.75} />;
-          })()}
-          <div className="min-w-0 flex-1">
-            {last.ok ? (
-              <>
-                <p className="text-2xl font-semibold">{last.result.student.fullName}</p>
-                <p>
-                  {last.result.student.studentNumber} · {last.result.session.batchName} ·{' '}
-                  {last.result.duplicate ? sc.already : sc[last.result.attendance.status]}
-                </p>
-                {last.result.feeDue && (
-                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-1.5 font-medium text-danger">
-                    {fmt(t.fees.feeDue, { amount: fmtMoney(last.result.feeDue) })}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {last.result.guardians.map((g) => (
-                    <a
-                      key={g.phone}
-                      href={waLink(g.phone, message(last.result))}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={btn('whatsapp')}
-                    >
-                      <MessageCircle aria-hidden className="size-4" />
-                      {fmt(sc.notifyParent, { name: g.fullName })}
-                    </a>
-                  ))}
-                </div>
-              </>
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
+          <form onSubmit={onSubmit} className="relative">
+            {/* USB/Bluetooth barcode scanners type the code and press Enter. */}
+            <ScanLine
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-4 size-6 -translate-y-1/2 text-primary"
+            />
+            <input
+              ref={inputRef}
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={sc.placeholder}
+              aria-label={sc.placeholder}
+              autoComplete="off"
+              className="w-full rounded-xl border-2 border-primary-ring bg-surface py-3 pr-4 pl-13 text-lg shadow-card"
+            />
+          </form>
+          <div>
+            {camera === 'on' ? (
+              <button
+                type="button"
+                onClick={() => setCamera('off')}
+                className={btn('link', 'none')}
+              >
+                <CameraOff aria-hidden className="size-4" />
+                {sc.stopCamera}
+              </button>
             ) : (
-              <>
-                {last.name && <p className="text-xl font-semibold">{last.name}</p>}
-                <p>{last.message}</p>
-              </>
+              <button
+                type="button"
+                onClick={() =>
+                  setCamera(window.BarcodeDetector && navigator.mediaDevices ? 'on' : 'unsupported')
+                }
+                className={btn('secondary')}
+              >
+                <Camera aria-hidden className="size-4" />
+                {sc.camera}
+              </button>
+            )}
+            {camera === 'unsupported' && (
+              <p className="mt-2 text-sm text-warning">{sc.cameraUnsupported}</p>
+            )}
+            {camera === 'on' && (
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                className="mt-2 w-full animate-fade-in rounded-xl bg-black shadow-card"
+              />
             )}
           </div>
-        </div>
-      )}
 
-      {recent.length > 0 && (
-        <section className={`${card} overflow-hidden`}>
-          <h2 className="border-b border-line bg-surface-soft px-4 py-2 text-sm font-medium">
-            {sc.recent}
-          </h2>
-          <ul className="divide-y divide-line text-sm">
-            {recent.map((r) => (
-              <li
-                key={`${r.student.id}-${r.session.id}`}
-                className="flex animate-fade-in gap-3 px-4 py-2"
-              >
-                <span className="font-mono text-ink-subtle">
-                  {colomboTime(r.attendance.markedAt)}
-                </span>
-                <span className="flex-1">{r.student.fullName}</span>
-                <span className="text-ink-subtle">{r.session.batchName}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          {last && (
+            <div
+              key={last.id}
+              role="status"
+              className={`flex animate-pop-in gap-4 rounded-2xl p-5 shadow-card ${
+                !last.ok
+                  ? 'bg-danger-soft text-danger'
+                  : last.result.duplicate
+                    ? 'bg-warning-soft text-warning'
+                    : last.result.attendance.status === 'late'
+                      ? 'bg-late-soft text-late'
+                      : 'bg-success-soft text-success'
+              }`}
+            >
+              {(() => {
+                const Icon = !last.ok
+                  ? CircleX
+                  : last.result.duplicate
+                    ? CircleAlert
+                    : last.result.attendance.status === 'late'
+                      ? Clock
+                      : CircleCheck;
+                return <Icon aria-hidden className="size-10 shrink-0" strokeWidth={1.75} />;
+              })()}
+              <div className="min-w-0 flex-1">
+                {last.ok ? (
+                  <>
+                    <p className="text-2xl font-semibold">{last.result.student.fullName}</p>
+                    <p>
+                      {last.result.student.studentNumber} · {last.result.session.batchName} ·{' '}
+                      {last.result.duplicate ? sc.already : sc[last.result.attendance.status]}
+                    </p>
+                    {last.result.feeDue && (
+                      <p className="mt-2 rounded-lg bg-danger-soft px-3 py-1.5 font-medium text-danger">
+                        {fmt(t.fees.feeDue, { amount: fmtMoney(last.result.feeDue) })}
+                      </p>
+                    )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {last.result.guardians.map((g) => (
+                        <a
+                          key={g.phone}
+                          href={waLink(g.phone, message(last.result))}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={btn('whatsapp')}
+                        >
+                          <MessageCircle aria-hidden className="size-4" />
+                          {fmt(sc.notifyParent, { name: g.fullName })}
+                        </a>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {last.name && <p className="text-xl font-semibold">{last.name}</p>}
+                    <p>{last.message}</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <div>
+          {recent.length > 0 && (
+            <section className={`${card} overflow-hidden`}>
+              <h2 className="border-b border-line bg-surface-soft px-4 py-2 text-sm font-medium">
+                {sc.recent}
+              </h2>
+              <ul className="divide-y divide-line text-sm">
+                {recent.map((r) => (
+                  <li
+                    key={`${r.student.id}-${r.session.id}`}
+                    className="flex animate-fade-in gap-3 px-4 py-2"
+                  >
+                    <span className="font-mono text-ink-subtle">
+                      {colomboTime(r.attendance.markedAt)}
+                    </span>
+                    <span className="flex-1">{r.student.fullName}</span>
+                    <span className="text-ink-subtle">{r.session.batchName}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

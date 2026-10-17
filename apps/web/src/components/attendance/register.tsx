@@ -60,7 +60,7 @@ export function AttendanceRegister() {
   const count = (s: Status | null) => data.students.filter((x) => x.status === s).length;
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       <BackLink href={`/${lang}/t/${tenantId}/attendance`}>{a.back}</BackLink>
       <div>
         <h1 className="text-2xl font-semibold">{data.session.batchName}</h1>

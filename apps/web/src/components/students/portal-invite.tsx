@@ -45,7 +45,7 @@ export function PortalInvite({ student }: { student: Student }) {
   }
 
   return (
-    <section className={`${card} max-w-xl space-y-3 p-4 text-sm`}>
+    <section className={`${card} space-y-3 p-4 text-sm`}>
       <div>
         <h2 className="flex items-center gap-2 text-base font-medium">
           <Smartphone aria-hidden className="size-5 text-primary" />

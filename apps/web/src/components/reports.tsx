@@ -85,7 +85,7 @@ export function Reports() {
   );
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{t.nav.reports}</h1>
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label>

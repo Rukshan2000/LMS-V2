@@ -55,7 +55,7 @@ export function ClassList() {
       ) : batches.length === 0 ? (
         <EmptyState icon={BookOpen}>{c.empty}</EmptyState>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {batches.map((b) => (
             <li key={b.id}>
               <Link

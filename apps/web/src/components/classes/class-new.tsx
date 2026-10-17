@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
+import { Plus } from 'lucide-react';
 import { BackLink, Button, card, Field, FormError } from '../ui';
 import type { BatchDetail, Member } from './types';
 
@@ -63,10 +64,10 @@ export function ClassNew() {
   );
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="space-y-4">
       <BackLink href={`/${lang}/t/${tenantId}/classes`}>{c.back}</BackLink>
       <h1 className="text-2xl font-semibold">{c.add}</h1>
-      <form onSubmit={onSubmit} className={`${card} space-y-4 p-5`}>
+      <form onSubmit={onSubmit} className={`${card} grid gap-4 p-5 sm:grid-cols-2`}>
         <Field
           label={c.name}
           value={form.name}
@@ -116,10 +117,12 @@ export function ClassNew() {
             <option value="hybrid">{c.hybrid}</option>
           </select>
         </label>
-        <FormError message={error} />
-        <Button type="submit" busy={busy}>
-          {c.create}
-        </Button>
+        <div className="space-y-4 sm:col-span-2">
+          <FormError message={error} />
+          <Button type="submit" busy={busy} full={false} icon={Plus}>
+            {c.create}
+          </Button>
+        </div>
       </form>
     </div>
   );

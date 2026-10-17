@@ -28,7 +28,7 @@ export function StudentCard({ studentId }: { studentId: string }) {
   }
 
   return (
-    <section className={`${card} flex max-w-xl flex-wrap items-center gap-3 p-4 text-sm`}>
+    <section className={`${card} flex flex-wrap items-center gap-3 p-4 text-sm`}>
       <Link href={`/${lang}/t/${tenantId}/students/${studentId}/card`} className={btn('secondary')}>
         <Printer aria-hidden className="size-4" />
         {c.printOne}

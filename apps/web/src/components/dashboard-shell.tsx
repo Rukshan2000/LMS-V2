@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   ScanLine,
   Settings,
@@ -28,6 +30,7 @@ import { LanguageSwitcher } from './language-switcher';
 import { Skeleton, ToastProvider } from './ui';
 
 export const LAST_TENANT_KEY = 'lastTenantId';
+const SIDEBAR_KEY = 'sidebarCollapsed';
 
 export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
   overview: LayoutDashboard,
@@ -63,6 +66,8 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [data, setData] = useState<TenantData | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Desktop only: icon rail instead of the full menu. Remembered in this browser.
+  const [collapsed, setCollapsed] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -84,6 +89,21 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [tenantId, lang, router]);
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_KEY) === '1');
+    } catch {}
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? '0' : '1');
+      } catch {}
+      return !c;
+    });
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -108,47 +128,59 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       ? pathname === base
       : pathname === `${base}${path}` || pathname.startsWith(`${base}${path}/`);
   const navItem =
-    'flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-colors duration-200';
-  const sidebar = data ? (
-    <nav className="flex flex-col gap-1 p-3">
-      {navForRoles(data.roles).map((item) => {
-        const Icon = NAV_ICONS[item.key];
-        if (item.path === undefined)
-          return (
-            <span key={item.key} className={`${navItem} text-ink-subtle`}>
-              <Icon aria-hidden className="size-5" />
-              <span className="flex-1">{t.nav[item.key]}</span>
-              <span className="rounded-full bg-neutral-soft px-2 py-0.5 text-xs">
-                {t.dashboard.soon}
+    'flex items-center gap-3 rounded-lg px-3 py-2 font-medium whitespace-nowrap transition-colors duration-200';
+  // `compact`: icons only, the label becomes a tooltip and stays readable by screen readers.
+  const nav = (compact: boolean) =>
+    data ? (
+      <nav className="flex flex-col gap-1 p-3">
+        {navForRoles(data.roles).map((item) => {
+          const Icon = NAV_ICONS[item.key];
+          if (item.path === undefined)
+            return (
+              <span
+                key={item.key}
+                title={compact ? t.nav[item.key] : undefined}
+                className={`${navItem} text-ink-subtle`}
+              >
+                <Icon aria-hidden className="size-5 shrink-0" />
+                <span className={compact ? 'sr-only' : 'flex-1'}>{t.nav[item.key]}</span>
+                {!compact && (
+                  <span className="rounded-full bg-neutral-soft px-2 py-0.5 text-xs">
+                    {t.dashboard.soon}
+                  </span>
+                )}
               </span>
-            </span>
+            );
+          const active = isActive(item.path);
+          return (
+            <Link
+              key={item.key}
+              href={`${base}${item.path}`}
+              onClick={() => setMenuOpen(false)}
+              aria-current={active ? 'page' : undefined}
+              title={compact ? t.nav[item.key] : undefined}
+              className={`${navItem} ${
+                active
+                  ? 'bg-primary-soft text-primary-hover'
+                  : 'text-ink-muted hover:bg-surface-soft hover:text-ink'
+              }`}
+            >
+              <Icon
+                aria-hidden
+                className={`size-5 shrink-0 ${active ? 'text-primary' : 'text-ink-subtle'}`}
+              />
+              <span className={compact ? 'sr-only' : undefined}>{t.nav[item.key]}</span>
+            </Link>
           );
-        const active = isActive(item.path);
-        return (
-          <Link
-            key={item.key}
-            href={`${base}${item.path}`}
-            onClick={() => setMenuOpen(false)}
-            aria-current={active ? 'page' : undefined}
-            className={`${navItem} ${
-              active
-                ? 'bg-primary-soft text-primary-hover'
-                : 'text-ink-muted hover:bg-surface-soft hover:text-ink'
-            }`}
-          >
-            <Icon aria-hidden className={`size-5 ${active ? 'text-primary' : 'text-ink-subtle'}`} />
-            {t.nav[item.key]}
-          </Link>
-        );
-      })}
-    </nav>
-  ) : (
-    <div className="space-y-2 p-3" aria-hidden>
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <div key={i} className="h-9 animate-shimmer rounded-lg bg-surface-soft" />
-      ))}
-    </div>
-  );
+        })}
+      </nav>
+    ) : (
+      <div className="space-y-2 p-3" aria-hidden>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="h-9 animate-shimmer rounded-lg bg-surface-soft" />
+        ))}
+      </div>
+    );
 
   return (
     <TenantDataContext value={data}>
@@ -168,6 +200,21 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 <X aria-hidden className="size-5" />
               ) : (
                 <Menu aria-hidden className="size-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-expanded={!collapsed}
+              aria-controls="sidebar"
+              aria-label={t.dashboard.menu}
+              title={t.dashboard.menu}
+              className="-ml-1 hidden rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-surface-soft hover:text-ink md:flex"
+            >
+              {collapsed ? (
+                <PanelLeftOpen aria-hidden className="size-5" />
+              ) : (
+                <PanelLeftClose aria-hidden className="size-5" />
               )}
             </button>
             <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white md:flex">
@@ -218,15 +265,20 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </div>
           </header>
           <div className="flex flex-1">
-            <aside className="hidden w-60 shrink-0 border-r border-line bg-surface md:block print:hidden">
-              <div className="sticky top-14">{sidebar}</div>
+            <aside
+              id="sidebar"
+              className={`hidden shrink-0 overflow-hidden border-r border-line bg-surface transition-[width] duration-200 ease-out md:block print:hidden ${collapsed ? 'w-[4.25rem]' : 'w-60'}`}
+            >
+              <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto">
+                {nav(collapsed)}
+              </div>
             </aside>
             {menuOpen && (
               <div
                 id="mobile-menu"
                 className="fixed inset-x-0 top-14 bottom-0 z-10 animate-slide-down overflow-y-auto bg-surface md:hidden"
               >
-                {sidebar}
+                {nav(false)}
                 <div className="px-6 pb-6">
                   <LanguageSwitcher />
                 </div>
@@ -238,7 +290,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                   {children}
                 </div>
               ) : (
-                <div className="max-w-3xl space-y-4">
+                <div className="space-y-4">
                   <div className="h-8 w-48 animate-shimmer rounded-lg bg-line" />
                   <Skeleton />
                 </div>

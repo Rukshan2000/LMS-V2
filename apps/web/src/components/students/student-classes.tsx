@@ -55,7 +55,7 @@ export function StudentClasses({
 
   const available = all.filter((b) => !classes.some((x) => x.id === b.id));
   return (
-    <section className={`${card} max-w-xl space-y-3 p-4`}>
+    <section className={`${card} space-y-3 p-4`}>
       <h2 className="flex items-center gap-2 font-medium">
         <BookOpen aria-hidden className="size-5 text-primary" />
         {c.inClasses}

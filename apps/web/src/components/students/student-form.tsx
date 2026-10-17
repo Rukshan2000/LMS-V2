@@ -85,7 +85,7 @@ export function StudentForm({ student }: { student?: Student }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-xl space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6">
       <div className={`${card} space-y-4 p-4`}>
         <Field
           label={s.name}

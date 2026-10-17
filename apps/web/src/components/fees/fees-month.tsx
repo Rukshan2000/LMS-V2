@@ -72,7 +72,7 @@ export function FeesMonth() {
 
   const monthName = `${t.calendar.months[Number(period.slice(5)) - 1]} ${period.slice(0, 4)}`;
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-semibold">{f.title}</h1>
         <label className="text-sm text-ink-muted">

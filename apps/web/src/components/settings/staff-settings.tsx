@@ -85,7 +85,7 @@ export function StaffSettings() {
     )}`;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{st.title}</h1>
       <FormError message={error} />
 
