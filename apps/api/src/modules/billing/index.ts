@@ -2,9 +2,13 @@
 export { KEYS, type Cap, type Feature, type Head } from './catalogue.js';
 export {
   accountForNewInstitute,
+  accountSuspended,
+  assertAccountWritable,
   assertCanAddHead,
   assertFeature,
+  featureLocked,
   generateInvoices,
+  getBilling,
   getEntitlements,
   recordPayment,
   voidInvoice,

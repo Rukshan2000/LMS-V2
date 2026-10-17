@@ -38,6 +38,8 @@ export interface ResolvedState {
   amountDueCents: number;
   /** Oldest unpaid invoice past its due date, for messages. */
   overdueInvoice: string | null;
+  /** Its due date (YYYY-MM-DD), for the overdue banner. */
+  overdueDueDate: string | null;
 }
 
 /** First matching rule wins: suspended → trial → restricted → overdue → active. */
@@ -75,6 +77,7 @@ export function resolveAccountState(
       : null,
     amountDueCents: unpaid.reduce((sum, i) => sum + i.amountDueCents, 0),
     overdueInvoice: overdue[0]?.number ?? null,
+    overdueDueDate: overdue[0]?.dueDate ?? null,
   };
 }
 

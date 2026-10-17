@@ -133,19 +133,23 @@ export default async function studentRoutes(app: FastifyInstance) {
     return reply.status(201).send({ student: created });
   });
 
-  app.post('/import', { preHandler: staff }, async (req, reply) => {
-    if (typeof req.body !== 'string') {
-      throw new HttpError(415, 'unsupported_media_type', 'Send the file as text/csv');
-    }
-    const { dryRun } = z
-      .object({ dryRun: z.enum(['true', 'false']).default('true') })
-      .parse(req.query);
-    const csv = req.body;
-    const result = await req.withTenant((trx) =>
-      importStudents(trx, req.tenant!.id, csv, dryRun === 'true'),
-    );
-    return reply.status(result.errors.length ? 400 : 200).send({ result });
-  });
+  app.post(
+    '/import',
+    { preHandler: staff, config: { feature: 'student_import' } },
+    async (req, reply) => {
+      if (typeof req.body !== 'string') {
+        throw new HttpError(415, 'unsupported_media_type', 'Send the file as text/csv');
+      }
+      const { dryRun } = z
+        .object({ dryRun: z.enum(['true', 'false']).default('true') })
+        .parse(req.query);
+      const csv = req.body;
+      const result = await req.withTenant((trx) =>
+        importStudents(trx, req.tenant!.id, csv, dryRun === 'true'),
+      );
+      return reply.status(result.errors.length ? 400 : 200).send({ result });
+    },
+  );
 
   app.get('/:studentId', { preHandler: viewers }, async (req) => {
     const { studentId } = req.params as { studentId: string };

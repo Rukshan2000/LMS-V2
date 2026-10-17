@@ -159,6 +159,7 @@ export default async function classRoutes(app: FastifyInstance) {
 
   app.post('/batches', { preHandler: managers }, async (req, reply) => {
     const body = batchInput.parse(req.body);
+    if (body.liveUrl) await req.requireFeature('live_links');
     if (!body.subjectId && !body.subjectName) {
       throw new HttpError(400, 'subject_required', 'Choose or enter a subject');
     }
@@ -204,6 +205,8 @@ export default async function classRoutes(app: FastifyInstance) {
       // No default on update: otherwise every edit would reset the mode to 'physical'.
       .extend({ mode: z.enum(MODES).optional(), status: z.enum(['active', 'archived']).optional() })
       .parse(req.body);
+    // Setting a link needs the feature; clearing one never does.
+    if (body.liveUrl) await req.requireFeature('live_links');
     try {
       const batch = await req.withTenant(async (trx) => {
         const fields = {

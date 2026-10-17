@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { HttpError, notFound } from '../../lib/http-error.js';
 import { normalizePhone } from '../../lib/phone.js';
+import { assertAccountWritable, assertCanAddHead, assertFeature } from '../billing/index.js';
 
 const INVITE_DAYS = 14;
 const STAFF_ROLES = ['admin', 'teacher', 'receptionist'] as const;
@@ -59,6 +60,8 @@ export async function staffRoutes(app: FastifyInstance) {
         .whereIn('r.role', ['owner', ...STAFF_ROLES])
         .first('m.id');
       if (member) throw new HttpError(409, 'already_member', 'This person is already staff here');
+      // Early refusal at the cap; accept checks again (pending invites are not counted).
+      await assertCanAddHead(trx, tenantId, body.role);
       // A new invite for the same phone replaces any older pending one.
       await trx('tenant_invites')
         .where({ phone, status: 'pending' })
@@ -151,6 +154,19 @@ export async function inviteRoutes(app: FastifyInstance) {
       if (!invite) throw notFound();
       if (invite.phone !== user.phone) {
         throw new HttpError(403, 'wrong_phone', 'This invite is for a different mobile number');
+      }
+      // Portal invites need the portal feature. Accepting adds a billable head only if the user
+      // does not already hold this role here (a parent of a second child is not a new head), and
+      // student logins are never billed (students are billed as records).
+      if (invite.studentId) await assertFeature(trx, tenantId, 'portal');
+      const holdsRole = await trx('tenant_memberships as m')
+        .join('membership_roles as r', 'r.membership_id', 'm.id')
+        .where({ 'm.user_id': user.id, 'm.status': 'active', 'r.role': invite.role })
+        .first('m.id');
+      if (!holdsRole && invite.role !== 'student') {
+        await assertCanAddHead(trx, tenantId, invite.role);
+      } else {
+        await assertAccountWritable(trx, tenantId);
       }
       const [membership] = await trx('tenant_memberships')
         .insert({ tenant_id: tenantId, user_id: user.id, status: 'active' })

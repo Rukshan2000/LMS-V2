@@ -38,6 +38,8 @@ export default async function slipRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.loadTenant);
   const desk = app.requireRole('owner', 'admin', 'receptionist');
   const family = app.requireRole('student', 'parent');
+  // The whole slip flow is one plan feature: upload and the desk queue (SAAS_PLAN §7.3).
+  const config = { feature: 'bank_slips' as const };
 
   // Parent/student uploads a slip for a student they have portal access to.
   app.post(
@@ -45,7 +47,7 @@ export default async function slipRoutes(app: FastifyInstance) {
     {
       preHandler: family,
       bodyLimit: 5 * 1024 * 1024,
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' }, feature: 'bank_slips' },
     },
     async (req, reply) => {
       const body = z
@@ -93,7 +95,7 @@ export default async function slipRoutes(app: FastifyInstance) {
   );
 
   // Desk review queue. Duplicate flags: the same file, or the same bank reference, seen before.
-  app.get('/slips', { preHandler: desk }, async (req) => {
+  app.get('/slips', { preHandler: desk, config }, async (req) => {
     const { status } = z
       .object({ status: z.enum(['pending', 'verified', 'rejected']).default('pending') })
       .parse(req.query);
@@ -131,7 +133,7 @@ export default async function slipRoutes(app: FastifyInstance) {
     return { slips };
   });
 
-  app.get('/slips/:paymentId/file', { preHandler: desk }, async (req, reply) => {
+  app.get('/slips/:paymentId/file', { preHandler: desk, config }, async (req, reply) => {
     const id = param(req);
     const file = await req.withTenant((trx) =>
       trx('payment_slips').where({ payment_id: id }).first('content_type', 'data'),
@@ -145,7 +147,7 @@ export default async function slipRoutes(app: FastifyInstance) {
       .send(file.data);
   });
 
-  app.post('/slips/:paymentId/verify', { preHandler: desk }, async (req) => {
+  app.post('/slips/:paymentId/verify', { preHandler: desk, config }, async (req) => {
     const id = param(req);
     const { amount } = z.object({ amount: amountInput.optional() }).parse(req.body ?? {});
     const receipt = await req.withTenant(async (trx) => {
@@ -156,7 +158,7 @@ export default async function slipRoutes(app: FastifyInstance) {
     return { receipt };
   });
 
-  app.post('/slips/:paymentId/reject', { preHandler: desk }, async (req) => {
+  app.post('/slips/:paymentId/reject', { preHandler: desk, config }, async (req) => {
     const id = param(req);
     const { note } = z.object({ note: z.string().trim().min(1).max(200) }).parse(req.body);
     const n = await req.withTenant((trx) =>

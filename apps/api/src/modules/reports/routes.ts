@@ -32,8 +32,9 @@ function sendCsv(reply: FastifyReply, name: string, rows: (string | number | nul
 export default async function reportRoutes(app: FastifyInstance) {
   app.addHook('preHandler', app.loadTenant);
   app.addHook('preHandler', app.requireRole('owner', 'admin'));
+  const gated = { config: { feature: 'reports' as const } };
 
-  app.get('/summary', async (req) => {
+  app.get('/summary', gated, async (req) => {
     const { from, to } = monthRange(req.query);
     return req.withTenant(async (trx) => {
       // Billed vs paid per fee month (invoice period).
@@ -97,7 +98,7 @@ export default async function reportRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get('/payments.csv', async (req, reply) => {
+  app.get('/payments.csv', gated, async (req, reply) => {
     const { from, to } = monthRange(req.query);
     const rows = await req.withTenant((trx) =>
       trx('payments as p')
@@ -144,7 +145,7 @@ export default async function reportRoutes(app: FastifyInstance) {
     ]);
   });
 
-  app.get('/unpaid.csv', async (req, reply) => {
+  app.get('/unpaid.csv', gated, async (req, reply) => {
     const rows = await req.withTenant((trx) =>
       trx('invoices as i')
         .join('students as s', 's.id', 'i.student_id')
@@ -190,7 +191,7 @@ export default async function reportRoutes(app: FastifyInstance) {
     ]);
   });
 
-  app.get('/students.csv', async (req, reply) => {
+  app.get('/students.csv', gated, async (req, reply) => {
     const rows = await req.withTenant((trx) =>
       trx('students as s')
         .orderBy('s.student_number')

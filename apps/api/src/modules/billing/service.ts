@@ -116,10 +116,18 @@ async function contextForTenant(trx: Knex.Transaction, tenantId: string) {
   return accountContext(trx, account);
 }
 
+export const accountSuspended = () =>
+  new HttpError(403, 'account_suspended', 'This account is suspended. Contact support.');
+export const featureLocked = (feature: Feature) =>
+  new HttpError(403, 'feature_locked', 'This feature is not included in your plan', { feature });
+
 function assertWritable({ state }: AccountContext) {
-  if (!state.writable) {
-    throw new HttpError(403, 'account_suspended', 'This account is suspended. Contact support.');
-  }
+  if (!state.writable) throw accountSuspended();
+}
+
+/** Refuse any write while the account is suspended (e.g. a family member joining). */
+export async function assertAccountWritable(trx: Knex.Transaction, tenantId: string) {
+  assertWritable(await contextForTenant(trx, tenantId));
 }
 
 function assertCanAddHeads(ctx: AccountContext) {
@@ -186,11 +194,7 @@ export async function assertCanAddHead(
 
 export async function assertFeature(trx: Knex.Transaction, tenantId: string, feature: Feature) {
   const ctx = await contextForTenant(trx, tenantId);
-  if (!ctx.values.features[feature]) {
-    throw new HttpError(403, 'feature_locked', 'This feature is not included in your plan', {
-      feature,
-    });
-  }
+  if (!ctx.values.features[feature]) throw featureLocked(feature);
 }
 
 /** What the web app needs: state, features and caps (with counts for owners/admins). */
@@ -209,6 +213,8 @@ export async function getEntitlements(
     writable: state.writable,
     canAddHeads: state.canAddHeads,
     amountDue: fromCents(state.amountDueCents),
+    overdueInvoice: state.overdueInvoice,
+    overdueDueDate: state.overdueDueDate,
     features: values.features,
     caps: Object.fromEntries(
       CAPS.map((cap) => [cap, { limit: values.caps[cap], ...(used && { used: usedFor(cap) }) }]),
@@ -744,6 +750,48 @@ export async function getAccount(db: Knex, accountId: string, now = new Date()) 
       audit: await auditQuery(trx, { accountId, limit: 100 }),
     };
   });
+}
+
+/**
+ * The customer's Billing page (owner, admin): prices, this month so far (the console's
+ * monthSoFar, so the estimate and the bill come from the same computeInvoice), invoices and where
+ * to pay. Void invoices are left out: they were replaced or cancelled.
+ */
+export async function getBilling(trx: Knex.Transaction, tenantId: string, now = new Date()) {
+  const ctx = await contextForTenant(trx, tenantId);
+  const month = await monthSoFar(trx, ctx, now);
+  const invoices = await trx('subscription_invoices as i')
+    .where('i.account_id', ctx.account.id)
+    .whereNot('i.status', 'void')
+    .orderBy('i.period', 'desc')
+    .orderBy('i.created_at', 'desc')
+    .limit(24)
+    .select(invoiceColumns(trx).filter((c) => c !== 'i.account_id as accountId'));
+  const settings = await trx('platform_settings')
+    .whereIn('key', ['bank_details', 'support_whatsapp'])
+    .select('key', 'value');
+  const setting = (key: string) => settings.find((s) => s.key === key)?.value ?? null;
+  const money = (lkr: number) => fromCents(Math.round(lkr * 100));
+  return {
+    prices: Object.fromEntries(HEADS.map((h) => [h, money(ctx.values.price[h])])) as Record<
+      Head,
+      string
+    >,
+    included: ctx.values.included,
+    minimumMonthly: money(ctx.values.minimumMonthly),
+    thisMonth: {
+      period: month.period,
+      headsNow: month.headsNow,
+      lines: month.estimate.lines,
+      total: month.estimate.total,
+    },
+    invoices,
+    // bank_details is free text (SAAS_PLAN §10.2), shown as written.
+    payTo: {
+      bankDetails: setting('bank_details') as string | null,
+      whatsapp: setting('support_whatsapp') as string | null,
+    },
+  };
 }
 
 /** One account row, locked, or 404. */

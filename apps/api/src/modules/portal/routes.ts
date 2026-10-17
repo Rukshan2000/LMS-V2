@@ -19,49 +19,55 @@ export default async function portalRoutes(app: FastifyInstance) {
 
   // Portal invite for a student (their own mobile) or a guardian (parent). The phone must be
   // the student's or one of their guardians', so a link can only go to a known number.
-  app.post('/students/:studentId/portal-invite', { preHandler: desk }, async (req, reply) => {
-    const { studentId } = req.params as { studentId: string };
-    if (!uuid.safeParse(studentId).success) throw notFound();
-    const phone = normalizePhone(z.object({ phone: z.string().max(20) }).parse(req.body).phone);
-    const token = randomBytes(32).toString('base64url');
-    const tenantId = req.tenant!.id;
-    const invite = await req.withTenant(async (trx) => {
-      const student = await trx('students')
-        .where({ id: studentId, status: 'active' })
-        .first('full_name', 'phone');
-      if (!student) throw notFound();
-      const guardian = await trx('student_guardians as sg')
-        .join('guardians as g', 'g.id', 'sg.guardian_id')
-        .where({ 'sg.student_id': studentId, 'g.phone': phone })
-        .first('g.full_name');
-      const target =
-        student.phone === phone
-          ? { role: 'student', fullName: student.full_name }
-          : guardian && { role: 'parent', fullName: guardian.full_name };
-      if (!target) {
-        throw new HttpError(400, 'unknown_phone', 'Use the student’s or a guardian’s mobile');
-      }
-      await trx('tenant_invites')
-        .where({ phone, student_id: studentId, status: 'pending' })
-        .update({ status: 'revoked', updated_at: trx.fn.now() });
-      await trx('tenant_invites').insert({
-        tenant_id: tenantId,
-        full_name: target.fullName,
-        phone,
-        role: target.role,
-        student_id: studentId,
-        token_hash: createHash('sha256').update(token).digest('hex'),
-        expires_at: new Date(Date.now() + INVITE_DAYS * 24 * 3600 * 1000),
-        invited_by_membership_id: req.tenant!.membershipId,
+  app.post(
+    '/students/:studentId/portal-invite',
+    { preHandler: desk, config: { feature: 'portal' } },
+    async (req, reply) => {
+      const { studentId } = req.params as { studentId: string };
+      if (!uuid.safeParse(studentId).success) throw notFound();
+      const phone = normalizePhone(z.object({ phone: z.string().max(20) }).parse(req.body).phone);
+      const token = randomBytes(32).toString('base64url');
+      const tenantId = req.tenant!.id;
+      const invite = await req.withTenant(async (trx) => {
+        const student = await trx('students')
+          .where({ id: studentId, status: 'active' })
+          .first('full_name', 'phone');
+        if (!student) throw notFound();
+        const guardian = await trx('student_guardians as sg')
+          .join('guardians as g', 'g.id', 'sg.guardian_id')
+          .where({ 'sg.student_id': studentId, 'g.phone': phone })
+          .first('g.full_name');
+        const target =
+          student.phone === phone
+            ? { role: 'student', fullName: student.full_name }
+            : guardian && { role: 'parent', fullName: guardian.full_name };
+        if (!target) {
+          throw new HttpError(400, 'unknown_phone', 'Use the student’s or a guardian’s mobile');
+        }
+        await trx('tenant_invites')
+          .where({ phone, student_id: studentId, status: 'pending' })
+          .update({ status: 'revoked', updated_at: trx.fn.now() });
+        await trx('tenant_invites').insert({
+          tenant_id: tenantId,
+          full_name: target.fullName,
+          phone,
+          role: target.role,
+          student_id: studentId,
+          token_hash: createHash('sha256').update(token).digest('hex'),
+          expires_at: new Date(Date.now() + INVITE_DAYS * 24 * 3600 * 1000),
+          invited_by_membership_id: req.tenant!.membershipId,
+        });
+        return { ...target, phone, studentName: student.full_name };
       });
-      return { ...target, phone, studentName: student.full_name };
-    });
-    return reply.status(201).send({ invite, code: `${tenantId}.${token}` });
-  });
+      return reply.status(201).send({ invite, code: `${tenantId}.${token}` });
+    },
+  );
 
   // Everything a parent/student needs on one screen, per linked student.
   app.get('/portal', { preHandler: family }, async (req) => {
     const today = colomboToday();
+    // Without the live links feature, links already set stay stored but are not shown.
+    const { live_links: liveLinks } = (await req.entitlements()).features;
     const children = await req.withTenant(async (trx) => {
       const students = await trx('portal_access as pa')
         .join('students as s', 's.id', 'pa.student_id')
@@ -153,7 +159,9 @@ export default async function portalRoutes(app: FastifyInstance) {
           return {
             ...s,
             classes,
-            sessions,
+            sessions: liveLinks
+              ? sessions
+              : sessions.map((x) => ({ ...x, online: false, liveUrl: null })),
             attendance,
             invoices,
             payments,

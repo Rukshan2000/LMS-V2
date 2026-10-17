@@ -2,6 +2,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import type { Knex } from 'knex';
 import attendanceRoutes from './modules/attendance/routes.js';
+import billingRoutes from './modules/billing/routes.js';
 import classRoutes from './modules/classes/routes.js';
 import feeRoutes from './modules/fees/routes.js';
 import identityRoutes from './modules/identity/routes.js';
@@ -14,6 +15,7 @@ import studentRoutes from './modules/students/routes.js';
 import tenancyRoutes from './modules/tenancy/routes.js';
 import authPlugin from './plugins/auth.js';
 import dbPlugin from './plugins/db.js';
+import entitlementsPlugin from './plugins/entitlements.js';
 import errorsPlugin from './plugins/errors.js';
 import platformAdminPlugin from './plugins/platform-admin.js';
 import tenantPlugin from './plugins/tenant.js';
@@ -43,6 +45,8 @@ export async function buildApp({
   await app.register(authPlugin, { secureCookies });
   await app.register(tenantPlugin);
   await app.register(platformAdminPlugin);
+  // Before the routes: it hooks onRoute to gate every route under /tenants/:tenantId.
+  await app.register(entitlementsPlugin);
   await app.register(rateLimit, { global: false });
 
   app.get('/api/health', async () => {
@@ -59,6 +63,7 @@ export async function buildApp({
   await app.register(feeRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(portalRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(slipRoutes, { prefix: '/api/v1/tenants/:tenantId' });
+  await app.register(billingRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(reportRoutes, { prefix: '/api/v1/tenants/:tenantId/reports' });
   await app.register(inviteRoutes, { prefix: '/api/v1/invites' });
   await app.register(platformRoutes, { prefix: '/api/v1/admin', adminRateLimitMax });
