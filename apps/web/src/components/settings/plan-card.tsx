@@ -1,62 +1,55 @@
 'use client';
 
 import { CircleAlert, CreditCard } from 'lucide-react';
-import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { useI18n } from '@/i18n/provider';
-import { api, fmt } from '@/lib/api';
-import { colomboDate } from '@/lib/datetime';
-import { card } from '../ui';
+import { fmt } from '@/lib/api';
+import { fmtMoney } from '@/lib/money';
+import { useTenantData } from '../dashboard-shell';
+import { Badge, card, type Tone } from '../ui';
 
-export interface Usage {
-  plan: 'free' | 'teacher' | 'institute';
-  planExpiresAt: string | null;
-  effectivePlan: 'free' | 'teacher' | 'institute';
-  studentLimit: number | null;
-  activeStudents: number;
-}
+const STATE_TONE: Record<string, Tone> = {
+  trial: 'primary',
+  active: 'success',
+  overdue: 'warning',
+  restricted: 'danger',
+  suspended: 'danger',
+};
 
-/** Settings: current plan, student usage, expiry and how to upgrade (bank transfer, manual). */
+/** Settings: account state (trial, payment due) and student usage. Billing details come in Phase 4. */
 export function PlanCard() {
   const { t } = useI18n();
   const p = t.plans;
-  const { tenantId } = useParams<{ tenantId: string }>();
-  const [usage, setUsage] = useState<Usage | null>(null);
+  const { entitlements: e } = useTenantData();
+  const { limit, used = 0 } = e.caps.students;
+  const full = limit !== null && used >= limit;
+  const status =
+    e.state === 'trial'
+      ? fmt(p.trial, { days: e.daysLeft ?? 0 })
+      : e.state === 'active'
+        ? p.active
+        : e.state === 'suspended'
+          ? p.suspended
+          : fmt(p[e.state], { amount: fmtMoney(e.amountDue) });
 
-  useEffect(() => {
-    api<{ usage: Usage }>(`/tenants/${tenantId}`)
-      .then((r) => setUsage(r.usage))
-      .catch(() => setUsage(null));
-  }, [tenantId]);
-
-  if (!usage) return null;
-  const { studentLimit: limit, activeStudents: active } = usage;
-  const full = limit !== null && active >= limit;
-  const expired = usage.plan !== usage.effectivePlan;
   return (
     <section className={`${card} space-y-3 p-4 text-sm`}>
-      <h2 className="flex items-center gap-2 text-base font-medium">
+      <h2 className="flex flex-wrap items-center gap-2 text-base font-medium">
         <CreditCard aria-hidden className="size-5 text-primary" />
-        {p.title}: {p.names[usage.effectivePlan]}
+        {p.title}
+        <Badge tone={STATE_TONE[e.state]}>{status}</Badge>
       </h2>
       <p>
-        {limit === null ? fmt(p.studentsUnlimited, { active }) : fmt(p.students, { active, limit })}
+        {limit === null
+          ? fmt(p.studentsUnlimited, { active: used })
+          : fmt(p.students, { active: used, limit })}
       </p>
       {limit !== null && (
         <div className="h-2 overflow-hidden rounded-full bg-surface-soft">
           <div
             className={`h-full rounded-full transition-[width] duration-700 ease-out ${full ? 'bg-danger-solid' : 'bg-primary'}`}
-            style={{ width: `${Math.min(100, (active * 100) / limit)}%` }}
+            style={{ width: `${Math.min(100, (used * 100) / limit)}%` }}
           />
         </div>
-      )}
-      {usage.planExpiresAt && (
-        <p className={expired ? 'font-medium text-danger' : 'text-ink-muted'}>
-          {fmt(expired ? p.expired : p.paidUntil, {
-            plan: p.names[usage.plan],
-            date: colomboDate(usage.planExpiresAt),
-          })}
-        </p>
       )}
       {full && (
         <p className="flex items-center gap-1.5 font-medium text-danger">
@@ -64,7 +57,7 @@ export function PlanCard() {
           {p.full}
         </p>
       )}
-      <p className="text-ink-subtle">{p.upgrade}</p>
+      <p className="text-ink-subtle">{p.billing}</p>
     </section>
   );
 }

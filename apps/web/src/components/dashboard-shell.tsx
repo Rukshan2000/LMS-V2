@@ -25,6 +25,7 @@ import { useParams, usePathname, useRouter } from 'next/navigation';
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, type Me, type Role } from '@/lib/api';
+import type { Entitlements } from '@/lib/entitlements';
 import { navForRoles, type NavItem } from '@/lib/nav';
 import { LanguageSwitcher } from './language-switcher';
 import { Skeleton, ToastProvider } from './ui';
@@ -47,8 +48,9 @@ export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
 
 interface TenantData {
   me: Me;
-  tenant: { id: string; slug: string; name: string; status: string; plan: string };
+  tenant: { id: string; slug: string; name: string; status: string };
   roles: Role[];
+  entitlements: Entitlements;
 }
 
 const TenantDataContext = createContext<TenantData | null>(null);

@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 import { parseCsv } from '../../lib/csv.js';
 import { HttpError } from '../../lib/http-error.js';
-import { assertStudentCapacity } from '../../lib/plans.js';
+import { assertCanAddHead } from '../billing/index.js';
 import {
   createStudent,
   findDuplicate,
@@ -150,11 +150,11 @@ export async function importStudents(
   }
   result.ready = prepared.length;
   try {
-    await assertStudentCapacity(trx, tenantId, prepared.length);
+    await assertCanAddHead(trx, tenantId, 'student', prepared.length);
   } catch (err) {
-    if (!(err instanceof HttpError)) throw err;
-    const { limit, active } = err.details as { limit: number; active: number };
-    result.errors.push({ line: 1, code: 'plan_limit', message: `${active}/${limit}` });
+    if (!(err instanceof HttpError) || err.code !== 'plan_limit') throw err;
+    const { limit, used } = err.details as { limit: number; used: number };
+    result.errors.push({ line: 1, code: 'plan_limit', message: `${used}/${limit}` });
   }
 
   if (!dryRun && result.errors.length === 0) {

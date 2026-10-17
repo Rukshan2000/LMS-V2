@@ -365,15 +365,17 @@ const en = {
   },
   plans: {
     title: 'Plan',
-    names: { free: 'Free', teacher: 'Teacher', institute: 'Institute' },
+    trial: 'Free trial: {days} days left',
+    active: 'Active',
+    overdue: 'Payment due: LKR {amount}',
+    restricted:
+      'Payment overdue: LKR {amount}. New students, teachers and parents cannot be added until it is paid.',
+    suspended: 'This account is suspended. Contact support.',
     students: '{active} of {limit} active students',
-    studentsUnlimited: '{active} active students (no limit)',
-    paidUntil: '{plan} plan paid until {date}',
-    expired:
-      '{plan} plan ended on {date}. Free limits apply until it is renewed; no data is deleted.',
-    full: 'Student limit reached: new students cannot be added. Make old students inactive or upgrade.',
-    upgrade:
-      'Upgrade: Teacher LKR 2,900/month (400 students), Institute LKR 9,900/month (no limit). Pay by bank transfer and send us the slip on WhatsApp; we switch the plan on the same day.',
+    studentsUnlimited: '{active} active students',
+    full: 'Student limit reached: new students cannot be added. Make old students inactive or contact us to raise the limit.',
+    billing:
+      'After the free trial you pay monthly for each active student, teacher and parent. Prices and invoices will appear here.',
   },
   privacy: {
     title: 'Privacy notice',
@@ -419,7 +421,12 @@ const en = {
     unknown_phone: 'Use the student’s or a parent’s mobile number',
     invalid_file: 'Upload a photo (JPG/PNG) or PDF of the slip',
     file_too_large: 'File is too large (max 3 MB)',
-    plan_limit: 'Your plan’s student limit is reached. See Settings → Plan.',
+    plan_limit:
+      'Your account limit is reached (students, teachers or institutes). See Settings → Plan.',
+    account_restricted:
+      'A payment is overdue. Pay it to add more students, teachers or parents. See Settings → Plan.',
+    account_suspended: 'This account is suspended. Contact support.',
+    feature_locked: 'This feature is not included in your plan.',
     privacy_not_accepted: 'Please agree to the privacy notice',
     slug_taken: 'This link name is already taken',
     validation_error: 'Please check the fields and try again.',

@@ -180,8 +180,9 @@ describe('tenants', () => {
   });
 
   it('rejects a taken slug', async () => {
-    const { cookie } = await signup('0771234567');
-    await createTenant(cookie);
+    await createTenant((await signup('0771234567')).cookie);
+    // Another customer: a second institute of the same trial account would hit the institute cap first.
+    const { cookie } = await signup('0771234568');
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/tenants',

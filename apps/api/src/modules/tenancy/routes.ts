@@ -2,7 +2,7 @@ import { setContext } from '@lms/db';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { HttpError, isUniqueViolation } from '../../lib/http-error.js';
-import { planUsage } from '../../lib/plans.js';
+import { accountForNewInstitute, getEntitlements } from '../billing/index.js';
 
 const createTenantBody = z.object({
   name: z.string().trim().min(1).max(200),
@@ -17,12 +17,14 @@ export default async function tenancyRoutes(app: FastifyInstance) {
   // Create an institute: tenant + owner membership + first branch, all or nothing.
   app.post('/', { preHandler: app.requireAuth }, async (req, reply) => {
     const body = createTenantBody.parse(req.body);
-    const userId = req.user!.id;
+    const user = req.user!;
+    const userId = user.id;
     try {
       const tenant = await app.db.transaction(async (trx) => {
+        const accountId = await accountForNewInstitute(trx, user, body.name);
         const [t] = await trx('tenants')
-          .insert({ name: body.name, slug: body.slug })
-          .returning(['id', 'slug', 'name', 'status', 'plan']);
+          .insert({ name: body.name, slug: body.slug, account_id: accountId })
+          .returning(['id', 'slug', 'name', 'status']);
         // The new tenant is now the context for its own tenant-owned rows (RLS WITH CHECK).
         await setContext(trx, { tenantId: t.id, userId });
         const [m] = await trx('tenant_memberships')
@@ -53,9 +55,12 @@ export default async function tenancyRoutes(app: FastifyInstance) {
       const tenant = await app
         .db('tenants')
         .where({ id: req.tenant!.id })
-        .first('id', 'slug', 'name', 'status', 'plan');
-      const usage = await req.withTenant((trx) => planUsage(trx, req.tenant!.id));
-      return { tenant, roles: req.tenant!.roles, usage };
+        .first('id', 'slug', 'name', 'status');
+      const { id, roles } = req.tenant!;
+      // Head counts only for those who manage the account (saves queries for everyone else).
+      const withUsage = roles.some((r) => r === 'owner' || r === 'admin');
+      const entitlements = await req.withTenant((trx) => getEntitlements(trx, id, { withUsage }));
+      return { tenant, roles, entitlements };
     });
 
     // Staff list for pickers (e.g. choosing a class teacher).

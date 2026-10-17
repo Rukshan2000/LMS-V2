@@ -1,6 +1,6 @@
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { withTenant, withUser } from '../src/context.js';
+import { forEachTenant, withTenant, withUser } from '../src/context.js';
 import { app, owner } from './db.js';
 
 let ownerDb: Knex;
@@ -20,12 +20,15 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await ownerDb.raw('TRUNCATE tenants, users CASCADE');
+  await ownerDb.raw('TRUNCATE tenants, users, accounts CASCADE');
+  const [account] = await ownerDb('accounts')
+    .insert({ name: 'Customer', owner_phone: '94770000001', price_book: 'standard' })
+    .returning('id');
   [tenantA, tenantB] = (
     await ownerDb('tenants')
       .insert([
-        { slug: 'tenant-a', name: 'A' },
-        { slug: 'tenant-b', name: 'B' },
+        { slug: 'tenant-a', name: 'A', account_id: account.id },
+        { slug: 'tenant-b', name: 'B', account_id: account.id },
       ])
       .returning('id')
   ).map((r) => r.id);
@@ -86,6 +89,40 @@ describe('tenant isolation (RLS)', () => {
     const rows = await withUser(appDb, userA, (trx) => trx('tenant_memberships'));
     expect(rows.map((r) => r.tenant_id).sort()).toEqual([tenantA, tenantB].sort());
     expect(rows.every((r) => r.user_id === userA)).toBe(true);
+  });
+
+  it('forEachTenant runs under each tenant, then restores the caller context', async () => {
+    const result = await withTenant(appDb, { tenantId: tenantA, userId: userA }, async (trx) => {
+      const names = await forEachTenant(
+        trx,
+        [tenantA, tenantB],
+        async () => (await trx('branches').first('name')).name,
+      );
+      const after = await trx('branches').pluck('name');
+      const { rows } = await trx.raw("SELECT current_setting('app.user_id', true) AS u");
+      return { names, after, user: rows[0].u };
+    });
+    expect(result).toEqual({ names: ['A main', 'B main'], after: ['A main'], user: userA });
+  });
+
+  it('forEachTenant restores the context when the work throws', async () => {
+    const after = await withTenant(appDb, { tenantId: tenantA }, async (trx) => {
+      await expect(
+        forEachTenant(trx, [tenantB], async () => {
+          throw new Error('boom');
+        }),
+      ).rejects.toThrow('boom');
+      return trx('branches').pluck('name');
+    });
+    expect(after).toEqual(['A main']);
+  });
+
+  it('platform_audit is append-only for the app role', async () => {
+    await ownerDb('platform_audit').insert({ actor_user_id: userA, action: 'test' });
+    await expect(appDb('platform_audit').delete()).rejects.toThrow(/permission denied/);
+    await expect(appDb('platform_audit').update({ action: 'x' })).rejects.toThrow(
+      /permission denied/,
+    );
   });
 
   it('app role cannot change migration history', async () => {
