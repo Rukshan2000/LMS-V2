@@ -50,7 +50,9 @@ An invoice that already has payments can't be voided. Settle the difference with
 
 ## What the customer sees
 
-Account state (SAAS_PLAN §5.2): the day after the due date the account is `overdue` (can still add people); after `grace_days` more days (Settings) it is `restricted` (no new students / teachers / parents; everything else keeps working). The Billing page comes in Phase 4; until then they see the state on Settings → Plan.
+Account state (SAAS_PLAN §5.2): the day after the due date the account is `overdue` (can still add people); after `grace_days` more days (Settings) it is `restricted` (no new students / teachers / parents; everything else keeps working). Owners and admins see a banner (trial days left, amount and due date when overdue, "pay to add more" when restricted) and the **Billing** page: this month so far (the same calculation as the invoice), their invoices, the bank details and support WhatsApp from **Settings**, and a **Send slip on WhatsApp** button per unpaid invoice that carries the invoice number and amount. Teachers and receptionists see the same banner without the link to Billing; parents and students see a banner only when the account is suspended.
+
+Fill in **Settings → Bank details** and **Support WhatsApp** before the first invoice: without them the Billing page says bank details are coming and shows no WhatsApp button.
 
 ## Checks
 

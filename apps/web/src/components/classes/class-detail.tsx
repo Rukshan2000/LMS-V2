@@ -5,6 +5,7 @@ import {
   ArchiveRestore,
   CalendarClock,
   CalendarDays,
+  Lock,
   Plus,
   Search,
   Trash2,
@@ -31,7 +32,8 @@ export function ClassDetail() {
   const { lang, t } = useI18n();
   const c = t.classes;
   const { tenantId, batchId } = useParams<{ tenantId: string; batchId: string }>();
-  const { roles } = useTenantData();
+  const { roles, entitlements } = useTenantData();
+  const liveLinks = entitlements.features.live_links;
   const manager = roles.includes('owner') || roles.includes('admin');
   const desk = manager || roles.includes('receptionist');
   const url = `/tenants/${tenantId}/batches/${batchId}`;
@@ -153,8 +155,12 @@ export function ClassDetail() {
                   <Video aria-hidden className="size-4 text-primary" />
                   {c.liveUrl}
                 </span>
-                <span className="block text-ink-subtle">{c.liveUrlHint}</span>
+                <span className="flex items-center gap-1.5 text-ink-subtle">
+                  {!liveLinks && <Lock aria-hidden className="size-3.5" />}
+                  {liveLinks ? c.liveUrlHint : t.locked.body}
+                </span>
                 <input
+                  disabled={!liveLinks}
                   name="liveUrl"
                   type="url"
                   pattern="https://.*"
@@ -163,7 +169,7 @@ export function ClassDetail() {
                   className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2"
                 />
               </label>
-              <button type="submit" className={btn('secondary')}>
+              <button type="submit" disabled={!liveLinks} className={btn('secondary')}>
                 {c.saveLink}
               </button>
             </form>

@@ -1,11 +1,14 @@
 import type { Dictionary } from '@/i18n/dictionaries/en';
 import type { Role } from './api';
+import type { Feature } from './entitlements';
 
 export interface NavItem {
   key: keyof Dictionary['nav'];
   /** Path under /t/:tenantId. Items without a path are not built yet ("Soon"). */
   path?: string;
   roles: Role[];
+  /** Plan feature the page needs; without it the item shows a lock and the page a <Locked> card. */
+  feature?: Feature;
 }
 
 const STAFF: Role[] = ['owner', 'admin'];
@@ -24,9 +27,10 @@ export const NAV: NavItem[] = [
   // Parents and students see classes, attendance and fees on their overview (portal).
   { key: 'attendance', path: '/attendance', roles: [...STAFF, 'receptionist', 'teacher'] },
   { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist'] },
-  { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'] },
+  { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'], feature: 'bank_slips' },
   { key: 'timetable', path: '/timetable', roles: [...STAFF, 'receptionist', 'teacher'] },
-  { key: 'reports', path: '/reports', roles: STAFF },
+  { key: 'reports', path: '/reports', roles: STAFF, feature: 'reports' },
+  { key: 'billing', path: '/billing', roles: STAFF },
   { key: 'settings', path: '/settings', roles: STAFF },
 ];
 

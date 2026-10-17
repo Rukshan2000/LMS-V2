@@ -33,6 +33,22 @@ Examples:
 | No student cap | `cap.students` | blank |
 | Switch the parent app off | `feature.portal` | Off |
 
+### What switching a feature off does
+
+The customer sees a lock on the menu item and a "not included in your plan" card on the page; the server refuses the action with `feature_locked`. Nothing is deleted, and switching it back on restores everything.
+
+| Feature | Off means |
+|---|---|
+| `feature.reports` | Reports page and all CSV downloads refused |
+| `feature.student_import` | CSV import refused; adding students one by one still works |
+| `feature.bank_slips` | Parents can't upload slips and the desk's Bank slips queue is locked. Pending slips stay pending and reappear when it is on again; the desk can still record the payment at the counter |
+| `feature.live_links` | A link can't be set (clearing one is allowed). Links already set are kept but hidden from parents and students |
+| `feature.portal` | New parent/student invites can't be sent or accepted. Families already in keep their access |
+
+### Caps
+
+`cap.students`, `cap.teachers`, `cap.parents`, `cap.institutes`. A teacher is checked when invited and again when the invite is accepted (pending invites don't count). A parent is checked only when accepting; inviting is free. A parent already linked to one child who accepts an invite for a sibling is not a new head. Admins and receptionists have no cap key.
+
 ## Trials
 
 Account page → **Extend trial** → days. A running trial is extended from its end date and its trial caps move with it; an ended trial restarts from today (without caps). Trial days are never billed.
@@ -41,6 +57,6 @@ The default trial length and caps for new sign-ups are on **Settings**.
 
 ## Suspend (read-only)
 
-Only for accounts that don't pay after reminders. Account page → reason → **Suspend** → click again. The customer sees the account as suspended and can't add students, teachers, parents or institutes. The full read-only block (every change refused) comes with Phase 4. **Unsuspend** lifts it at once.
+Only for accounts that don't pay after reminders. Account page → reason → **Suspend** → click again. The account becomes **read-only**: staff can open every page, the Billing page and download reports, but every change is refused (`account_suspended`), including attendance scans and fee payments. Parents and students can still view the portal but can't upload slips or accept invites. Everyone sees a red banner. **Unsuspend** lifts it at once.
 
 An unpaid account is already `restricted` automatically (no new heads, fee collection still works); suspension is the manual step after that.

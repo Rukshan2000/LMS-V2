@@ -181,7 +181,7 @@ Given the account, its unpaid invoices, settings and `now`, the first matching r
 
 | # | Condition | State | New billable heads | Banner |
 |---|---|---|---|---|
-| 1 | `suspended_at` set | `suspended` | No. **All writes blocked** (read-only) | Red, contact support |
+| 1 | `suspended_at` set | `suspended` | No. **All writes blocked** (read-only, no exceptions; §7.7) | Red, contact support |
 | 2 | `trial_ends_at > now` | `trial` | Yes, within trial caps | Blue, days left |
 | 3 | An open invoice is past `due_date + grace_days` | `restricted` | **No.** Everything else works | Red, pay to add more |
 | 4 | An open invoice is past `due_date` | `overdue` | Yes | Amber, amount due |
@@ -340,6 +340,13 @@ Exact call sites:
 
 **Restricted accounts must still be able to collect fees** (that's how they earn the money to pay us). The block applies only to adding heads.
 
+*(Changed during Phase 4.)*
+- **Where the gate runs.** `plugins/entitlements.ts` adds its check through an `onRoute` hook to every route whose URL starts with `/api/v1/tenants/:tenantId`, after the route's own preHandlers (`loadTenant`, role checks). A route-level hook was needed because each module adds `loadTenant` itself, so a global preHandler would run before it.
+- **Restricted** is not checked in the plugin: `assertCanAddHead` already refuses it at every head call site, and nothing else is blocked when restricted.
+- **Live links** are a field, not a route: `POST /batches` and `PATCH /batches/:id` call `req.requireFeature('live_links')` only when a non-empty `liveUrl` is sent (clearing is always allowed).
+- **Staff invite accept** also checks `feature.portal` for portal invites, and counts a head only if the user does not already hold that role in the institute (a parent of a second child, or a re-sent invite, is not a new head). Student-role accepts are never billed (students are billed as records) and only check that the account is writable.
+- **Admin and receptionist** have no `cap.*` key in §5.3, so their call sites check the account state (restricted, suspended) only. Add `cap.admins` / `cap.receptionists` to the catalogue if a customer ever needs one.
+
 ### 7.4 Counting across institutes under RLS
 
 The live count for a cap check uses a small helper that runs a count under each of the account's institutes in turn, inside the caller's transaction, and restores the original context in `finally`:
@@ -362,6 +369,8 @@ export async function forEachTenant<T>(trx, tenantIds, userId, fn: (tenantId) =>
 
 ### 7.6 API contract
 
+*(Changed during Phase 4: see the notes after the example.)*
+
 ```jsonc
 // GET /api/v1/tenants/:tenantId  (existing; replaces the old `usage` field)
 {
@@ -383,12 +392,31 @@ export async function forEachTenant<T>(trx, tenantIds, userId, fn: (tenantId) =>
 }
 ```
 
+What was built differs from the example above:
+
+- `entitlements` also has `amountDue`, `overdueInvoice` and `overdueDueDate` (for the overdue banner); `caps` has `used` only for owners and admins.
+- `/billing`: all money is a string with 2 decimals (`"100.00"`), like every other amount in the API. `thisMonth` is `{ period, headsNow, lines, total }` where `lines` are the same objects an invoice stores (`{ type: 'head', head, peak, included, billable, unitPrice, amount }` or `{ type: 'minimum', … }`). The response also has `included` and `minimumMonthly`. `invoices` are the newest 24, void ones left out, each with `paid`.
+- `payTo` is `{ "bankDetails": "<free text>" | null, "whatsapp": "94…" | null }`, because `platform_settings.bank_details` is free text (Phase 3); the page shows it as written.
+
 Errors use the existing `{ code, message, requestId, details }` shape:
 
 - `403 plan_limit { key, limit, used }` (existing code, more detail);
 - `403 feature_locked { feature }`;
 - `403 account_restricted { amountDue, invoiceNumber }`;
 - `403 account_suspended`.
+
+### 7.7 Decisions made in Phase 4
+
+| Question | Decision | Why |
+|---|---|---|
+| Which writes still work when suspended? | **None.** Every POST/PUT/PATCH/DELETE under `/tenants/:tenantId` returns `403 account_suspended`, as do institute create and invite accept. Logout and login are outside `/tenants`. | Paying is a bank transfer plus a WhatsApp message (no API call), the Billing page is a GET, and every report and CSV export is a GET, so a suspended owner can still pay and take their data. An empty allowlist cannot be got wrong. |
+| `feature.portal` off | Only **new** portal links stop: invite create and invite accept are refused. Parents and students already in keep their logins and the portal. | §11: "family never blocked except suspension". Switching a feature off should not lock out people who already rely on it. |
+| `feature.bank_slips` off | Family upload and the whole desk queue (list, file, verify, reject) are refused. Pending slips are kept unchanged and come back when it is switched on. The parent's portal still lists their pending slip, without the upload button. | The feature is the whole slip flow. Nothing is deleted or auto-rejected; the desk can record the money as a normal payment meanwhile. |
+| `feature.live_links` off | A new link can't be set; links already set stay stored and visible to staff, but the portal returns `liveUrl: null` and `online: false`. | Never deletes data, and switching back on restores the links. |
+| Do pending staff invites count against the cap? | **No.** Invite create checks active members only (an early refusal); accept checks again under the advisory lock, and that check is the one that holds. Parents: invite free, accept checked (§7.3). | Unaccepted invites expire in 14 days; counting them would let stale invites block real hires. |
+| Who sees the account banner? | Staff see trial, overdue, restricted and suspended (owners and admins also get a link to Billing). Parents and students see it **only when suspended**, with their own wording. | Only suspension changes what a family can do; trial and money details are the institute's business. |
+| `payTo` shape | `{ bankDetails, whatsapp }`, bank details as free text. | Matches the Phase 3 setting. |
+| Memoise entitlements | `req.entitlements()` caches one `getEntitlements(…, { withUsage: false })` promise per request. The write-block, the feature gate, `req.requireFeature()` and the portal's live-link check share it. Head checks still run inside the write transaction, because they need the lock. | A gated write loads the account once. |
 
 ---
 
@@ -514,12 +542,13 @@ apps/api/src/
                                  recordPayment, voidInvoice, extendTrial, setOverride,
                                  clearOverride, suspend, unsuspend, updatePriceBook, updateSettings
                                  (every mutation writes platform_audit in the same trx)
-      routes.ts                  customer: GET /tenants/:id/billing
+      routes.ts                  customer: GET /tenants/:id/billing (mounted at /api/v1/tenants/:tenantId)
       index.ts                   public surface for other modules
     platform/                    NEW — super admin API, /api/v1/admin/*
       routes.ts
   plugins/
     entitlements.ts              NEW — feature gate (route config) + suspension write-block + req.entitlements() memo
+                                 (via onRoute, after each route's own preHandlers; Phase 4)
     platform-admin.ts            NEW — requirePlatformAdmin (404 for everyone else), fresh-session check
   lib/plans.ts                   DELETED in phase 1
 packages/db/
@@ -540,7 +569,7 @@ apps/web/src/
     account-banner.tsx           trial / overdue / restricted / suspended
     locked.tsx                   <Locked feature> card for gated pages
     billing/billing-page.tsx     this month estimate, invoices, how to pay, WhatsApp slip button
-    settings/plan-card.tsx       replaced by a link to Billing
+    settings/billing-link.tsx    replaces settings/plan-card.tsx (deleted); caps usage moved to the Billing page (Phase 4)
     admin/*                      admin shell + screens (§10.4)
   app/[lang]/t/[tenantId]/billing/page.tsx
   app/[lang]/admin/**            accounts, accounts/new, accounts/[id], invoices, price-books, settings, audit
@@ -662,7 +691,7 @@ Each phase is its own release to `production` and must pass format, lint, typech
 
 | # | Task | Files |
 |---|---|---|
-| 4.1 | `plugins/entitlements.ts`: feature gate, suspension write-block, restricted-state head block | plugin, `app.ts` |
+| 4.1 | `plugins/entitlements.ts`: feature gate, suspension write-block. *(Changed during Phase 4: the restricted-state head block stays in `assertCanAddHead`, see §7.3.)* | plugin, `app.ts` |
 | 4.2 | Gate routes (reports, import, slips, live links, portal invites); caps on teachers, parents and institutes | module routes |
 | 4.3 | ~~New self-service accounts get a trial~~ done in Phase 1 (`accountForNewInstitute`) | `billing/service.ts` |
 | 4.4 | Billing page: estimate, invoices, pay instructions, WhatsApp slip button | `billing/routes.ts`, web `billing/*` |

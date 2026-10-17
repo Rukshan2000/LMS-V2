@@ -63,6 +63,12 @@ export async function api<T>(
 
 export function errorMessage(t: Dictionary, err: unknown): string {
   const code = err instanceof ApiError ? err.code : 'generic';
+  // plan_limit says which limit: { key: 'cap.teachers', limit, used }.
+  if (err instanceof ApiError && code === 'plan_limit') {
+    const { key, limit } = (err.details ?? {}) as { key?: string; limit?: number };
+    const text = (t.billing.planLimit as Record<string, string>)[key ?? ''];
+    if (text) return fmt(text, { limit: limit ?? '' });
+  }
   return (t.errors as Record<string, string>)[code] ?? t.errors.generic;
 }
 

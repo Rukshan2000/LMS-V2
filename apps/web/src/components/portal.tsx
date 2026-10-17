@@ -15,6 +15,7 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate, fmtDay, fmtTime } from '@/lib/datetime';
 import { cents, fmtMoney, fromCents } from '@/lib/money';
+import { useTenantData } from './dashboard-shell';
 import { SlipUpload } from './slip-upload';
 import { Badge, btn, card, EmptyState, FormError, Skeleton } from './ui';
 
@@ -78,6 +79,9 @@ export function Portal() {
   const { t } = useI18n();
   const p = t.portal;
   const { tenantId } = useParams<{ tenantId: string }>();
+  const { entitlements } = useTenantData();
+  // No uploads without the slips feature, or while the account is suspended (read-only).
+  const canUpload = entitlements.features.bank_slips && entitlements.writable;
   const [children, setChildren] = useState<Child[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,7 +155,7 @@ export function Portal() {
                   ))}
                 </ul>
               )}
-              {cents(c.outstanding) > 0 && (
+              {canUpload && cents(c.outstanding) > 0 && (
                 <SlipUpload studentId={c.id} outstanding={c.outstanding} onDone={load} />
               )}
               {c.payments.length > 0 && (

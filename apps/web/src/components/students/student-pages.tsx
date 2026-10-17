@@ -9,6 +9,7 @@ import { useTenantData } from '../dashboard-shell';
 import { StudentFees } from '../fees/student-fees';
 import { StudentCard } from './student-card';
 import { StudentClasses } from './student-classes';
+import { Locked } from '../locked';
 import { PortalInvite } from './portal-invite';
 import { StudentForm } from './student-form';
 import type { Student } from './types';
@@ -69,7 +70,11 @@ export function StudentDetail() {
         </div>
         <div className="space-y-6">
           <StudentCard studentId={student.id} />
-          {desk && student.status === 'active' && <PortalInvite student={student} />}
+          {desk && student.status === 'active' && (
+            <Locked feature="portal">
+              <PortalInvite student={student} />
+            </Locked>
+          )}
           <StudentForm key={student.id} student={student} />
         </div>
       </div>

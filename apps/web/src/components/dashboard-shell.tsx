@@ -6,8 +6,10 @@ import {
   CalendarDays,
   ChartColumn,
   ClipboardCheck,
+  CreditCard,
   GraduationCap,
   LayoutDashboard,
+  Lock,
   LogOut,
   Menu,
   PanelLeftClose,
@@ -28,6 +30,7 @@ import { useI18n } from '@/i18n/provider';
 import { api, ApiError, type Me, type Role } from '@/lib/api';
 import type { Entitlements } from '@/lib/entitlements';
 import { navForRoles, type NavItem } from '@/lib/nav';
+import { AccountBanner } from './account-banner';
 import { LanguageSwitcher } from './language-switcher';
 import { Skeleton, ToastProvider } from './ui';
 
@@ -44,6 +47,7 @@ export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
   slips: Receipt,
   timetable: CalendarDays,
   reports: ChartColumn,
+  billing: CreditCard,
   settings: Settings,
 };
 
@@ -155,6 +159,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               </span>
             );
           const active = isActive(item.path);
+          const locked = item.feature && !data.entitlements.features[item.feature];
           return (
             <Link
               key={item.key}
@@ -162,7 +167,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               onClick={() => setMenuOpen(false)}
               aria-current={active ? 'page' : undefined}
               title={compact ? t.nav[item.key] : undefined}
-              className={`${navItem} ${
+              className={`${navItem} relative ${
                 active
                   ? 'bg-primary-soft text-primary-hover'
                   : 'text-ink-muted hover:bg-surface-soft hover:text-ink'
@@ -172,7 +177,14 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 aria-hidden
                 className={`size-5 shrink-0 ${active ? 'text-primary' : 'text-ink-subtle'}`}
               />
-              <span className={compact ? 'sr-only' : undefined}>{t.nav[item.key]}</span>
+              <span className={compact ? 'sr-only' : 'flex-1'}>{t.nav[item.key]}</span>
+              {locked && (
+                <Lock
+                  role="img"
+                  aria-label={t.locked.label}
+                  className={`size-3.5 shrink-0 text-ink-subtle ${compact ? 'absolute right-1.5 top-1.5' : ''}`}
+                />
+              )}
             </Link>
           );
         })}
@@ -299,6 +311,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <main className="min-w-0 flex-1 p-4 sm:p-8 print:p-0">
               {data ? (
                 <div key={pathname} className="animate-fade-in">
+                  <AccountBanner />
                   {children}
                 </div>
               ) : (

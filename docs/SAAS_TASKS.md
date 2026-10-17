@@ -4,7 +4,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 30/32 · Phase 4: 2/19 · Phase 5: 0/8
+**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 30/32 · Phase 4: 18/19 · Phase 5: 0/8
 
 **Rules for every phase**
 
@@ -151,29 +151,31 @@ Goal: everything in the old SQL runbook is done from `/admin`, audited. SAAS_PLA
 
 Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN §5.2, §7.3, §6.4.
 
+**Status:** built and committed to `main` 2026-10-17; not yet released to production (release after Phases 1–3). No migration. Open points decided in SAAS_PLAN §7.7; differences from the plan are marked *(Changed during Phase 4)* in SAAS_PLAN §5.2, §7.3, §7.6, §9 and §11.
+
 ### API
-- [ ] `plugins/entitlements.ts`: `config: { feature }` gate after `loadTenant`; typed `FastifyContextConfig`; `req.entitlements()` memoised per request
-- [ ] Same plugin: suspended account + non-GET → `403 account_suspended` for everything under `/tenants/:tenantId`
+- [x] `plugins/entitlements.ts`: `config: { feature }` gate after `loadTenant`; typed `FastifyContextConfig`; `req.entitlements()` memoised per request
+- [x] Same plugin: suspended account + non-GET → `403 account_suspended` for everything under `/tenants/:tenantId`
 - [x] Restricted state: `assertCanAddHead` → `403 account_restricted { amountDue, invoiceNumber }`; fee routes unaffected (done in Phase 1 for students; teacher/parent call sites come with the caps below)
-- [ ] Feature gates: reports (`reports/routes.ts`), student import, slips (desk + family upload), live link set (`classes/routes.ts`), portal invites
-- [ ] Portal hides `liveUrl` when `feature.live_links` is off (`portal/routes.ts`)
-- [ ] Caps: teacher/admin/receptionist on staff invite create + accept; parent on portal invite accept (`staff/routes.ts`)
+- [x] Feature gates: reports (`reports/routes.ts`), student import, slips (desk + family upload), live link set (`classes/routes.ts`), portal invites
+- [x] Portal hides `liveUrl` when `feature.live_links` is off (`portal/routes.ts`)
+- [x] Caps: teacher/admin/receptionist on staff invite create + accept; parent on portal invite accept (`staff/routes.ts`)
 - [x] New self-service accounts get `trial_ends_at = now + trial_days` and expiring trial-cap overrides (done in Phase 1)
-- [ ] `GET /tenants/:tenantId/billing` (owner, admin): prices, this month so far via `computeInvoice`, invoices, pay-to details (SAAS_PLAN §7.6)
+- [x] `GET /tenants/:tenantId/billing` (owner, admin): prices, this month so far via `computeInvoice`, invoices, pay-to details (SAAS_PLAN §7.6)
 
 ### Web
-- [ ] Billing page `app/[lang]/t/[tenantId]/billing/page.tsx` + `components/billing/billing-page.tsx`: this month estimate, invoices, bank details, "Send slip on WhatsApp" button with invoice number and amount
-- [ ] "Billing" menu item for owner and admin (`lib/nav.ts`); Settings plan card replaced by a link to Billing
-- [ ] `account-banner.tsx` in the shell: trial (days left), overdue (amount, due date), restricted, suspended
-- [ ] `lib/nav.ts` `feature?` key; lock icon on locked menu items; `<Locked>` card on gated pages
-- [~] Error messages for `plan_limit` (per key), `feature_locked`, `account_restricted`, `account_suspended` in `si`, `ta`, `en` (all four added in Phase 1; `plan_limit` is still one generic text, per-key text pending)
-- [ ] Check in the browser at phone and desktop width in all three languages
+- [x] Billing page `app/[lang]/t/[tenantId]/billing/page.tsx` + `components/billing/billing-page.tsx`: this month estimate, invoices, bank details, "Send slip on WhatsApp" button with invoice number and amount
+- [x] "Billing" menu item for owner and admin (`lib/nav.ts`); Settings plan card replaced by a link to Billing
+- [x] `account-banner.tsx` in the shell: trial (days left), overdue (amount, due date), restricted, suspended
+- [x] `lib/nav.ts` `feature?` key; lock icon on locked menu items; `<Locked>` card on gated pages
+- [x] Error messages for `plan_limit` (per key), `feature_locked`, `account_restricted`, `account_suspended` in `si`, `ta`, `en` (per-key `plan_limit` text added in Phase 4, chosen by `details.key`)
+- [x] Check in the browser at phone and desktop width in all three languages
 
 ### Tests and release
-- [ ] `apps/api/test/entitlements.test.ts`: each feature gate on/off; trial caps; trial end starts billing on the next invoice
-- [ ] Tests: overdue → restricted after grace blocks only new heads; fee collection and invoice generation still work when restricted
-- [ ] Tests: suspended → GET works, POST/PUT/PATCH/DELETE return 403; family users blocked only when suspended
-- [ ] Tests: staff invite and accept refused at the teacher cap; parent accept refused at the parent cap
+- [x] `apps/api/test/entitlements.test.ts`: each feature gate on/off; trial caps; trial end starts billing on the next invoice
+- [x] Tests: overdue → restricted after grace blocks only new heads; fee collection and invoice generation still work when restricted
+- [x] Tests: suspended → GET works, POST/PUT/PATCH/DELETE return 403; family users blocked only when suspended
+- [x] Tests: staff invite and accept refused at the teacher cap; parent accept refused at the parent cap
 - [ ] Release Phase 4; sign up a new test account on production and see the trial banner and Billing page
 
 ---

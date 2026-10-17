@@ -35,6 +35,18 @@ describe('navForRoles', () => {
     expect(navForRoles(['teacher']).find((i) => i.key === 'timetable')?.path).toBeDefined();
   });
 
+  it('billing is for owners and admins only', () => {
+    expect(keys(['owner'])).toContain('billing');
+    expect(keys(['admin'])).toContain('billing');
+    expect(keys(['receptionist', 'teacher'])).not.toContain('billing');
+  });
+
+  it('gated pages name their plan feature', () => {
+    const feature = (key: string) => navForRoles(['owner']).find((i) => i.key === key)?.feature;
+    expect(feature('reports')).toBe('reports');
+    expect(feature('slips')).toBe('bank_slips');
+  });
+
   it('no roles → nothing', () => {
     expect(keys([])).toEqual([]);
   });

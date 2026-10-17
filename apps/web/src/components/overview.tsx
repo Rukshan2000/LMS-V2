@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, ChevronRight, UserRound } from 'lucide-react';
+import { Building2, ChevronRight, Lock, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { NAV_ICONS, useTenantData } from './dashboard-shell';
 import { useI18n } from '@/i18n/provider';
@@ -10,7 +10,7 @@ import { card } from './ui';
 
 export function Overview() {
   const { lang, t } = useI18n();
-  const { me, tenant, roles } = useTenantData();
+  const { me, tenant, roles, entitlements } = useTenantData();
   const family = roles.every((r) => r === 'student' || r === 'parent');
   const base = `/${lang}/t/${tenant.id}`;
 
@@ -57,6 +57,13 @@ export function Overview() {
                     >
                       <Icon aria-hidden className="size-5 text-primary" />
                       <span className="flex-1">{t.nav[item.key]}</span>
+                      {item.feature && !entitlements.features[item.feature] && (
+                        <Lock
+                          role="img"
+                          aria-label={t.locked.label}
+                          className="size-4 text-ink-subtle"
+                        />
+                      )}
                       <ChevronRight
                         aria-hidden
                         className="size-4 text-ink-subtle transition-transform duration-200 group-hover:translate-x-0.5"

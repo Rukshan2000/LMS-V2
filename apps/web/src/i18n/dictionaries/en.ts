@@ -49,6 +49,7 @@ const en = {
     fees: 'Fees',
     slips: 'Bank slips',
     reports: 'Reports',
+    billing: 'Billing',
     settings: 'Settings',
     timetable: 'Timetable',
   },
@@ -107,7 +108,7 @@ const en = {
     imported: '{count} students imported',
     invalidValue: 'check this value',
     issues: {
-      plan_limit: 'over your plan’s student limit (Settings → Plan)',
+      plan_limit: 'over your plan’s student limit (see Billing)',
       invalid_phone: 'invalid mobile number',
       missing_name_column: 'The file needs a Name column',
       too_many_rows: 'Max 2000 rows per file',
@@ -363,19 +364,78 @@ const en = {
     exports: 'Download for Excel (CSV)',
     csv: { payments: 'Payments', unpaid: 'Unpaid fees', students: 'Students' },
   },
-  plans: {
-    title: 'Plan',
-    trial: 'Free trial: {days} days left',
-    active: 'Active',
-    overdue: 'Payment due: LKR {amount}',
-    restricted:
-      'Payment overdue: LKR {amount}. New students, teachers and parents cannot be added until it is paid.',
-    suspended: 'This account is suspended. Contact support.',
-    students: '{active} of {limit} active students',
-    studentsUnlimited: '{active} active students',
-    full: 'Student limit reached: new students cannot be added. Make old students inactive or contact us to raise the limit.',
-    billing:
-      'After the free trial you pay monthly for each active student, teacher and parent. Prices and invoices will appear here.',
+  billing: {
+    title: 'Billing',
+    trial: 'Free trial: {days} days left. Nothing is billed for trial days.',
+    caps: {
+      students: 'Active students',
+      teachers: 'Teachers',
+      parents: 'Parents (app users)',
+      institutes: 'Institutes',
+    },
+    thisMonth: 'This month so far ({month})',
+    thisMonthHint:
+      'An estimate: after the free trial you pay for the highest number of each in the month. The bill is made on the 1st of next month.',
+    nothing: 'Nothing to pay so far this month.',
+    nothingTrial: 'Nothing to pay: you are in the free trial.',
+    item: 'Item',
+    peak: 'Highest',
+    unitPrice: 'Price (LKR)',
+    amount: 'Amount (LKR)',
+    included: 'first {count} free',
+    minimum: 'Minimum monthly charge: LKR {amount}',
+    total: 'Total',
+    prices: 'Prices per month:',
+    invoices: 'Invoices',
+    noInvoices: 'No invoices yet.',
+    number: 'No.',
+    month: 'Month',
+    due: 'Due',
+    status: 'Status',
+    statuses: {
+      open: 'Unpaid',
+      paid: 'Paid',
+    },
+    left: 'LKR {amount} still due',
+    sendSlip: 'Send slip on WhatsApp',
+    slipMessage:
+      'Hello, I paid Tuition LMS invoice {number}, LKR {amount}, for {institute}. The bank slip is attached.',
+    howToPay: 'How to pay',
+    noBankDetails: 'Bank details will be shown here soon. Message us on WhatsApp to pay.',
+    reference:
+      'Pay by bank transfer and use the invoice number as the reference. Then send the slip on WhatsApp with the button under the invoices.',
+    whatsapp: 'Support WhatsApp: {phone}',
+    settingsLink: 'Your plan, this month’s estimate, invoices and how to pay',
+    banner: {
+      trial: 'Free trial: {days} days left.',
+      overdue:
+        'Invoice {number} for LKR {amount} was due on {date}. Please pay it to avoid limits.',
+      restricted:
+        'Payment overdue: LKR {amount}. New students, teachers and parents cannot be added until it is paid. Everything else works.',
+      suspended:
+        'This account is suspended: you can view everything but not make changes. Contact support.',
+      suspendedFamily:
+        'This institute’s account is paused. You can view, but cannot upload slips right now.',
+      action: 'View billing',
+    },
+    planLimit: {
+      'cap.students':
+        'Your plan allows {limit} active students. Make old students inactive or contact us to raise the limit.',
+      'cap.teachers': 'Your plan allows {limit} teachers. Contact us to raise the limit.',
+      'cap.parents': 'Your plan allows {limit} parents on the app. Contact us to raise the limit.',
+      'cap.institutes': 'Your plan allows {limit} institutes. Contact us to raise the limit.',
+    },
+  },
+  locked: {
+    label: 'Not in your plan',
+    body: 'This is not included in your plan. Contact us to turn it on.',
+    features: {
+      bank_slips: 'Bank slips',
+      live_links: 'Live class links',
+      reports: 'Reports',
+      student_import: 'Student import (CSV)',
+      portal: 'Parent and student app',
+    },
   },
   admin: {
     bar: 'Platform admin',
@@ -587,10 +647,9 @@ const en = {
     unknown_phone: 'Use the student’s or a parent’s mobile number',
     invalid_file: 'Upload a photo (JPG/PNG) or PDF of the slip',
     file_too_large: 'File is too large (max 3 MB)',
-    plan_limit:
-      'Your account limit is reached (students, teachers or institutes). See Settings → Plan.',
+    plan_limit: 'Your account limit is reached. See Billing.',
     account_restricted:
-      'A payment is overdue. Pay it to add more students, teachers or parents. See Settings → Plan.',
+      'A payment is overdue. Pay it to add more students, teachers or parents. See Billing.',
     account_suspended: 'This account is suspended. Contact support.',
     feature_locked: 'This feature is not included in your plan.',
     privacy_not_accepted: 'Please agree to the privacy notice',
