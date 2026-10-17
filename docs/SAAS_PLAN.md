@@ -248,6 +248,8 @@ total        = max(Σ line(h), minimum.monthly)        -- top-up shown as its ow
 
 - **Trial overlap:** days on or before `trial_ends_at` are excluded. A trial that ends on the 12th bills the peak from the 13th onward.
 - **Mid-month price change:** prices are read when the invoice is generated, and each line stores its unit price.
+- **Nothing to bill:** an account in trial for the whole month, or whose total is 0, gets no invoice. *(Added during Phase 2.)*
+- **Numbering:** `S-<period>-NNNN`, numbered per billed month (September's invoices are `S-2026-09-0001`…). *(Changed during Phase 2; the §8.1 example used the issue month.)*
 - **Customers mid-month:** a new account bills from its first day, with no proration (peak rule).
 - `computeInvoice(dailyCounts, values, trialEndsAt, month)` is a pure function. Most billing tests target it.
 
@@ -269,10 +271,13 @@ The trigger:
 Properties:
 
 - **Can't be forgotten.** Any future code path that adds students or members is metered automatically. That covers the console, an API route, CSV import and the portal.
-- **Statement level.** A CSV import of 300 students causes one count, not 300.
+- **Statement level.** A multi-row statement causes one count. The CSV import currently inserts one student per statement, so a 300-row import runs 300 small indexed counts, still into the same single row for the day. *(Clarified during Phase 2.)*
+- **All heads at once.** One function (`meter_tenant`) recounts all five heads of an institute and upserts five rows, whichever table changed. Simpler than per-head triggers; the cost is one extra grouped count. *(Changed during Phase 2.)*
+- **Every UPDATE recounts.** PostgreSQL does not allow a column list (`UPDATE OF status`) on triggers with transition tables, so any UPDATE statement on the three tables recounts. *(Changed during Phase 2.)*
+- **Deleted institutes.** When an institute is deleted, its cascaded deletes skip metering and its usage rows go with it. *(Added during Phase 2.)*
 - **Days with no change** have no row. The count on such a day is the latest `count_last` before it, so the invoice query carries values forward. It also reads the last row before the month to get the opening count.
 - **Per institute, with RLS.** `tenant_usage_daily` has `tenant_id`, so it gets forced RLS like every tenant table (the isolation test in `packages/db` enforces this). Invoicing and the console read it per institute with `forEachTenant`. *(Changed during Phase 1; the earlier draft made it a global table.)*
-- **Backfill:** migration 013 writes today's counts for every institute, so the first month has an opening value.
+- **Backfill:** migration 014 writes today's counts for every institute (per-tenant context, rehearsed with a non-`BYPASSRLS` owner role), so the first month has an opening value.
 
 ### 6.4 Customer-facing estimate
 
@@ -437,7 +442,7 @@ subscription_invoices (
   account_id uuid NOT NULL REFERENCES accounts,
   number varchar(32) NOT NULL UNIQUE,           -- S-2026-10-0007
   period char(7) NOT NULL,                      -- YYYY-MM billed
-  lines jsonb NOT NULL,                         -- snapshot: head, peak, included, unit_price, amount
+  lines jsonb NOT NULL,                         -- snapshot: {type:'head', head, peak, included, billable, unitPrice, amount} | {type:'minimum', minimum, amount}
   total numeric(12,2) NOT NULL CHECK (total >= 0),
   due_date date NOT NULL,
   status varchar(8) NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid','void')),
@@ -469,7 +474,7 @@ users    + is_platform_admin boolean NOT NULL DEFAULT false
 Notes:
 
 - `price_books.values` and override values are validated by Zod against the code catalogue on write. The resolver treats a missing key as its safe default (price 0, feature off, cap 0 for caps that are set), so keys can be added in either order.
-- An invoice is `paid` when its payments sum to its total. Part payments are allowed.
+- An invoice is `paid` when its payments sum to its total. Part payments are allowed; a payment above the amount due is refused. Only an open invoice without payments can be voided, and a voided month cannot be regenerated (`UNIQUE (account_id, period)`) until credit notes exist. *(Phase 2.)*
 - `platform_audit` and `subscription_invoices` lines are append-only: the app role gets no `UPDATE`/`DELETE` on audit, and voiding an invoice is a status change plus an audit row.
 - The trigger function is `SECURITY INVOKER` and only writes `tenant_usage_daily`, so it needs no extra privilege.
 

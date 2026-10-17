@@ -4,7 +4,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 0/18 · Phase 3: 1/29 · Phase 4: 2/19 · Phase 5: 0/8
+**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 1/29 · Phase 4: 2/19 · Phase 5: 0/8
 
 **Rules for every phase**
 
@@ -71,29 +71,33 @@ Goal: accounts exist, the student cap runs through `billing`, existing institute
 
 Goal: head counts are recorded automatically and monthly invoices can be generated and paid. SAAS_PLAN §6, §8.2.
 
+**Status:** built and committed to `main` 2026-10-17; not yet released to production (release after Phase 1). Differences from the plan are marked *(Phase 2)* in SAAS_PLAN §6.2, §6.3 and §8.1.
+
 ### Metering
-- [ ] Migration `014_usage_metering`: table `tenant_usage_daily` **with forced RLS** (`enableTenantRls`; the db isolation test requires it), trigger function (`SECURITY INVOKER`)
-- [ ] 014: statement-level `AFTER INSERT / UPDATE / DELETE` triggers with transition tables on `students`, `membership_roles`, `tenant_memberships`
-- [ ] 014: backfill today's counts for every institute (per-tenant context)
-- [ ] Day boundary uses Asia/Colombo date (same rule as `lib/time.ts`)
-- [ ] Tests `apps/api/test/metering.test.ts`: student add / deactivate / restore / delete; CSV import of 500 rows writes one count; teacher accept and remove; parent accept counted, parent invite not counted; `count_max` keeps the day's peak, `count_last` the latest
+- [x] Migration `014_usage_metering`: table `tenant_usage_daily` **with forced RLS** (`enableTenantRls`; the db isolation test requires it), trigger function (`SECURITY INVOKER`)
+- [x] 014: statement-level `AFTER INSERT / UPDATE / DELETE` triggers with transition tables on `students`, `membership_roles`, `tenant_memberships`
+- [x] 014: backfill today's counts for every institute (per-tenant context); rehearsed on a copy of dev data with a non-`BYPASSRLS` owner role (3 institutes, 15 rows, matches live counts)
+- [x] Day boundary uses Asia/Colombo date (same rule as `lib/time.ts`)
+- [x] Tests `apps/api/test/metering.test.ts`: student add / deactivate / restore / delete; CSV import of 500 rows writes one count; teacher accept and remove; parent accept counted, parent invite not counted; `count_max` keeps the day's peak, `count_last` the latest
 
 ### Invoices
-- [ ] `modules/billing/invoice.ts`: pure `computeInvoice(dailyCounts, values, trialEndsAt, period)` (SAAS_PLAN §6.2)
-- [ ] Unit tests `test/billing-invoice.test.ts`: peak summed across institutes per day; carry-forward of days without rows; opening value from before the month; trial days excluded; free allowance; minimum charge line; zero-head account; rounding to cents with `lib/money.ts`
-- [ ] `usage.ts`: daily series per account for a month from `tenant_usage_daily`, read per institute with `forEachTenant`
-- [ ] `service.ts`: `generateInvoices(period)` (lock `invoice:<accountId>`, `UNIQUE (account_id, period)`, number `S-YYYY-MM-NNNN`, due date from settings, lines snapshot)
-- [ ] `service.ts`: `recordPayment(invoiceId, { amount, reference, clientRef })` (part payments; invoice `paid` when sum ≥ total) and `voidInvoice(invoiceId, reason)`
-- [ ] Audit row in the same transaction for generate, payment and void
-- [ ] Tests: generating twice is a no-op; price change after generation doesn't change the invoice; same `clientRef` records once; account goes overdue / restricted / back to active as invoices age and get paid
-- [ ] Temporary admin script `npm run billing -w apps/api -- generate <YYYY-MM> | pay <invoice> <amount> <ref>` (uses the same service functions; removed in Phase 3)
-- [ ] Runbook `docs/runbooks/billing.md`: monthly steps until the console exists
+- [x] `modules/billing/invoice.ts`: pure `computeInvoice(dailyCounts, values, trialEndsAt, period)` (SAAS_PLAN §6.2)
+- [x] Unit tests `test/billing-invoice.test.ts`: peak summed across institutes per day; carry-forward of days without rows; opening value from before the month; trial days excluded; free allowance; minimum charge line; zero-head account; rounding to cents with `lib/money.ts`
+- [x] `usage.ts`: daily series per account for a month from `tenant_usage_daily`, read per institute with `forEachTenant`
+- [x] `service.ts`: `generateInvoices(period)` (lock `invoice:<accountId>`, `UNIQUE (account_id, period)`, number `S-YYYY-MM-NNNN`, due date from settings, lines snapshot)
+- [x] `service.ts`: `recordPayment(invoiceId, { amount, reference, clientRef })` (part payments; invoice `paid` when sum ≥ total) and `voidInvoice(invoiceId, reason)`
+- [x] Audit row in the same transaction for generate, payment and void
+- [x] Tests: generating twice is a no-op; price change after generation doesn't change the invoice; same `clientRef` records once; account goes overdue / restricted / back to active as invoices age and get paid
+- [x] Temporary admin script `npm run billing -w apps/api -- generate <YYYY-MM> | pay <invoice> <amount> <ref> | void <invoice> <reason>` (uses the same service functions; bundled as `dist/billing.js` for the server; acts as the platform admin in `BILLING_ADMIN_PHONE`; removed in Phase 3)
+- [x] Runbook `docs/runbooks/billing.md`: monthly steps until the console exists
 - [ ] Release Phase 2; check `tenant_usage_daily` fills on production after a student is added
 
+- [x] Tests added: 11 invoice unit tests (`billing-invoice.test.ts`), 14 metering/invoice integration tests (`metering.test.ts`); suite: 150 API + 17 web + 11 db passing
+
 ### Done check
-- [ ] A seeded month with heads changing across two institutes produces the expected invoice to the cent
-- [ ] `migrate check` passes with 013 + 014
-- [ ] No change visible to customers
+- [x] A seeded month with heads changing across two institutes produces the expected invoice to the cent
+- [x] `migrate check` passes with 013 + 014
+- [x] No change visible to customers
 
 ---
 

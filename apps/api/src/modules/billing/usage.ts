@@ -1,6 +1,7 @@
 import { forEachTenant } from '@lms/db';
 import type { Knex } from 'knex';
 import { HEADS, type Head } from './catalogue.js';
+import type { UsageRow } from './invoice.js';
 
 export type HeadCounts = Record<Head, number>;
 
@@ -41,4 +42,33 @@ export async function countAccountHeads(
     for (const head of HEADS) total[head] += counts[head];
   }
   return { ...total, institutes: ids.length };
+}
+
+/**
+ * The account's tenant_usage_daily rows for days `from`..`to`, plus each institute's last row per
+ * head before `from` (the opening count). Read per institute: the table has forced RLS.
+ */
+export async function usageRows(
+  trx: Knex.Transaction,
+  accountId: string,
+  from: string,
+  to: string,
+): Promise<UsageRow[]> {
+  const ids = await accountTenantIds(trx, accountId);
+  const perTenant = await forEachTenant(trx, ids, async (tenantId) => {
+    const { rows } = await trx.raw(
+      `SELECT tenant_id AS "tenantId", head, to_char(day, 'YYYY-MM-DD') AS day,
+          count_max AS "countMax", count_last AS "countLast"
+        FROM tenant_usage_daily WHERE tenant_id = ? AND day BETWEEN ? AND ?
+      UNION ALL
+      SELECT * FROM (
+        SELECT DISTINCT ON (head) tenant_id, head, to_char(day, 'YYYY-MM-DD'), count_max, count_last
+          FROM tenant_usage_daily WHERE tenant_id = ? AND day < ?
+          ORDER BY head, day DESC
+      ) opening`,
+      [tenantId, from, to, tenantId, from],
+    );
+    return rows as UsageRow[];
+  });
+  return perTenant.flat();
 }

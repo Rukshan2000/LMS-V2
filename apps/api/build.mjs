@@ -1,4 +1,4 @@
-// Bundle the API (and the migration CLI) into dist/. Workspace code (@lms/db, TypeScript)
+// Bundle the API (and the migration and billing CLIs) into dist/. Workspace code (@lms/db, TypeScript)
 // is bundled in; npm dependencies stay external and come from node_modules at runtime.
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
@@ -9,7 +9,12 @@ const external = [...deps('package.json'), ...deps('../../packages/db/package.js
 );
 
 await build({
-  entryPoints: { index: 'src/index.ts', migrate: '../../packages/db/src/migrate.ts' },
+  entryPoints: {
+    index: 'src/index.ts',
+    migrate: '../../packages/db/src/migrate.ts',
+    // Temporary billing CLI (docs/runbooks/billing.md); removed with the console in Phase 3.
+    billing: 'src/modules/billing/admin-cli.ts',
+  },
   outdir: 'dist',
   bundle: true,
   platform: 'node',

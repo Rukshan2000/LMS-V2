@@ -3,9 +3,11 @@
 import type { Knex } from 'knex';
 import { HttpError } from '../../lib/http-error.js';
 import { fromCents, toCents } from '../../lib/money.js';
+import { addDays, colomboToday } from '../../lib/time.js';
 import { CAP_HEAD, CAPS, type Cap, type Feature, type Head, type Values } from './catalogue.js';
+import { computeInvoice, monthDays } from './invoice.js';
 import { resolveAccountState, resolveValues, type ResolvedState } from './resolve.js';
-import { countAccountHeads } from './usage.js';
+import { countAccountHeads, usageRows } from './usage.js';
 
 interface AccountRow {
   id: string;
@@ -38,6 +40,19 @@ export async function loadSettings(trx: Knex.Transaction): Promise<Settings> {
   };
 }
 
+/** Price book values with the account's unexpired overrides applied. */
+async function accountValues(
+  trx: Knex.Transaction,
+  account: Pick<AccountRow, 'id' | 'price_book'>,
+  now = new Date(),
+): Promise<Values> {
+  const book = await trx('price_books').where({ key: account.price_book }).first('values');
+  const overrides = await trx('account_overrides')
+    .where({ account_id: account.id })
+    .select('key', 'value', 'expires_at as expiresAt');
+  return resolveValues(book?.values ?? {}, overrides, now);
+}
+
 interface AccountContext {
   account: AccountRow;
   state: ResolvedState;
@@ -47,10 +62,7 @@ interface AccountContext {
 async function accountContext(trx: Knex.Transaction, account: AccountRow): Promise<AccountContext> {
   // Sequential: one transaction = one connection, which runs one query at a time anyway.
   const settings = await loadSettings(trx);
-  const book = await trx('price_books').where({ key: account.price_book }).first('values');
-  const overrides = await trx('account_overrides')
-    .where({ account_id: account.id })
-    .select('key', 'value', 'expires_at as expiresAt');
+  const values = await accountValues(trx, account);
   const invoices = await trx('subscription_invoices as i')
     .where({ 'i.account_id': account.id, 'i.status': 'open' })
     .select(
@@ -75,7 +87,7 @@ async function accountContext(trx: Knex.Transaction, account: AccountRow): Promi
       openInvoices,
       settings,
     ),
-    values: resolveValues(book?.values ?? {}, overrides),
+    values,
   };
 }
 
@@ -250,4 +262,237 @@ export async function accountForNewInstitute(
     ),
   );
   return ctx.account.id;
+}
+
+// ---- Subscription invoices (docs/SAAS_PLAN.md §6.1). Platform admin actions, each audited in
+// the same transaction (§4 rule 9).
+
+export interface Actor {
+  userId: string;
+  ip?: string;
+}
+
+const audit = (
+  trx: Knex.Transaction,
+  actor: Actor,
+  accountId: string,
+  action: string,
+  before: unknown,
+  after: unknown,
+) =>
+  trx('platform_audit').insert({
+    actor_user_id: actor.userId,
+    account_id: accountId,
+    action,
+    before: before === null ? null : JSON.stringify(before),
+    after: JSON.stringify(after),
+    ip: actor.ip ?? null,
+  });
+
+export interface GeneratedInvoice {
+  id: string;
+  accountId: string;
+  number: string;
+  total: string;
+  dueDate: string;
+}
+
+/**
+ * One invoice per account for a finished month. Idempotent: an account that already has an
+ * invoice for the period is skipped (and UNIQUE (account_id, period) backs that up), so running
+ * it twice does nothing. Accounts with nothing to bill (trial all month, total 0) get no invoice.
+ * Each account has its own transaction, so one failure does not undo the others.
+ */
+export async function generateInvoices(
+  db: Knex,
+  period: string,
+  actor: Actor,
+  now = new Date(),
+): Promise<GeneratedInvoice[]> {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || period >= colomboToday(now).slice(0, 7)) {
+    throw new HttpError(400, 'invalid_period', 'Only a finished month (YYYY-MM) can be invoiced');
+  }
+  const accountIds: string[] = await db('accounts').orderBy('created_at').pluck('id');
+  const generated: GeneratedInvoice[] = [];
+  for (const accountId of accountIds) {
+    const invoice = await db.transaction((trx) =>
+      generateInvoice(trx, accountId, period, actor, now),
+    );
+    if (invoice) generated.push(invoice);
+  }
+  return generated;
+}
+
+async function generateInvoice(
+  trx: Knex.Transaction,
+  accountId: string,
+  period: string,
+  actor: Actor,
+  now: Date,
+): Promise<GeneratedInvoice | null> {
+  await lock(trx, `invoice:${accountId}`);
+  if (await trx('subscription_invoices').where({ account_id: accountId, period }).first('id')) {
+    return null;
+  }
+  const account = await trx('accounts')
+    .where({ id: accountId })
+    .first('id', 'price_book', 'trial_ends_at');
+  const days = monthDays(period);
+  const rows = await usageRows(trx, accountId, days[0]!, days.at(-1)!);
+  // Prices as they are now; the invoice keeps them, later changes never touch it.
+  const computed = computeInvoice(
+    rows,
+    await accountValues(trx, account, now),
+    account.trial_ends_at,
+    period,
+  );
+  if (!computed || computed.totalCents === 0) return null;
+
+  // Numbers run per period: S-2026-09-0001, S-2026-09-0002, …
+  await lock(trx, `invoice-number:${period}`);
+  const issued = await trx('subscription_invoices').where({ period }).count({ n: '*' }).first();
+  const settings = await loadSettings(trx);
+  const [row] = await trx('subscription_invoices')
+    .insert({
+      account_id: accountId,
+      number: `S-${period}-${String(Number(issued?.n ?? 0) + 1).padStart(4, '0')}`,
+      period,
+      lines: JSON.stringify(computed.lines),
+      total: computed.total,
+      due_date: addDays(colomboToday(now), settings.invoiceDueDays),
+      generated_by: actor.userId,
+    })
+    .returning([
+      'id',
+      'account_id as accountId',
+      'number',
+      'total',
+      trx.raw(`to_char(due_date, 'YYYY-MM-DD') AS "dueDate"`),
+    ]);
+  await audit(trx, actor, accountId, 'invoice.generate', null, {
+    number: row.number,
+    period,
+    lines: computed.lines,
+    total: row.total,
+    dueDate: row.dueDate,
+  });
+  return row;
+}
+
+const invoiceNotFound = () => new HttpError(404, 'not_found', 'Invoice not found');
+
+/**
+ * Record a bank transfer against an invoice. Part payments add up; the invoice is `paid` when
+ * they reach its total. The same `clientRef` records once (a retry returns the first result).
+ */
+export async function recordPayment(
+  db: Knex,
+  invoiceId: string,
+  payment: { amount: string; reference: string; clientRef: string },
+  actor: Actor,
+): Promise<{ paymentId: string; status: string; amountDue: string }> {
+  let amountCents: number;
+  try {
+    amountCents = toCents(payment.amount);
+  } catch {
+    amountCents = 0;
+  }
+  if (amountCents <= 0) throw new HttpError(400, 'invalid_amount', 'Amount must be above 0');
+
+  return db.transaction(async (trx) => {
+    const invoice = await trx('subscription_invoices')
+      .where({ id: invoiceId })
+      .forUpdate()
+      .first('id', 'account_id', 'number', 'total', 'status');
+    if (!invoice) throw invoiceNotFound();
+    const paidCents = async () =>
+      toCents(
+        (
+          await trx('subscription_payments')
+            .where({ invoice_id: invoice.id })
+            .first(trx.raw('COALESCE(sum(amount), 0)::text AS paid'))
+        ).paid,
+      );
+    const totalCents = toCents(invoice.total);
+
+    const existing = await trx('subscription_payments')
+      .where({ client_ref: payment.clientRef })
+      .first('id', 'invoice_id');
+    if (existing) {
+      if (existing.invoice_id !== invoice.id) {
+        throw new HttpError(409, 'client_ref_used', 'This payment was recorded on another invoice');
+      }
+      const due = Math.max(0, totalCents - (await paidCents()));
+      return { paymentId: existing.id, status: invoice.status, amountDue: fromCents(due) };
+    }
+    if (invoice.status !== 'open') {
+      throw new HttpError(409, 'invoice_not_open', `Invoice is ${invoice.status}`);
+    }
+    const before = await paidCents();
+    const due = totalCents - before;
+    if (amountCents > due) {
+      throw new HttpError(400, 'amount_exceeds_due', `Only ${fromCents(due)} is due`, {
+        amountDue: fromCents(due),
+      });
+    }
+    const [{ id }] = await trx('subscription_payments')
+      .insert({
+        invoice_id: invoice.id,
+        amount: fromCents(amountCents),
+        reference: payment.reference,
+        client_ref: payment.clientRef,
+        recorded_by: actor.userId,
+      })
+      .returning('id');
+    const status = amountCents === due ? 'paid' : 'open';
+    if (status === 'paid') {
+      await trx('subscription_invoices').where({ id: invoice.id }).update({ status });
+    }
+    await audit(
+      trx,
+      actor,
+      invoice.account_id,
+      'invoice.payment',
+      { number: invoice.number, status: invoice.status, paid: fromCents(before) },
+      {
+        number: invoice.number,
+        status,
+        paid: fromCents(before + amountCents),
+        amount: fromCents(amountCents),
+        reference: payment.reference,
+      },
+    );
+    return { paymentId: id, status, amountDue: fromCents(due - amountCents) };
+  });
+}
+
+/** Cancel an open invoice that has no payments. The row stays (status `void`) for the record. */
+export async function voidInvoice(
+  db: Knex,
+  invoiceId: string,
+  reason: string,
+  actor: Actor,
+): Promise<void> {
+  await db.transaction(async (trx) => {
+    const invoice = await trx('subscription_invoices')
+      .where({ id: invoiceId })
+      .forUpdate()
+      .first('id', 'account_id', 'number', 'status');
+    if (!invoice) throw invoiceNotFound();
+    if (invoice.status !== 'open') {
+      throw new HttpError(409, 'invoice_not_open', `Invoice is ${invoice.status}`);
+    }
+    if (await trx('subscription_payments').where({ invoice_id: invoice.id }).first('id')) {
+      throw new HttpError(409, 'invoice_has_payments', 'Invoice has payments; it cannot be voided');
+    }
+    await trx('subscription_invoices').where({ id: invoice.id }).update({ status: 'void' });
+    await audit(
+      trx,
+      actor,
+      invoice.account_id,
+      'invoice.void',
+      { number: invoice.number, status: 'open' },
+      { number: invoice.number, status: 'void', reason },
+    );
+  });
 }

@@ -4,5 +4,8 @@ export {
   accountForNewInstitute,
   assertCanAddHead,
   assertFeature,
+  generateInvoices,
   getEntitlements,
+  recordPayment,
+  voidInvoice,
 } from './service.js';
