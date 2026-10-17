@@ -1,10 +1,11 @@
 'use client';
 
+import { BookOpen, QrCode, Smartphone, UserRound, Wallet } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { BackLink, FormError, Skeleton } from '../ui';
+import { BackLink, FormError, Skeleton, Tabs } from '../ui';
 import { useTenantData } from '../dashboard-shell';
 import { StudentFees } from '../fees/student-fees';
 import { StudentCard } from './student-card';
@@ -62,22 +63,45 @@ export function StudentDetail() {
         </>
       }
     >
-      {/* Two columns on wide screens; on phones the order stays classes → fees → card → form. */}
-      <div className="grid items-start gap-6 xl:grid-cols-2">
-        <div className="space-y-6">
-          <StudentClasses studentId={student.id} initial={student.classes} />
-          <StudentFees studentId={student.id} classes={student.classes} />
-        </div>
-        <div className="space-y-6">
-          <StudentCard studentId={student.id} />
-          {desk && student.status === 'active' && (
-            <Locked feature="portal">
-              <PortalInvite student={student} />
-            </Locked>
-          )}
-          <StudentForm key={student.id} student={student} />
-        </div>
-      </div>
+      <Tabs
+        items={[
+          {
+            id: 'classes',
+            icon: BookOpen,
+            label: t.classes.inClasses,
+            content: <StudentClasses studentId={student.id} initial={student.classes} />,
+          },
+          {
+            id: 'fees',
+            icon: Wallet,
+            label: t.fees.title,
+            content: <StudentFees studentId={student.id} classes={student.classes} />,
+          },
+          {
+            id: 'card',
+            icon: QrCode,
+            label: t.students.cardTab,
+            content: <StudentCard studentId={student.id} />,
+          },
+          desk &&
+            student.status === 'active' && {
+              id: 'portal',
+              icon: Smartphone,
+              label: t.portal.invite,
+              content: (
+                <Locked feature="portal">
+                  <PortalInvite student={student} />
+                </Locked>
+              ),
+            },
+          {
+            id: 'details',
+            icon: UserRound,
+            label: t.students.detailsTab,
+            content: <StudentForm key={student.id} student={student} />,
+          },
+        ]}
+      />
     </Page>
   );
 }

@@ -1,7 +1,7 @@
 // Class helpers shared by client and server components (no 'use client', so server pages can call them).
 
-/** White surface used by every section and list. */
-export const card = 'rounded-xl border border-line bg-surface shadow-card';
+/** Flat white surface used by every section and list (depth comes from tabs and borders, not shadows). */
+export const card = 'rounded-xl border border-line bg-surface';
 
 const variants = {
   primary: 'bg-primary text-white shadow-sm hover:bg-primary-hover',
