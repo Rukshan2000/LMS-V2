@@ -4,10 +4,27 @@ import type { Knex } from 'knex';
 import { HttpError } from '../../lib/http-error.js';
 import { fromCents, toCents } from '../../lib/money.js';
 import { addDays, colomboToday } from '../../lib/time.js';
-import { CAP_HEAD, CAPS, type Cap, type Feature, type Head, type Values } from './catalogue.js';
-import { computeInvoice, monthDays } from './invoice.js';
-import { resolveAccountState, resolveValues, type ResolvedState } from './resolve.js';
-import { countAccountHeads, usageRows } from './usage.js';
+import { z } from 'zod';
+import {
+  CAP_HEAD,
+  CAPS,
+  HEADS,
+  KEYS,
+  keyValue,
+  valuesSchema,
+  type Cap,
+  type Feature,
+  type Head,
+  type Values,
+} from './catalogue.js';
+import { computeInvoice, dailyTotals, monthDays } from './invoice.js';
+import {
+  resolveAccountState,
+  resolveValues,
+  type AccountState,
+  type ResolvedState,
+} from './resolve.js';
+import { accountTenantIds, countAccountHeads, usageRows } from './usage.js';
 
 interface AccountRow {
   id: string;
@@ -275,7 +292,7 @@ export interface Actor {
 const audit = (
   trx: Knex.Transaction,
   actor: Actor,
-  accountId: string,
+  accountId: string | null,
   action: string,
   before: unknown,
   after: unknown,
@@ -289,6 +306,39 @@ const audit = (
     ip: actor.ip ?? null,
   });
 
+function assertFinishedPeriod(period: string, now: Date) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || period >= colomboToday(now).slice(0, 7)) {
+    throw new HttpError(400, 'invalid_period', 'Only a finished month (YYYY-MM) can be invoiced');
+  }
+}
+
+/** The account's live (not void) invoice for a month, if any. */
+const liveInvoice = (trx: Knex.Transaction, accountId: string, period: string) =>
+  trx('subscription_invoices')
+    .where({ account_id: accountId, period })
+    .whereNot({ status: 'void' })
+    .first('id');
+
+/** What the account would be billed for a finished month, with prices as they are now. */
+async function computeForPeriod(
+  trx: Knex.Transaction,
+  accountId: string,
+  period: string,
+  now: Date,
+) {
+  const account = await trx('accounts')
+    .where({ id: accountId })
+    .first('id', 'price_book', 'trial_ends_at');
+  const days = monthDays(period);
+  const rows = await usageRows(trx, accountId, days[0]!, days.at(-1)!);
+  return computeInvoice(
+    rows,
+    await accountValues(trx, account, now),
+    account.trial_ends_at,
+    period,
+  );
+}
+
 export interface GeneratedInvoice {
   id: string;
   accountId: string;
@@ -298,8 +348,8 @@ export interface GeneratedInvoice {
 }
 
 /**
- * One invoice per account for a finished month. Idempotent: an account that already has an
- * invoice for the period is skipped (and UNIQUE (account_id, period) backs that up), so running
+ * One invoice per account for a finished month. Idempotent: an account that already has a live
+ * invoice for the period is skipped (and a unique index on live invoices backs that up), so running
  * it twice does nothing. Accounts with nothing to bill (trial all month, total 0) get no invoice.
  * Each account has its own transaction, so one failure does not undo the others.
  */
@@ -309,9 +359,7 @@ export async function generateInvoices(
   actor: Actor,
   now = new Date(),
 ): Promise<GeneratedInvoice[]> {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period) || period >= colomboToday(now).slice(0, 7)) {
-    throw new HttpError(400, 'invalid_period', 'Only a finished month (YYYY-MM) can be invoiced');
-  }
+  assertFinishedPeriod(period, now);
   const accountIds: string[] = await db('accounts').orderBy('created_at').pluck('id');
   const generated: GeneratedInvoice[] = [];
   for (const accountId of accountIds) {
@@ -331,21 +379,10 @@ async function generateInvoice(
   now: Date,
 ): Promise<GeneratedInvoice | null> {
   await lock(trx, `invoice:${accountId}`);
-  if (await trx('subscription_invoices').where({ account_id: accountId, period }).first('id')) {
-    return null;
-  }
-  const account = await trx('accounts')
-    .where({ id: accountId })
-    .first('id', 'price_book', 'trial_ends_at');
-  const days = monthDays(period);
-  const rows = await usageRows(trx, accountId, days[0]!, days.at(-1)!);
+  // A voided invoice does not count: the month can be generated again (SAAS_PLAN §8.1).
+  if (await liveInvoice(trx, accountId, period)) return null;
   // Prices as they are now; the invoice keeps them, later changes never touch it.
-  const computed = computeInvoice(
-    rows,
-    await accountValues(trx, account, now),
-    account.trial_ends_at,
-    period,
-  );
+  const computed = await computeForPeriod(trx, accountId, period, now);
   if (!computed || computed.totalCents === 0) return null;
 
   // Numbers run per period: S-2026-09-0001, S-2026-09-0002, …
@@ -496,3 +533,581 @@ export async function voidInvoice(
     );
   });
 }
+
+/** Totals per head for a finished month, without creating anything (Generate shows these first). */
+export async function previewInvoices(
+  db: Knex,
+  period: string,
+  now = new Date(),
+): Promise<{ accountId: string; accountName: string; total: string }[]> {
+  assertFinishedPeriod(period, now);
+  return db.transaction(async (trx) => {
+    const accounts: { id: string; name: string }[] = await trx('accounts')
+      .orderBy('created_at')
+      .select('id', 'name');
+    const preview = [];
+    for (const a of accounts) {
+      if (await liveInvoice(trx, a.id, period)) continue;
+      const computed = await computeForPeriod(trx, a.id, period, now);
+      if (computed && computed.totalCents > 0) {
+        preview.push({ accountId: a.id, accountName: a.name, total: computed.total });
+      }
+    }
+    return preview;
+  });
+}
+
+// ---- Platform console (docs/SAAS_PLAN.md §10). Metadata only: names, owner phone, counts,
+// prices and money; never students, guardians, attendance or fee records.
+
+const accountNotFound = () => new HttpError(404, 'not_found', 'Account not found');
+
+const ACCOUNT_COLUMNS = [
+  'a.id',
+  'a.name',
+  'a.owner_phone',
+  'a.owner_user_id',
+  'u.full_name as owner_name',
+  'a.price_book',
+  'a.trial_ends_at',
+  'a.suspended_at',
+  'a.suspended_reason',
+  'a.notes',
+  'a.created_at',
+];
+type AccountDetailRow = AccountRow & {
+  name: string;
+  owner_phone: string;
+  owner_user_id: string | null;
+  owner_name: string | null;
+  suspended_reason: string | null;
+  notes: string | null;
+  created_at: Date;
+};
+const accountsQuery = (trx: Knex.Transaction) =>
+  trx('accounts as a').leftJoin('users as u', 'u.id', 'a.owner_user_id').select(ACCOUNT_COLUMNS);
+
+/**
+ * This month so far, from tenant_usage_daily: heads per day, heads now (latest count) and the
+ * estimate, which uses computeInvoice with the same rules as the bill (SAAS_PLAN §6.4).
+ */
+async function monthSoFar(trx: Knex.Transaction, ctx: AccountContext, now: Date) {
+  const today = colomboToday(now);
+  const period = today.slice(0, 7);
+  const rows = await usageRows(trx, ctx.account.id, `${period}-01`, today);
+  const days = monthDays(period).filter((d) => d <= today);
+  const daily = dailyTotals(rows, days);
+  // Tomorrow has no rows yet, so each institute carries its latest count_last into it.
+  const latest = dailyTotals(rows, [addDays(today, 1)]);
+  const estimate = computeInvoice(rows, ctx.values, ctx.account.trial_ends_at, period, today);
+  return {
+    period,
+    days: days.map((day, i) => ({
+      day,
+      ...Object.fromEntries(HEADS.map((h) => [h, daily[h][i]!])),
+    })),
+    headsNow: Object.fromEntries(HEADS.map((h) => [h, latest[h][0]!])) as Record<Head, number>,
+    estimate: estimate ?? { lines: [], total: '0.00', totalCents: 0 },
+  };
+}
+
+function summary(row: AccountDetailRow, ctx: AccountContext) {
+  return {
+    id: row.id,
+    name: row.name,
+    ownerPhone: row.owner_phone,
+    ownerName: row.owner_name,
+    claimed: row.owner_user_id !== null,
+    priceBook: row.price_book,
+    trialEndsAt: row.trial_ends_at,
+    suspendedAt: row.suspended_at,
+    state: ctx.state.state,
+    daysLeft: ctx.state.daysLeft,
+    amountDue: fromCents(ctx.state.amountDueCents),
+    overdueInvoice: ctx.state.overdueInvoice,
+    createdAt: row.created_at,
+  };
+}
+
+export type AccountFilter = AccountState | 'trial_ending';
+
+/** Accounts list: state, heads now, this month's estimate and amount due. */
+export async function listAccounts(
+  db: Knex,
+  { q, state }: { q?: string; state?: AccountFilter },
+  now = new Date(),
+) {
+  return db.transaction(async (trx) => {
+    const query = accountsQuery(trx).orderBy('a.name');
+    if (q) {
+      // 0771234567 is stored as 94771234567: match without the leading 0.
+      const digits = q.replace(/\D/g, '').replace(/^0/, '');
+      query.where((w) => {
+        w.whereILike('a.name', `%${q}%`);
+        if (digits.length >= 3) w.orWhere('a.owner_phone', 'like', `%${digits}%`);
+      });
+    }
+    const rows: AccountDetailRow[] = await query;
+    // ponytail: a few queries per account, sequential on one transaction. Fine for hundreds of
+    // accounts; add a monthly rollup table if the list gets slow (SAAS_TASKS Phase 3).
+    const list = [];
+    for (const row of rows) {
+      const ctx = await accountContext(trx, row);
+      const s = ctx.state;
+      const keep =
+        !state ||
+        (state === 'trial_ending'
+          ? s.state === 'trial' && (s.daysLeft ?? 0) <= 7
+          : s.state === state);
+      if (!keep) continue;
+      const month = await monthSoFar(trx, ctx, now);
+      list.push({
+        ...summary(row, ctx),
+        institutes: (await accountTenantIds(trx, row.id)).length,
+        headsNow: month.headsNow,
+        estimate: month.estimate.total,
+      });
+    }
+    return list;
+  });
+}
+
+const invoiceColumns = (trx: Knex.Transaction) => [
+  'i.id',
+  'i.account_id as accountId',
+  'i.number',
+  'i.period',
+  'i.lines',
+  'i.total',
+  'i.status',
+  trx.raw(`to_char(i.due_date, 'YYYY-MM-DD') AS "dueDate"`),
+  'i.created_at as createdAt',
+  trx.raw(
+    `(SELECT COALESCE(sum(p.amount), 0)::numeric(12, 2)::text FROM subscription_payments p WHERE p.invoice_id = i.id) AS paid`,
+  ),
+];
+
+/** Everything about one account the console shows. */
+export async function getAccount(db: Knex, accountId: string, now = new Date()) {
+  return db.transaction(async (trx) => {
+    const row: AccountDetailRow | undefined = await accountsQuery(trx)
+      .where('a.id', accountId)
+      .first();
+    if (!row) throw accountNotFound();
+    const ctx = await accountContext(trx, row);
+    const book = await trx('price_books')
+      .where({ key: row.price_book })
+      .first('key', 'name', 'values');
+    const overrides = await trx('account_overrides as o')
+      .leftJoin('users as u', 'u.id', 'o.created_by')
+      .where('o.account_id', accountId)
+      .orderBy('o.key')
+      .select(
+        'o.key',
+        'o.value',
+        'o.expires_at as expiresAt',
+        'o.note',
+        'o.created_at as createdAt',
+        'u.full_name as createdBy',
+      );
+    const institutes = await trx('tenants')
+      .where({ account_id: accountId })
+      .orderBy('created_at')
+      .select('id', 'name', 'slug', 'status', 'created_at as createdAt');
+    const invoices = await trx('subscription_invoices as i')
+      .where('i.account_id', accountId)
+      .orderBy('i.period', 'desc')
+      .orderBy('i.created_at', 'desc')
+      .select(invoiceColumns(trx));
+    const payments = await trx('subscription_payments as p')
+      .join('subscription_invoices as i', 'i.id', 'p.invoice_id')
+      .where('i.account_id', accountId)
+      .orderBy('p.received_at', 'desc')
+      .select(
+        'p.id',
+        'i.number',
+        'p.amount',
+        'p.method',
+        'p.reference',
+        'p.received_at as receivedAt',
+      );
+    const month = await monthSoFar(trx, ctx, now);
+    return {
+      account: { ...summary(row, ctx), notes: row.notes, suspendedReason: row.suspended_reason },
+      values: ctx.values,
+      book,
+      overrides,
+      institutes,
+      invoices,
+      payments,
+      month,
+      audit: await auditQuery(trx, { accountId, limit: 100 }),
+    };
+  });
+}
+
+/** One account row, locked, or 404. */
+async function lockAccount(trx: Knex.Transaction, accountId: string) {
+  const account = await trx('accounts')
+    .where({ id: accountId })
+    .forUpdate()
+    .first(
+      'id',
+      'name',
+      'notes',
+      'price_book',
+      'trial_ends_at',
+      'suspended_at',
+      'suspended_reason',
+    );
+  if (!account) throw accountNotFound();
+  return account;
+}
+
+async function assertPriceBook(trx: Knex.Transaction, key: string) {
+  if (!(await trx('price_books').where({ key }).first('key'))) {
+    throw new HttpError(400, 'unknown_price_book', `No price book ${key}`);
+  }
+}
+
+/**
+ * An account created by the platform admin for a customer who has not signed up yet. The
+ * customer claims it by creating an institute with this phone (SAAS_PLAN §10.3). No trial caps:
+ * the admin picks the price book, and sets caps as overrides if wanted.
+ */
+export async function createAccount(
+  db: Knex,
+  input: { name: string; ownerPhone: string; priceBook: string; trialDays: number },
+  actor: Actor,
+  now = new Date(),
+) {
+  return db.transaction(async (trx) => {
+    await lock(trx, `account-phone:${input.ownerPhone}`);
+    await assertPriceBook(trx, input.priceBook);
+    // A second account for the same phone could never be claimed (claiming takes the oldest).
+    const owner = await trx('users').where({ phone: input.ownerPhone }).first('id');
+    const existing = await trx('accounts')
+      .where({ owner_phone: input.ownerPhone })
+      .modify((w) => {
+        if (owner) w.orWhere({ owner_user_id: owner.id });
+      })
+      .first('id');
+    if (existing) {
+      throw new HttpError(409, 'account_exists', 'This phone already has an account', {
+        accountId: existing.id,
+      });
+    }
+    const trialEndsAt =
+      input.trialDays > 0 ? new Date(now.getTime() + input.trialDays * 86400_000) : null;
+    const [account] = await trx('accounts')
+      .insert({
+        name: input.name,
+        owner_phone: input.ownerPhone,
+        price_book: input.priceBook,
+        trial_ends_at: trialEndsAt,
+        created_by: actor.userId,
+      })
+      .returning(['id', 'name', 'owner_phone', 'price_book', 'trial_ends_at']);
+    await audit(trx, actor, account.id, 'account.create', null, {
+      name: account.name,
+      ownerPhone: account.owner_phone,
+      priceBook: account.price_book,
+      trialEndsAt: account.trial_ends_at,
+    });
+    return { id: account.id as string, ownerPhone: account.owner_phone as string };
+  });
+}
+
+export async function updateAccount(
+  db: Knex,
+  accountId: string,
+  patch: { name?: string; notes?: string | null; priceBook?: string },
+  actor: Actor,
+) {
+  await db.transaction(async (trx) => {
+    const account = await lockAccount(trx, accountId);
+    if (patch.priceBook !== undefined) await assertPriceBook(trx, patch.priceBook);
+    const before = { name: account.name, notes: account.notes, priceBook: account.price_book };
+    const after = { ...before, ...patch };
+    await trx('accounts').where({ id: accountId }).update({
+      name: after.name,
+      notes: after.notes,
+      price_book: after.priceBook,
+      updated_at: trx.fn.now(),
+    });
+    await audit(trx, actor, accountId, 'account.update', before, after);
+  });
+}
+
+const overrideRow = (trx: Knex.Transaction, accountId: string, key: string) =>
+  trx('account_overrides')
+    .where({ account_id: accountId, key })
+    .first('value', 'expires_at as expiresAt', 'note');
+
+/** A per-customer value for one catalogue key; wins over the price book until it expires. */
+export async function setOverride(
+  db: Knex,
+  accountId: string,
+  key: string,
+  input: { value: unknown; expiresAt: Date | null; note: string },
+  actor: Actor,
+  now = new Date(),
+) {
+  if (!KEYS.includes(key)) throw new HttpError(400, 'unknown_key', `Unknown billing key: ${key}`);
+  const value = keyValue(key).parse(input.value);
+  if (input.expiresAt && input.expiresAt <= now) {
+    throw new HttpError(400, 'expiry_in_past', 'The expiry must be in the future');
+  }
+  await db.transaction(async (trx) => {
+    await lockAccount(trx, accountId);
+    const before = (await overrideRow(trx, accountId, key)) ?? null;
+    const row = {
+      account_id: accountId,
+      key,
+      value: JSON.stringify(value),
+      expires_at: input.expiresAt,
+      note: input.note,
+      created_by: actor.userId,
+      created_at: trx.fn.now(),
+    };
+    await trx('account_overrides').insert(row).onConflict(['account_id', 'key']).merge();
+    await audit(trx, actor, accountId, 'override.set', before && { key, ...before }, {
+      key,
+      value,
+      expiresAt: input.expiresAt,
+      note: input.note,
+    });
+  });
+}
+
+export async function clearOverride(db: Knex, accountId: string, key: string, actor: Actor) {
+  await db.transaction(async (trx) => {
+    await lockAccount(trx, accountId);
+    const before = await overrideRow(trx, accountId, key);
+    if (!before) throw new HttpError(404, 'not_found', 'No override for this key');
+    await trx('account_overrides').where({ account_id: accountId, key }).del();
+    await audit(trx, actor, accountId, 'override.clear', { key, ...before }, { key });
+  });
+}
+
+/**
+ * Extend a running trial by `days`, or start a new one from now. Overrides that expired with the
+ * running trial (the trial caps) move with it.
+ */
+export async function extendTrial(
+  db: Knex,
+  accountId: string,
+  days: number,
+  actor: Actor,
+  now = new Date(),
+) {
+  return db.transaction(async (trx) => {
+    const account = await lockAccount(trx, accountId);
+    const running: Date | null =
+      account.trial_ends_at && account.trial_ends_at > now ? account.trial_ends_at : null;
+    const trialEndsAt = new Date((running ?? now).getTime() + days * 86400_000);
+    await trx('accounts')
+      .where({ id: accountId })
+      .update({ trial_ends_at: trialEndsAt, updated_at: trx.fn.now() });
+    const moved = running
+      ? await trx('account_overrides')
+          .where({ account_id: accountId, expires_at: running })
+          .update({ expires_at: trialEndsAt })
+      : 0;
+    await audit(
+      trx,
+      actor,
+      accountId,
+      'account.trial',
+      { trialEndsAt: account.trial_ends_at },
+      { trialEndsAt, days, overridesMoved: moved },
+    );
+    return { trialEndsAt };
+  });
+}
+
+/** Read-only for the customer (SAAS_PLAN §5.2 rule 1). */
+export async function suspendAccount(db: Knex, accountId: string, reason: string, actor: Actor) {
+  await db.transaction(async (trx) => {
+    const account = await lockAccount(trx, accountId);
+    if (account.suspended_at) throw new HttpError(409, 'already_suspended', 'Already suspended');
+    const [after] = await trx('accounts')
+      .where({ id: accountId })
+      .update({ suspended_at: trx.fn.now(), suspended_reason: reason, updated_at: trx.fn.now() })
+      .returning(['suspended_at as suspendedAt', 'suspended_reason as reason']);
+    await audit(trx, actor, accountId, 'account.suspend', { suspendedAt: null }, after);
+  });
+}
+
+export async function unsuspendAccount(db: Knex, accountId: string, actor: Actor) {
+  await db.transaction(async (trx) => {
+    const account = await lockAccount(trx, accountId);
+    if (!account.suspended_at) throw new HttpError(409, 'not_suspended', 'Not suspended');
+    await trx('accounts')
+      .where({ id: accountId })
+      .update({ suspended_at: null, suspended_reason: null, updated_at: trx.fn.now() });
+    await audit(
+      trx,
+      actor,
+      accountId,
+      'account.unsuspend',
+      { suspendedAt: account.suspended_at, reason: account.suspended_reason },
+      { suspendedAt: null },
+    );
+  });
+}
+
+export async function listInvoices(
+  db: Knex,
+  { period, status }: { period?: string; status?: string },
+) {
+  return db.transaction((trx) =>
+    trx('subscription_invoices as i')
+      .join('accounts as a', 'a.id', 'i.account_id')
+      .modify((w) => {
+        if (period) w.where('i.period', period);
+        if (status) w.where('i.status', status);
+      })
+      .orderBy('i.number', 'desc')
+      // ponytail: newest 500 without a period filter; add paging when there are more.
+      .limit(500)
+      .select([...invoiceColumns(trx), 'a.name as accountName', 'a.owner_phone as ownerPhone']),
+  );
+}
+
+// ---- Price books and settings: platform-wide, audited with no account.
+
+export async function listPriceBooks(db: Knex) {
+  return db('price_books as b')
+    .orderBy([{ column: 'b.is_default', order: 'desc' }, 'b.key'])
+    .select(
+      'b.key',
+      'b.name',
+      'b.values',
+      'b.is_default as isDefault',
+      'b.updated_at as updatedAt',
+      db.raw('(SELECT count(*)::int FROM accounts a WHERE a.price_book = b.key) AS accounts'),
+    );
+}
+
+/** Replace a book's values. Unknown keys are refused (valuesSchema is strict). */
+export async function updatePriceBook(
+  db: Knex,
+  key: string,
+  input: { name?: string; values: unknown },
+  actor: Actor,
+) {
+  const values = valuesSchema.parse(input.values);
+  return db.transaction(async (trx) => {
+    const book = await trx('price_books').where({ key }).forUpdate().first('name', 'values');
+    if (!book) throw new HttpError(404, 'not_found', 'Price book not found');
+    const name = input.name ?? book.name;
+    await trx('price_books')
+      .where({ key })
+      .update({ name, values: JSON.stringify(values), updated_at: trx.fn.now() });
+    await audit(trx, actor, null, 'price_book.update', { key, ...book }, { key, name, values });
+    const affected = await trx('accounts').where({ price_book: key }).count({ n: '*' }).first();
+    return { affectedAccounts: Number(affected?.n ?? 0) };
+  });
+}
+
+export async function createPriceBook(
+  db: Knex,
+  input: { key: string; name: string; values: unknown },
+  actor: Actor,
+) {
+  const values = valuesSchema.parse(input.values);
+  await db.transaction(async (trx) => {
+    if (await trx('price_books').where({ key: input.key }).first('key')) {
+      throw new HttpError(409, 'price_book_exists', 'A price book with this key exists');
+    }
+    await trx('price_books').insert({
+      key: input.key,
+      name: input.name,
+      values: JSON.stringify(values),
+    });
+    await audit(trx, actor, null, 'price_book.create', null, { ...input, values });
+  });
+}
+
+/** Each setting the console may change, with its schema (SAAS_PLAN §5.3). */
+const SETTINGS_SCHEMA: Record<string, z.ZodType> = {
+  trial_days: z.number().int().min(1).max(365),
+  grace_days: z.number().int().min(0).max(90),
+  invoice_due_days: z.number().int().min(0).max(90),
+  trial_caps: valuesSchema.refine(
+    (v) => Object.keys(v).every((k) => k.startsWith('cap.')),
+    'only cap.* keys',
+  ),
+  // wa.me format, like users.phone.
+  support_whatsapp: z
+    .string()
+    .regex(/^94\d{9}$/)
+    .nullable(),
+  bank_details: z.string().trim().min(1).max(1000).nullable(),
+};
+
+export async function getSettings(db: Knex): Promise<Record<string, unknown>> {
+  const rows: { key: string; value: unknown }[] = await db('platform_settings').select(
+    'key',
+    'value',
+  );
+  const stored = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  return Object.fromEntries(Object.keys(SETTINGS_SCHEMA).map((k) => [k, stored[k] ?? null]));
+}
+
+export async function updateSetting(db: Knex, key: string, raw: unknown, actor: Actor) {
+  const schema = SETTINGS_SCHEMA[key];
+  if (!schema) throw new HttpError(404, 'not_found', 'Unknown setting');
+  const value = schema.parse(raw);
+  await db.transaction(async (trx) => {
+    const before = await trx('platform_settings').where({ key }).forUpdate().first('value');
+    await trx('platform_settings')
+      .insert({ key, value: JSON.stringify(value), updated_at: trx.fn.now() })
+      .onConflict('key')
+      .merge();
+    await audit(
+      trx,
+      actor,
+      null,
+      'setting.update',
+      { key, value: before?.value ?? null },
+      {
+        key,
+        value,
+      },
+    );
+  });
+}
+
+function auditQuery(
+  trx: Knex | Knex.Transaction,
+  { accountId, actorId, limit = 200 }: { accountId?: string; actorId?: string; limit?: number },
+) {
+  return (
+    trx('platform_audit as e')
+      .join('users as u', 'u.id', 'e.actor_user_id')
+      .leftJoin('accounts as a', 'a.id', 'e.account_id')
+      .modify((w) => {
+        if (accountId) w.where('e.account_id', accountId);
+        if (actorId) w.where('e.actor_user_id', actorId);
+      })
+      .orderBy('e.id', 'desc')
+      // ponytail: newest `limit` rows, no paging; add a `before` cursor when the log grows.
+      .limit(limit)
+      .select(
+        'e.id',
+        'e.action',
+        'e.before',
+        'e.after',
+        'e.ip',
+        'e.created_at as createdAt',
+        'e.account_id as accountId',
+        'a.name as accountName',
+        'u.full_name as actor',
+      )
+  );
+}
+
+export const listAudit = (db: Knex, filter: { accountId?: string; actorId?: string }) =>
+  auditQuery(db, filter);

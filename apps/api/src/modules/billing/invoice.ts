@@ -41,22 +41,11 @@ export function monthDays(period: string): string[] {
 const cents = (lkr: number) => Math.round(lkr * 100);
 
 /**
- * The bill for one account and month, or null when every day of the month was a trial day.
- * `rows` holds each institute's rows in the month plus its last row before it (the opening
- * count). A day without a row carries the institute's previous count_last forward.
+ * Each head's total across institutes for each of `days`. `rows` holds each institute's rows in
+ * the range plus its last row before it (the opening count). A day without a row carries the
+ * institute's previous count_last forward.
  */
-export function computeInvoice(
-  rows: UsageRow[],
-  values: Values,
-  trialEndsAt: Date | null,
-  period: string,
-): ComputedInvoice | null {
-  const days = monthDays(period);
-  // Days on or before the trial's last (Sri Lanka) day are free.
-  const trialEnd = trialEndsAt ? colomboToday(trialEndsAt) : '';
-  if (!days.some((d) => d > trialEnd)) return null;
-
-  // Daily totals per head, summed across institutes.
+export function dailyTotals(rows: UsageRow[], days: string[]): Record<Head, number[]> {
   const daily = Object.fromEntries(HEADS.map((h) => [h, days.map(() => 0)])) as Record<
     Head,
     number[]
@@ -76,6 +65,26 @@ export function computeInvoice(
       totals[d]! += rs[i]?.day === day ? rs[i]!.countMax : last;
     });
   }
+  return daily;
+}
+
+/**
+ * The bill for one account and month, or null when every billed day was a trial day. With
+ * `lastDay`, only days up to it count: the month so far, for estimates (SAAS_PLAN §6.4), so an
+ * estimate and the invoice come from the same rules.
+ */
+export function computeInvoice(
+  rows: UsageRow[],
+  values: Values,
+  trialEndsAt: Date | null,
+  period: string,
+  lastDay?: string,
+): ComputedInvoice | null {
+  const days = monthDays(period).filter((d) => !lastDay || d <= lastDay);
+  // Days on or before the trial's last (Sri Lanka) day are free.
+  const trialEnd = trialEndsAt ? colomboToday(trialEndsAt) : '';
+  if (!days.some((d) => d > trialEnd)) return null;
+  const daily = dailyTotals(rows, days);
 
   const lines: InvoiceLine[] = [];
   let totalCents = 0;

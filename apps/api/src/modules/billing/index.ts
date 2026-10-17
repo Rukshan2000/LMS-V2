@@ -1,5 +1,5 @@
 // Public surface of billing. Other modules import only from here (docs/SAAS_PLAN.md §4 rule 3).
-export type { Cap, Feature, Head } from './catalogue.js';
+export { KEYS, type Cap, type Feature, type Head } from './catalogue.js';
 export {
   accountForNewInstitute,
   assertCanAddHead,
@@ -8,4 +8,24 @@ export {
   getEntitlements,
   recordPayment,
   voidInvoice,
+  // Platform console (modules/platform). Every mutation writes one platform_audit row.
+  clearOverride,
+  createAccount,
+  createPriceBook,
+  extendTrial,
+  getAccount,
+  getSettings,
+  listAccounts,
+  listAudit,
+  listInvoices,
+  listPriceBooks,
+  previewInvoices,
+  setOverride,
+  suspendAccount,
+  unsuspendAccount,
+  updateAccount,
+  updatePriceBook,
+  updateSetting,
+  type Actor,
+  type AccountFilter,
 } from './service.js';

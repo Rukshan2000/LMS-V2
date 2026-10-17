@@ -16,6 +16,8 @@ export interface SessionUser {
 declare module 'fastify' {
   interface FastifyRequest {
     user: SessionUser | null;
+    /** Set with `user`: when this login happened, and whether the user is a platform admin. */
+    authSession: { createdAt: Date; isPlatformAdmin: boolean } | null;
   }
   interface FastifyInstance {
     requireAuth: (req: FastifyRequest) => Promise<void>;
@@ -36,6 +38,7 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
   };
 
   app.decorateRequest('user', null);
+  app.decorateRequest('authSession', null);
 
   app.addHook('onRequest', async (req) => {
     const token = req.cookies[SESSION_COOKIE];
@@ -47,8 +50,10 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
       .whereNull('s.revoked_at')
       .where('s.expires_at', '>', app.db.fn.now())
       .where('u.status', 'active')
-      .first('u.id', 'u.phone', 'u.full_name');
-    if (row) req.user = { id: row.id, phone: row.phone, fullName: row.full_name };
+      .first('u.id', 'u.phone', 'u.full_name', 'u.is_platform_admin', 's.created_at');
+    if (!row) return;
+    req.user = { id: row.id, phone: row.phone, fullName: row.full_name };
+    req.authSession = { createdAt: row.created_at, isPlatformAdmin: row.is_platform_admin };
   });
 
   app.decorate('requireAuth', async (req: FastifyRequest) => {

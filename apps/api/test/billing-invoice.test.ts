@@ -158,4 +158,15 @@ describe('computeInvoice', () => {
       line('admin', 2, '0.00', '0.00'),
     ]);
   });
+
+  it('month so far: days after lastDay do not count (estimate = same rules as the bill)', () => {
+    const rows = [row('A', 'student', '2026-09-01', 10), row('A', 'student', '2026-09-20', 90)];
+    expect(computeInvoice(rows, values(), null, '2026-09', '2026-09-19')!.lines).toEqual([
+      line('student', 10, '100.00', '1000.00'),
+    ]);
+    expect(computeInvoice(rows, values(), null, '2026-09', '2026-09-20')!.total).toBe('9000.00');
+    // Still in trial on the last counted day: nothing billed yet.
+    const trialEnd = new Date('2026-09-25T00:00:00Z');
+    expect(computeInvoice(rows, values(), trialEnd, '2026-09', '2026-09-20')).toBeNull();
+  });
 });

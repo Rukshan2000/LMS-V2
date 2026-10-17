@@ -5,6 +5,7 @@ import attendanceRoutes from './modules/attendance/routes.js';
 import classRoutes from './modules/classes/routes.js';
 import feeRoutes from './modules/fees/routes.js';
 import identityRoutes from './modules/identity/routes.js';
+import platformRoutes from './modules/platform/routes.js';
 import portalRoutes from './modules/portal/routes.js';
 import reportRoutes from './modules/reports/routes.js';
 import slipRoutes from './modules/slips/routes.js';
@@ -14,6 +15,7 @@ import tenancyRoutes from './modules/tenancy/routes.js';
 import authPlugin from './plugins/auth.js';
 import dbPlugin from './plugins/db.js';
 import errorsPlugin from './plugins/errors.js';
+import platformAdminPlugin from './plugins/platform-admin.js';
 import tenantPlugin from './plugins/tenant.js';
 
 export interface AppOptions {
@@ -21,6 +23,8 @@ export interface AppOptions {
   secureCookies: boolean;
   /** Login/signup attempts per IP per minute. */
   authRateLimitMax?: number;
+  /** Platform console changes per IP per minute. */
+  adminRateLimitMax?: number;
   logger?: FastifyServerOptions['logger'];
 }
 
@@ -28,6 +32,7 @@ export async function buildApp({
   db,
   secureCookies,
   authRateLimitMax = 10,
+  adminRateLimitMax = 30,
   logger = true,
 }: AppOptions) {
   // trustProxy: nginx on the same host sets X-Forwarded-For (needed for rate limits + session IP).
@@ -37,6 +42,7 @@ export async function buildApp({
   await app.register(dbPlugin, { db });
   await app.register(authPlugin, { secureCookies });
   await app.register(tenantPlugin);
+  await app.register(platformAdminPlugin);
   await app.register(rateLimit, { global: false });
 
   app.get('/api/health', async () => {
@@ -55,6 +61,7 @@ export async function buildApp({
   await app.register(slipRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(reportRoutes, { prefix: '/api/v1/tenants/:tenantId/reports' });
   await app.register(inviteRoutes, { prefix: '/api/v1/invites' });
+  await app.register(platformRoutes, { prefix: '/api/v1/admin', adminRateLimitMax });
 
   return app;
 }

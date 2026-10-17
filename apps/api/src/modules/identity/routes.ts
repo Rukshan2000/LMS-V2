@@ -86,6 +86,6 @@ export default async function identityRoutes(
         .orderBy('t.name')
         .select('t.id', 't.slug', 't.name', 't.status'),
     );
-    return { user, tenants };
+    return { user, tenants, isPlatformAdmin: req.authSession!.isPlatformAdmin };
   });
 }
