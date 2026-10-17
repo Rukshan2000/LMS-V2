@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, MessageCircle, UserMinus, UserPlus, Users, X } from 'lucide-react';
+import { Copy, Mail, MessageCircle, UserMinus, UserPlus, Users, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -13,13 +13,16 @@ import { btn, Button, card, ConfirmButton, Field, FormError, Tabs, useToast } fr
 interface Member {
   membershipId: string;
   fullName: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   roles: Role[];
 }
 interface Invite {
   id: string;
   fullName: string;
-  phone: string;
+  email: string | null;
+  /** Invites from before email login. */
+  phone?: string | null;
   role: Role;
   expiresAt: string;
   /** Only known right after creating it in this browser (the server stores a hash). */
@@ -33,12 +36,13 @@ export function StaffSettings() {
   const { tenant, me } = useTenantData();
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [form, setForm] = useState({ fullName: '', phone: '', role: 'teacher' });
+  const [form, setForm] = useState({ fullName: '', email: '', role: 'teacher' });
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   const fail = useCallback((err: unknown) => setError(errorMessage(t, err)), [t]);
+  const isMe = (m: Member) => m.email === me.user.email && m.phone === me.user.phone;
   const load = useCallback(() => {
     api<{ members: Member[] }>(`/tenants/${tenantId}/members`)
       .then((r) => setMembers(r.members))
@@ -58,24 +62,46 @@ export function StaffSettings() {
     setBusy(true);
     setError(null);
     try {
-      const res = await api<{ invite: Invite; code: string }>(`/tenants/${tenantId}/invites`, {
-        method: 'POST',
-        body: form,
-      });
+      const res = await api<{ invite: Invite; code: string; emailSent: boolean }>(
+        `/tenants/${tenantId}/invites`,
+        { method: 'POST', body: form },
+      );
       const link = `${window.location.origin}/${lang}/join/${res.code}`;
       setInvites((list) => [
         { ...res.invite, link },
-        ...list.filter((i) => i.phone !== res.invite.phone),
+        ...list.filter((i) => i.email !== res.invite.email),
       ]);
-      setForm({ fullName: '', phone: '', role: 'teacher' });
+      setForm({ fullName: '', email: '', role: 'teacher' });
+      sent(res.invite, res.emailSent);
     } catch (err) {
       fail(err);
     }
     setBusy(false);
   }
 
+  function sent(i: Invite, emailSent: boolean) {
+    if (emailSent) toast(fmt(st.emailSent, { email: i.email ?? '' }));
+    else setError(st.emailFailed);
+  }
+
+  async function resend(i: Invite) {
+    setError(null);
+    try {
+      const res = await api<{ code: string; emailSent: boolean }>(
+        `/tenants/${tenantId}/invites/${i.id}/resend`,
+        { method: 'POST' },
+      );
+      const link = `${window.location.origin}/${lang}/join/${res.code}`;
+      setInvites((list) => list.map((x) => (x.id === i.id ? { ...x, link } : x)));
+      sent(i, res.emailSent);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  // No number: WhatsApp lets the sender pick the chat.
   const whatsapp = (i: Invite) =>
-    `https://wa.me/${i.phone}?text=${encodeURIComponent(
+    `https://wa.me/${i.phone ?? ''}?text=${encodeURIComponent(
       fmt(st.message, {
         name: i.fullName,
         institute: tenant.name,
@@ -111,14 +137,13 @@ export function StaffSettings() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="font-medium">{m.fullName}</span>
-                        {m.fullName === me.user.fullName && m.phone === me.user.phone && (
-                          <span className="text-ink-subtle"> {st.you}</span>
-                        )}
+                        {isMe(m) && <span className="text-ink-subtle"> {st.you}</span>}
                         <span className="block text-ink-subtle">
-                          {displayPhone(m.phone)} · {m.roles.map((r) => t.roles[r]).join(', ')}
+                          {m.email ?? displayPhone(m.phone)} ·{' '}
+                          {m.roles.map((r) => t.roles[r]).join(', ')}
                         </span>
                       </span>
-                      {!m.roles.includes('owner') && m.phone !== me.user.phone && (
+                      {!m.roles.includes('owner') && !isMe(m) && (
                         <ConfirmButton
                           icon={UserMinus}
                           onConfirm={() =>
@@ -160,12 +185,12 @@ export function StaffSettings() {
                     maxLength={200}
                   />
                   <Field
-                    label={st.phone}
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    label={st.email}
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
                     required
-                    placeholder="077 123 4567"
+                    maxLength={254}
                   />
                   <label className="block text-sm">
                     <span className="mb-1 block font-medium text-ink-muted">{st.role}</span>
@@ -197,10 +222,20 @@ export function StaffSettings() {
                       <span className="min-w-0 flex-1">
                         <span className="font-medium">{i.fullName}</span> · {t.roles[i.role]}
                         <span className="block text-ink-subtle">
-                          {displayPhone(i.phone)} ·{' '}
+                          {i.email ?? displayPhone(i.phone)} ·{' '}
                           {fmt(st.expires, { date: colomboDate(i.expiresAt) })}
                         </span>
                       </span>
+                      {i.email && (
+                        <button
+                          type="button"
+                          onClick={() => resend(i)}
+                          className={btn('link', 'none')}
+                        >
+                          <Mail aria-hidden className="size-4" />
+                          {st.resend}
+                        </button>
+                      )}
                       {i.link && (
                         <>
                           <a

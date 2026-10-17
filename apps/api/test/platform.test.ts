@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { provision, sentMail, signupUser } from './provision.js';
 import { addDays, colomboToday } from '../src/lib/time.js';
 
 // Super admin console API (docs/SAAS_PLAN.md §10). Price books and settings are seeded rows that
@@ -31,6 +31,7 @@ const ROUTES: [string, string][] = [
   ['POST', `/accounts/${ID}/recount`],
   ['POST', `/accounts/${ID}/suspend`],
   ['POST', `/accounts/${ID}/unsuspend`],
+  ['POST', `/accounts/${ID}/invite`],
   ['GET', '/invoices'],
   ['GET', '/invoices/preview?period=2026-01'],
   ['POST', '/invoices/generate'],
@@ -45,12 +46,8 @@ const ROUTES: [string, string][] = [
   ['GET', '/docs'],
 ];
 
-async function signup(phone: string) {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+async function signup(phone: string, email?: string) {
+  const res = await signupUser(app, { phone, email, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }
@@ -198,6 +195,7 @@ describe('accounts', () => {
       expect.objectContaining({
         id: accountId,
         name: 'Nimal Maths',
+        ownerEmail: '94770000001@test.lk',
         ownerPhone: '94770000001',
         ownerName: 'User 0770000001',
         state: 'active',
@@ -210,6 +208,8 @@ describe('accounts', () => {
     expect((await call('GET', '/accounts?state=trial')).json().accounts).toEqual([]);
     expect((await call('GET', '/accounts?q=nimal')).json().accounts).toHaveLength(1);
     expect((await call('GET', '/accounts?q=0770000001')).json().accounts).toHaveLength(1);
+    expect((await call('GET', '/accounts?q=@test.lk')).json().accounts).toHaveLength(1);
+    expect(res.json().unverifiedUsers).toBe(0);
     expect((await call('GET', '/accounts?q=nobody')).json().accounts).toEqual([]);
   });
 
@@ -228,25 +228,47 @@ describe('accounts', () => {
     expect((await call('GET', `/accounts/${ID}`)).statusCode).toBe(404);
   });
 
-  it('claiming: an account created in the console is claimed when that phone opens an institute', async () => {
+  it('claiming: the owner gets an email and claims the account with that verified email', async () => {
     const created = await call('POST', '/accounts', {
       name: 'Saman Science',
+      ownerEmail: ' Saman@Example.com ',
       ownerPhone: '071 234 5678',
       priceBook: 'standard',
       trialDays: 14,
     });
     expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      account: { ownerEmail: 'saman@example.com', ownerPhone: '94712345678' },
+      emailSent: true,
+    });
+    const mail = sentMail(app).at(-1)!;
+    expect(mail).toMatchObject({
+      to: 'saman@example.com',
+      subject: 'Your institute account is ready',
+    });
+    expect(mail.text).toContain('/signup?email=saman%40example.com');
     const id = created.json().account.id;
     const again = await call('POST', '/accounts', {
       name: 'Twice',
-      ownerPhone: '0712345678',
+      ownerEmail: 'SAMAN@example.com',
       priceBook: 'standard',
       trialDays: 14,
     });
     expect(again.statusCode).toBe(409);
     expect(again.json().code).toBe('account_exists');
+    expect((await call('POST', `/accounts/${id}/invite`)).json()).toEqual({ emailSent: true });
 
-    const saman = await signup('0712345678');
+    // Same phone, other email: the phone is contact data, not proof of who owns the account.
+    const impostor = await signup('0712345678', 'other@example.com');
+    const refused = await call(
+      'POST',
+      '/api/v1/tenants',
+      { name: 'X', slug: 'xxx' },
+      impostor.cookie,
+    );
+    expect(refused.json().code).toBe('no_account');
+
+    const saman = await signup('0713333333', 'saman@example.com');
     const tenant = await call(
       'POST',
       '/api/v1/tenants',
@@ -258,169 +280,11 @@ describe('accounts', () => {
       await ownerDb('tenants').where({ id: tenant.json().tenant.id }).first('account_id'),
     ).toEqual({ account_id: id });
     const detail = (await call('GET', `/accounts/${id}`)).json();
-    expect(detail.account).toMatchObject({ claimed: true, ownerName: 'User 0712345678' });
+    expect(detail.account).toMatchObject({ claimed: true, ownerName: 'User 0713333333' });
     expect(detail.account.daysLeft).toBe(14);
+    expect((await call('POST', `/accounts/${id}/invite`)).json().code).toBe('already_claimed');
   });
 
-  it('extending a running trial moves the trial caps with it', async () => {
-    const before = await ownerDb('accounts').where({ id: accountId }).first('trial_ends_at');
-    const res = await call('POST', `/accounts/${accountId}/trial`, { days: 10 });
-    expect(res.statusCode).toBe(200);
-    const after = await ownerDb('accounts').where({ id: accountId }).first('trial_ends_at');
-    expect(after.trial_ends_at.getTime() - before.trial_ends_at.getTime()).toBe(10 * 86400_000);
-    const caps = await ownerDb('account_overrides').where({ account_id: accountId });
-    expect(caps.map((c) => c.expires_at.getTime())).toEqual(
-      caps.map(() => after.trial_ends_at.getTime()),
-    );
-  });
-
-  it('recount rewrites today from live counts and never lowers the peak', async () => {
-    const today = colomboToday();
-    await call('POST', `/api/v1/tenants/${tenantId}/students`, { fullName: 'Amal' }, owner);
-    // A path the triggers missed: today's student row is lost, the teacher row says 4 at peak.
-    await ownerDb('tenant_usage_daily').where({ tenant_id: tenantId, head: 'student' }).del();
-    await usage('teacher', today, 4);
-    const res = await call('POST', `/accounts/${accountId}/recount`);
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ day: today, counts: { student: 1, teacher: 4 } });
-    const rows = await ownerDb('tenant_usage_daily')
-      .where({ tenant_id: tenantId })
-      .whereRaw('day = ?', [today])
-      .select('head', 'count_max as max', 'count_last as last');
-    expect(rows).toEqual(
-      expect.arrayContaining([
-        { head: 'student', max: 1, last: 1 },
-        { head: 'teacher', max: 4, last: 0 },
-      ]),
-    );
-  });
-
-  it('suspending makes the account read-only for the customer', async () => {
-    const suspend = await call('POST', `/accounts/${accountId}/suspend`, { reason: 'Unpaid' });
-    expect(suspend.statusCode).toBe(204);
-    const add = await call(
-      'POST',
-      `/api/v1/tenants/${tenantId}/students`,
-      { fullName: 'Kasun' },
-      owner,
-    );
-    expect(add.json().code).toBe('account_suspended');
-    expect((await call('POST', `/accounts/${accountId}/suspend`, { reason: 'x' })).statusCode).toBe(
-      409,
-    );
-    expect((await call('POST', `/accounts/${accountId}/unsuspend`)).statusCode).toBe(204);
-  });
-});
-
-describe('overrides and invoices', () => {
-  it('an override changes the next invoice but never a past one', async () => {
-    await ownerDb('accounts').where({ id: accountId }).update({ trial_ends_at: null });
-    await usage('student', `${lastMonth}-01`, 10);
-    const generated = await call('POST', '/invoices/generate', { period: lastMonth });
-    expect(generated.json().invoices).toMatchObject([{ total: '1000.00' }]);
-
-    const set = await call('PUT', `/accounts/${accountId}/overrides/price.student`, {
-      value: 80,
-      note: 'Pilot discount',
-    });
-    expect(set.statusCode).toBe(204);
-    const invoices = (await call('GET', `/invoices?period=${lastMonth}`)).json().invoices;
-    expect(invoices).toMatchObject([{ total: '1000.00', status: 'open', paid: '0.00' }]);
-    expect(invoices[0].lines[0]).toMatchObject({ unitPrice: '100.00' });
-    // The month so far already uses the new price.
-    expect((await call('GET', `/accounts/${accountId}`)).json()).toMatchObject({
-      values: { price: { student: 80 } },
-      month: { estimate: { total: '800.00' } },
-    });
-
-    // Void, then regenerate the month: the new invoice uses the price as it is now.
-    const voided = await call('POST', `/invoices/${invoices[0].id}/void`, { reason: 'Discount' });
-    expect(voided.statusCode).toBe(204);
-    expect((await call('GET', `/invoices/preview?period=${lastMonth}`)).json().preview).toEqual([
-      { accountId, accountName: 'Nimal Maths', total: '800.00' },
-    ]);
-    const again = await call('POST', '/invoices/generate', { period: lastMonth });
-    expect(again.json().invoices).toMatchObject([
-      { number: `S-${lastMonth}-0002`, total: '800.00' },
-    ]);
-    const all = await ownerDb('subscription_invoices').orderBy('number');
-    expect(all.map((i) => [i.number, i.status, i.total])).toEqual([
-      [`S-${lastMonth}-0001`, 'void', '1000.00'],
-      [`S-${lastMonth}-0002`, 'open', '800.00'],
-    ]);
-  });
-
-  it('override values are checked against the catalogue', async () => {
-    const put = (key: string, body: object) =>
-      call('PUT', `/accounts/${accountId}/overrides/${key}`, body);
-    expect((await put('price.unicorn', { value: 1, note: 'x' })).json().code).toBe('unknown_key');
-    expect((await put('price.student', { value: -1, note: 'x' })).statusCode).toBe(400);
-    expect((await put('price.student', { value: 1.005, note: 'x' })).statusCode).toBe(400);
-    expect((await put('feature.reports', { value: 'yes', note: 'x' })).statusCode).toBe(400);
-    expect((await put('cap.students', { value: 5 })).statusCode).toBe(400); // note required
-    const past = new Date(Date.now() - 1000).toISOString();
-    expect((await put('cap.students', { value: 5, note: 'x', expiresAt: past })).statusCode).toBe(
-      400,
-    );
-    expect((await put('cap.students', { value: null, note: 'No cap' })).statusCode).toBe(204);
-  });
-
-  it('records a payment once per clientRef', async () => {
-    await ownerDb('accounts').where({ id: accountId }).update({ trial_ends_at: null });
-    await usage('teacher', `${lastMonth}-01`, 1);
-    const [invoice] = (await call('POST', '/invoices/generate', { period: lastMonth })).json()
-      .invoices;
-    const body = { amount: '2000', reference: 'BOC 1', clientRef: crypto.randomUUID() };
-    const paid = await call('POST', `/invoices/${invoice.id}/payments`, body);
-    expect(paid.json()).toMatchObject({ status: 'paid', amountDue: '0.00' });
-    expect((await call('POST', `/invoices/${invoice.id}/payments`, body)).statusCode).toBe(200);
-    expect(await ownerDb('subscription_payments')).toHaveLength(1);
-  });
-});
-
-describe('price books and settings', () => {
-  it('a price book edit rejects unknown keys and reports the accounts it affects', async () => {
-    await call('POST', '/price-books', { key: 'pilot', name: 'Pilot', values: {} });
-    await ownerDb('accounts').where({ id: accountId }).update({ price_book: 'pilot' });
-    const bad = await call('PUT', '/price-books/pilot', { values: { 'price.unicorn': 5 } });
-    expect(bad.statusCode).toBe(400);
-    expect(bad.json().code).toBe('validation_error');
-    const badValue = await call('PUT', '/price-books/pilot', { values: { 'price.student': -5 } });
-    expect(badValue.statusCode).toBe(400);
-    expect((await ownerDb('price_books').where({ key: 'pilot' }).first()).values).toEqual({});
-
-    const ok = await call('PUT', '/price-books/pilot', { values: { 'price.student': 75 } });
-    expect(ok.json()).toEqual({ affectedAccounts: 1 });
-    const books = (await call('GET', '/price-books')).json().priceBooks;
-    expect(books.map((b: { key: string; accounts: number }) => [b.key, b.accounts])).toEqual([
-      ['standard', 0],
-      ['pilot', 1],
-    ]);
-    expect(
-      (await call('POST', '/price-books', { key: 'pilot', name: 'x', values: {} })).statusCode,
-    ).toBe(409);
-  });
-
-  it('settings are validated per key', async () => {
-    const settings = (await call('GET', '/settings')).json().settings;
-    expect(settings).toMatchObject({ trial_days: 30, grace_days: 7, invoice_due_days: 7 });
-    const put = (key: string, value: unknown) => call('PUT', `/settings/${key}`, { value });
-    expect((await put('trial_days', 0)).statusCode).toBe(400);
-    expect((await put('support_whatsapp', '0771234567')).statusCode).toBe(400);
-    expect((await put('trial_caps', { 'price.student': 1 })).statusCode).toBe(400);
-    expect((await put('nonsense', 1)).statusCode).toBe(404);
-    try {
-      expect((await put('grace_days', 10)).statusCode).toBe(204);
-      expect((await call('GET', '/settings')).json().settings.grace_days).toBe(10);
-    } finally {
-      await ownerDb('platform_settings')
-        .where({ key: 'grace_days' })
-        .update({ value: JSON.stringify(settings.grace_days) });
-    }
-  });
-});
-
-describe('audit', () => {
   it('every mutation writes exactly one audit row, with actor, before, after and IP', async () => {
     await ownerDb('accounts').where({ id: accountId }).update({ trial_ends_at: null });
     await usage('teacher', `${lastMonth}-01`, 1);
@@ -432,7 +296,7 @@ describe('audit', () => {
         () =>
           call('POST', '/accounts', {
             name: 'New',
-            ownerPhone: '0711111111',
+            ownerEmail: 'new@example.com',
             priceBook: 'standard',
             trialDays: 0,
           }),

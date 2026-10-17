@@ -19,6 +19,8 @@ const HEADERS: Record<string, keyof RowFields> = {
   studentname: 'fullName',
   phone: 'phone',
   studentphone: 'phone',
+  email: 'email',
+  studentemail: 'email',
   school: 'school',
   grade: 'grade',
   notes: 'notes',
@@ -26,16 +28,20 @@ const HEADERS: Record<string, keyof RowFields> = {
   parentname: 'guardianName',
   guardianphone: 'guardianPhone',
   parentphone: 'guardianPhone',
+  guardianemail: 'guardianEmail',
+  parentemail: 'guardianEmail',
   relationship: 'relationship',
 };
 interface RowFields {
   fullName: string;
   phone: string;
+  email: string;
   school: string;
   grade: string;
   notes: string;
   guardianName: string;
   guardianPhone: string;
+  guardianEmail: string;
   relationship: string;
 }
 
@@ -59,11 +65,12 @@ type Prepared = { line: number; input: StudentInput };
 
 function toInput(fields: Partial<RowFields>) {
   const guardians =
-    fields.guardianPhone || fields.guardianName
+    fields.guardianPhone || fields.guardianName || fields.guardianEmail
       ? [
           {
             fullName: fields.guardianName || fields.fullName || '',
             phone: fields.guardianPhone ?? '',
+            email: fields.guardianEmail,
             relationship: (RELATIONSHIPS as readonly string[]).includes(
               (fields.relationship ?? '').toLowerCase(),
             )
@@ -75,6 +82,7 @@ function toInput(fields: Partial<RowFields>) {
   return studentInput.safeParse({
     fullName: fields.fullName ?? '',
     phone: fields.phone,
+    email: fields.email,
     school: fields.school,
     grade: fields.grade,
     notes: fields.notes,

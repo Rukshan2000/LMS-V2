@@ -83,6 +83,7 @@ export default async function tenancyRoutes(app: FastifyInstance) {
             .select(
               'm.id as membershipId',
               'u.full_name as fullName',
+              'u.email',
               'u.phone',
               trx.raw(
                 `ARRAY(SELECT r.role FROM membership_roles r WHERE r.membership_id = m.id ORDER BY r.role) AS roles`,

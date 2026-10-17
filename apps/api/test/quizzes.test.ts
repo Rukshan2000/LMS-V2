@@ -4,7 +4,7 @@ import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { colomboToday } from '../src/lib/time.js';
-import { provision } from './provision.js';
+import { emailFor, provision, signupUser } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -19,11 +19,7 @@ let mother: string; // parent login
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   return `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`;
 }
 const call = (method: string, url: string, payload?: unknown, cookie = owner) =>
@@ -34,7 +30,9 @@ const call = (method: string, url: string, payload?: unknown, cookie = owner) =>
     payload: payload as object,
   });
 async function portalLogin(studentId: string, phone: string) {
-  const code = (await call('POST', `/students/${studentId}/portal-invite`, { phone })).json().code;
+  const code = (
+    await call('POST', `/students/${studentId}/portal-invite`, { email: emailFor(phone) })
+  ).json().code;
   const cookie = await signup(phone);
   expect((await call('POST', `/api/v1/invites/${code}/accept`, undefined, cookie)).statusCode).toBe(
     200,
@@ -123,7 +121,15 @@ beforeEach(async () => {
     await call('POST', '/students', {
       fullName: 'Amal',
       phone: '0711111111',
-      guardians: [{ fullName: 'Kamala', phone: '0722222222', relationship: 'mother' }],
+      email: emailFor('0711111111'),
+      guardians: [
+        {
+          fullName: 'Kamala',
+          phone: '0722222222',
+          email: emailFor('0722222222'),
+          relationship: 'mother',
+        },
+      ],
       force: true,
     })
   ).json().student.id;
@@ -286,7 +292,11 @@ describe('quizzes', () => {
   it('a teacher manages only their own classes’ quizzes', async () => {
     const quizId = await openQuiz();
     const { code } = (
-      await call('POST', '/invites', { fullName: 'Sunil', phone: '0712345678', role: 'teacher' })
+      await call('POST', '/invites', {
+        fullName: 'Sunil',
+        email: emailFor('0712345678'),
+        role: 'teacher',
+      })
     ).json();
     const teacher = await signup('0712345678');
     await call('POST', `/api/v1/invites/${code}/accept`, undefined, teacher);
@@ -464,6 +474,7 @@ describe('ranks, statistics, export and copies', () => {
           await call('POST', '/students', {
             fullName: `Student ${i}`,
             phone,
+            email: emailFor(phone),
             guardians: [
               { fullName: `Parent ${i}`, phone: `07666666${i}${i}`, relationship: 'father' },
             ],

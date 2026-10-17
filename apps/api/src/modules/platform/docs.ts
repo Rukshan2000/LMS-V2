@@ -155,7 +155,7 @@ export const DOCS: DocPage[] = [
         p: 'There is no console screen for this until two-factor login exists. On the server, as the database owner:',
       },
       {
-        code: "UPDATE users SET is_platform_admin = true WHERE phone = '94771234567';",
+        code: "UPDATE users SET is_platform_admin = true WHERE lower(email) = 'you@example.com';",
         title: 'SQL (tuition_lms, owner role)',
       },
       {
@@ -182,7 +182,7 @@ export const DOCS: DocPage[] = [
           rows: [
             [
               'Created in the console',
-              '**Accounts → New account**: name, owner mobile, price book, trial days (0 = none). With a trial, the `trial_caps` overrides are added (expiring with the trial). This is the only way to get a new customer: sign-up alone cannot create an institute.',
+              '**Accounts → New account**: name, owner email, optional owner mobile (contact only), price book, trial days (0 = none). The owner is emailed a link to create their login. With a trial, the `trial_caps` overrides are added (expiring with the trial). This is the only way to get a new customer: sign-up alone cannot create an institute.',
             ],
             [
               'Existing institutes (migration 013)',
@@ -191,17 +191,20 @@ export const DOCS: DocPage[] = [
           ],
         },
       },
-      { h2: 'Claiming by mobile' },
+      { h2: 'Claiming by email' },
       {
-        p: 'When someone creates an institute, the API looks for, in order: the account they already own; an **unclaimed** account whose owner mobile matches theirs (it becomes theirs); otherwise it is refused with `403 no_account`. After creating an account, use **Send sign-up message on WhatsApp** so the owner signs up with that exact mobile.',
+        p: 'When someone creates an institute, the API looks for, in order: the account they already own; an **unclaimed** account whose owner email matches their **verified** login email (it becomes theirs); for accounts made before email login (no owner email), one whose owner mobile matches theirs; otherwise it is refused with `403 no_account`. Signing up proves the email with a 6-digit code, so only the person who reads that inbox can claim the account.',
       },
       {
-        note: 'A mobile that already has an account is refused with `409 account_exists`. The list shows "Not signed up yet" until the account is claimed.',
+        note: 'An email that already has an account is refused with `409 account_exists`. The list shows "Not signed up yet" until the account is claimed; **Resend invitation** emails the owner again.',
+      },
+      {
+        p: 'The accounts list also shows how many users still log in by phone (no verified email yet). When it reaches 0, phone login can be removed (docs/EMAIL_AUTH_PLAN.md §9).',
       },
       { h2: 'The accounts list' },
       {
         list: [
-          'Search by account name or owner mobile (0771234567 and 94771234567 both match).',
+          'Search by account name, owner email or owner mobile (0771234567 and 94771234567 both match).',
           'Filters: **Trial ending in 7 days**, **Overdue**, **Restricted**, **Suspended**.',
           'Columns: state, heads now (latest count per head), this month’s estimate, amount due.',
           '**Remind** opens WhatsApp with a reminder in the console’s language: the amount due, or the trial days left.',
@@ -645,14 +648,15 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
           path: `${ADMIN}/accounts`,
           summary: 'List accounts with state, heads now, this month’s estimate and amount due.',
           query: [
-            { name: 'q', type: 'string', description: 'Name or owner mobile' },
+            { name: 'q', type: 'string', description: 'Name, owner email or owner mobile' },
             {
               name: 'state',
               type: 'enum',
               description: '`trial` `trial_ending` `active` `overdue` `restricted` `suspended`',
             },
           ],
-          response: `{ "accounts": [ { "id": "…", "name": "Nimal Maths", "ownerPhone": "94771234567",
+          response: `{ "unverifiedUsers": 0, "accounts": [ { "id": "…", "name": "Nimal Maths",
+  "ownerEmail": "nimal@example.com", "ownerPhone": "94771234567",
   "ownerName": "Nimal", "claimed": true, "priceBook": "standard", "state": "trial",
   "daysLeft": 21, "amountDue": "0.00", "institutes": 1,
   "headsNow": { "student": 120, "teacher": 3, "parent": 40, "admin": 0, "receptionist": 1 },
@@ -667,10 +671,15 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
           body: [
             { name: 'name', type: 'string', required: true, description: '1–200 characters' },
             {
-              name: 'ownerPhone',
+              name: 'ownerEmail',
               type: 'string',
               required: true,
-              description: 'Sri Lankan mobile',
+              description: 'The owner signs up and claims the account with this email',
+            },
+            {
+              name: 'ownerPhone',
+              type: 'string',
+              description: 'Sri Lankan mobile, contact only',
             },
             { name: 'priceBook', type: 'string', required: true, description: 'Price book key' },
             {
@@ -680,8 +689,20 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
               description: '0–365 (0 = no trial)',
             },
           ],
-          response: `201 { "account": { "id": "…", "ownerPhone": "94771234567" } }`,
+          response: `201 { "account": { "id": "…", "name": "…", "ownerEmail": "nimal@example.com",
+  "ownerPhone": null }, "emailSent": true }`,
           errors: ['409 account_exists', '400 unknown_price_book', '400 invalid_phone'],
+        },
+      },
+      {
+        endpoint: {
+          method: 'POST',
+          path: `${ADMIN}/accounts/:id/invite`,
+          summary:
+            'Email the owner the "account ready" link again. `emailSent: false` if the mail server failed.',
+          params: [accountId],
+          response: '{ "emailSent": true }',
+          errors: ['409 already_claimed', '409 no_owner_email', '404 not_found'],
         },
       },
       {

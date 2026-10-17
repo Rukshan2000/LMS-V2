@@ -9,7 +9,7 @@ import { api, ApiError, errorMessage, fmt } from '@/lib/api';
 import { btn, Button, card, Field, FormError, useToast } from '../ui';
 import { displayPhone, type Guardian, type Relationship, type Student } from './types';
 
-const emptyGuardian: Guardian = { fullName: '', phone: '', relationship: 'mother' };
+const emptyGuardian: Guardian = { fullName: '', phone: '', email: '', relationship: 'mother' };
 
 interface Duplicate {
   id: string;
@@ -28,6 +28,7 @@ export function StudentForm({ student }: { student?: Student }) {
   const [form, setForm] = useState({
     fullName: student?.fullName ?? '',
     phone: displayPhone(student?.phone),
+    email: student?.email ?? '',
     grade: student?.grade ?? '',
     school: student?.school ?? '',
     notes: student?.notes ?? '',
@@ -35,7 +36,7 @@ export function StudentForm({ student }: { student?: Student }) {
   });
   const [guardians, setGuardians] = useState<Guardian[]>(
     student?.guardians.length
-      ? student.guardians.map((g) => ({ ...g, phone: displayPhone(g.phone) }))
+      ? student.guardians.map((g) => ({ ...g, phone: displayPhone(g.phone), email: g.email ?? '' }))
       : [emptyGuardian],
   );
   const [error, setError] = useState<string | null>(null);
@@ -104,13 +105,22 @@ export function StudentForm({ student }: { student?: Student }) {
           />
           <Field label={s.school} value={form.school} onChange={set('school')} maxLength={200} />
         </div>
-        <Field
-          label={s.phone}
-          type="tel"
-          value={form.phone}
-          onChange={set('phone')}
-          placeholder="077 123 4567"
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={s.phone}
+            type="tel"
+            value={form.phone}
+            onChange={set('phone')}
+            placeholder="077 123 4567"
+          />
+          <Field
+            label={s.email}
+            type="email"
+            value={form.email}
+            onChange={set('email')}
+            maxLength={254}
+          />
+        </div>
       </div>
 
       <fieldset className={`${card} space-y-4 p-4`}>
@@ -130,6 +140,13 @@ export function StudentForm({ student }: { student?: Student }) {
                 value={g.phone}
                 onChange={(e) => setGuardian(i, 'phone', e.target.value)}
                 placeholder="077 123 4567"
+              />
+              <Field
+                label={s.guardianEmail}
+                type="email"
+                value={g.email ?? ''}
+                onChange={(e) => setGuardian(i, 'email', e.target.value)}
+                maxLength={254}
               />
             </div>
             <div className="flex items-center gap-3">

@@ -7,6 +7,7 @@ import {
   ChartColumn,
   CircleCheck,
   History,
+  Mail,
   ReceiptText,
   RefreshCw,
   Settings2,
@@ -125,6 +126,19 @@ export function AccountDetail() {
     }
   }
 
+  async function resendInvite() {
+    setError(null);
+    try {
+      const { emailSent } = await api<{ emailSent: boolean }>(`/admin/accounts/${id}/invite`, {
+        method: 'POST',
+      });
+      if (emailSent) toast(d.resent);
+      else setError(t.errors.mail_unavailable);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
   if (!data) return <FormError message={error} />;
   const { account } = data;
   const maxDay = Math.max(1, ...data.month.days.map((x) => x.student));
@@ -139,8 +153,19 @@ export function AccountDetail() {
       <FormError message={error} />
 
       <section className={`${card} grid gap-4 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4`}>
-        <Info label={d.ownerPhone}>
-          {account.ownerName ?? t.admin.accounts.unclaimed} · {displayPhone(account.ownerPhone)}
+        <Info label={d.ownerEmail}>
+          {account.ownerName ?? t.admin.accounts.unclaimed} · {account.ownerEmail ?? '–'}
+          {account.ownerPhone && ` · ${displayPhone(account.ownerPhone)}`}
+          {!account.claimed && account.ownerEmail && (
+            <button
+              type="button"
+              onClick={resendInvite}
+              className="mt-1 flex items-center gap-1 font-medium text-primary hover:text-primary-hover"
+            >
+              <Mail aria-hidden className="size-4" />
+              {d.resend}
+            </button>
+          )}
         </Info>
         <Info label={d.priceBook}>{account.priceBook}</Info>
         <Info label={d.trialEnds}>

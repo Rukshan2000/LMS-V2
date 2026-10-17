@@ -23,8 +23,8 @@ interface Result {
 
 // UTF-8 BOM so Excel opens Sinhala/Tamil text correctly.
 const TEMPLATE =
-  '\uFEFFName,Grade,School,Phone,Guardian Name,Guardian Phone,Relationship\r\n' +
-  'Kasun Perera,2027 A/L,Royal College,,Nimali Perera,0771234567,mother\r\n';
+  '\uFEFFName,Grade,School,Phone,Email,Guardian Name,Guardian Phone,Guardian Email,Relationship\r\n' +
+  'Kasun Perera,2027 A/L,Royal College,,,Nimali Perera,0771234567,nimali@example.com,mother\r\n';
 
 export function StudentImport() {
   const { lang, t } = useI18n();

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { emailFor, provision, signupUser } from './provision.js';
 import { generateInvoices } from '../src/modules/billing/service.js';
 import { addDays, colomboToday } from '../src/lib/time.js';
 
@@ -27,11 +27,7 @@ const png = (seed = 'a') =>
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }
@@ -62,9 +58,9 @@ const openInvoice = (dueDaysAgo: number) =>
 const suspend = () =>
   ownerDb('accounts').where({ id: accountId }).update({ suspended_at: new Date() });
 const inviteStaff = (phone: string, role = 'teacher') =>
-  call('POST', '/invites', { fullName: `Staff ${phone}`, phone, role });
+  call('POST', '/invites', { fullName: `Staff ${phone}`, email: emailFor(phone), role });
 const portalInvite = (phone: string, studentId = kid) =>
-  call('POST', `/students/${studentId}/portal-invite`, { phone });
+  call('POST', `/students/${studentId}/portal-invite`, { email: emailFor(phone) });
 const accept = (code: string, cookie: string) =>
   call('POST', `/api/v1/invites/${code}/accept`, undefined, cookie);
 const uploadSlip = (cookie: string) =>
@@ -129,7 +125,14 @@ beforeEach(async () => {
   kid = (
     await call('POST', '/students', {
       fullName: 'Amal',
-      guardians: [{ fullName: 'Kamala', phone: '0722222222', relationship: 'mother' }],
+      guardians: [
+        {
+          fullName: 'Kamala',
+          phone: '0722222222',
+          email: emailFor('0722222222'),
+          relationship: 'mother',
+        },
+      ],
       force: true,
     })
   ).json().student.id;
@@ -399,7 +402,14 @@ describe('suspended: read-only', () => {
     const dad = await signup('0733333333');
     await call('POST', '/students', {
       fullName: 'Bimal',
-      guardians: [{ fullName: 'Sunil', phone: '0733333333', relationship: 'father' }],
+      guardians: [
+        {
+          fullName: 'Sunil',
+          phone: '0733333333',
+          email: emailFor('0733333333'),
+          relationship: 'father',
+        },
+      ],
       force: true,
     });
     const bimal = await ownerDb('students').where({ full_name: 'Bimal' }).first('id');
@@ -444,8 +454,18 @@ describe('staff and parent caps', () => {
       await call('POST', '/students', {
         fullName: 'Bimal',
         guardians: [
-          { fullName: 'Kamala', phone: '0722222222', relationship: 'mother' },
-          { fullName: 'Sunil', phone: '0733333333', relationship: 'father' },
+          {
+            fullName: 'Kamala',
+            phone: '0722222222',
+            email: emailFor('0722222222'),
+            relationship: 'mother',
+          },
+          {
+            fullName: 'Sunil',
+            phone: '0733333333',
+            email: emailFor('0733333333'),
+            relationship: 'father',
+          },
         ],
         force: true,
       })

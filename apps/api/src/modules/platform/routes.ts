@@ -1,9 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { emailSchema } from '../../lib/email.js';
+import { accountReadyMail } from '../../lib/mail-templates.js';
 import { amountInput } from '../../lib/money.js';
 import { normalizePhone } from '../../lib/phone.js';
 import {
   clearOverride,
+  countUnverifiedUsers,
   createAccount,
   createPriceBook,
   extendTrial,
@@ -20,6 +23,7 @@ import {
   recountUsage,
   setOverride,
   suspendAccount,
+  unclaimedOwnerEmail,
   unsuspendAccount,
   updateAccount,
   updatePriceBook,
@@ -43,7 +47,13 @@ const accountsQuery = z.object({
 });
 const createAccountBody = z.object({
   name: z.string().trim().min(1).max(200),
-  ownerPhone: z.string().min(9).max(20).transform(normalizePhone),
+  ownerEmail: emailSchema,
+  // Contact only (WhatsApp). Optional.
+  ownerPhone: z
+    .string()
+    .max(20)
+    .optional()
+    .transform((v) => (v?.trim() ? normalizePhone(v) : null)),
   priceBook: z.string().min(1).max(32),
   trialDays: z.number().int().min(0).max(365),
 });
@@ -92,10 +102,19 @@ export default async function platformRoutes(
 
   app.get('/accounts', async (req) => ({
     accounts: await listAccounts(app.db, accountsQuery.parse(req.query)),
+    unverifiedUsers: await countUnverifiedUsers(app.db),
   }));
   app.post('/accounts', mutation, async (req, reply) => {
     const account = await createAccount(app.db, createAccountBody.parse(req.body), actor(req));
-    return reply.status(201).send({ account });
+    const emailSent = await app.sendMail(
+      accountReadyMail(account.ownerEmail, account.name, app.appUrl),
+    );
+    return reply.status(201).send({ account, emailSent });
+  });
+  // Resend the "account ready" email while the owner has not signed up.
+  app.post('/accounts/:id/invite', mutation, async (req) => {
+    const { name, email } = await unclaimedOwnerEmail(app.db, idParams.parse(req.params).id);
+    return { emailSent: await app.sendMail(accountReadyMail(email, name, app.appUrl)) };
   });
   app.get('/accounts/:id', async (req) => getAccount(app.db, idParams.parse(req.params).id));
   app.patch('/accounts/:id', mutation, async (req, reply) => {

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { emailFor, provision, signupUser } from './provision.js';
 import { addDays, colomboToday } from '../src/lib/time.js';
 import { generateInvoices, recordPayment, voidInvoice } from '../src/modules/billing/service.js';
 
@@ -20,11 +20,7 @@ let api: string;
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }
@@ -51,7 +47,14 @@ const addStudent = async (fullName: string, guardianPhone?: string) => {
     fullName,
     force: true,
     ...(guardianPhone && {
-      guardians: [{ fullName: 'Kamala', phone: guardianPhone, relationship: 'mother' }],
+      guardians: [
+        {
+          fullName: 'Kamala',
+          phone: guardianPhone,
+          email: emailFor(guardianPhone),
+          relationship: 'mother',
+        },
+      ],
     }),
   });
   expect(res.statusCode).toBe(201);
@@ -118,7 +121,7 @@ describe('metering triggers', () => {
   it('a teacher counts once the invite is accepted, and stops when removed', async () => {
     const invite = await call('POST', '/invites', {
       fullName: 'Sunil',
-      phone: '0712345678',
+      email: emailFor('0712345678'),
       role: 'teacher',
     });
     expect((await today('teacher'))?.last ?? 0).toBe(0);
@@ -133,7 +136,9 @@ describe('metering triggers', () => {
 
   it('a parent invite is not counted; accepting it is', async () => {
     const kid = await addStudent('Amal', '0722222222');
-    const invite = await call('POST', `/students/${kid}/portal-invite`, { phone: '0722222222' });
+    const invite = await call('POST', `/students/${kid}/portal-invite`, {
+      email: emailFor('0722222222'),
+    });
     expect(invite.statusCode).toBe(201);
     expect((await today('parent'))?.max ?? 0).toBe(0);
 

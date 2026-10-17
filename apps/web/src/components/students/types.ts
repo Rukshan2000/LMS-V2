@@ -4,6 +4,7 @@ export interface Guardian {
   id?: string;
   fullName: string;
   phone: string;
+  email?: string | null;
   relationship: Relationship;
 }
 
@@ -12,6 +13,7 @@ export interface Student {
   studentNumber: string;
   fullName: string;
   phone: string | null;
+  email: string | null;
   school: string | null;
   grade: string | null;
   status: 'active' | 'inactive';

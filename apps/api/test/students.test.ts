@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { provision, signupUser } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -14,11 +14,7 @@ let base: string;
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: 'Owner' },
-  });
+  const res = await signupUser(app, { phone, fullName: 'Owner' });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }
@@ -244,6 +240,19 @@ describe('CSV import', () => {
     expect(created).toBe(0);
     expect(errors.map((e: { line: number }) => e.line)).toEqual([6, 7]);
     expect(await ownerDb('students').count({ n: '*' }).first()).toEqual({ n: '0' });
+  });
+
+  it('reads student and guardian emails (for portal invites); a bad email blocks the row', async () => {
+    const withEmail = [
+      'Name,Email,Guardian Name,Guardian Phone,Guardian Email',
+      'Kasun Perera,Kasun@Example.com,Nimali Perera,0771234567,NIMALI@example.com',
+    ].join('\n');
+    expect((await importCsv(withEmail, false)).json().result.created).toBe(1);
+    expect(await ownerDb('students').first('email')).toEqual({ email: 'kasun@example.com' });
+    expect(await ownerDb('guardians').first('email')).toEqual({ email: 'nimali@example.com' });
+
+    const bad = await importCsv('Name,Email\nAmal,not-an-email', true);
+    expect(bad.json().result.errors).toMatchObject([{ line: 2, field: 'email' }]);
   });
 
   it('requires a name column', async () => {

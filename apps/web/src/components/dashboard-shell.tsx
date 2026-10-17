@@ -84,6 +84,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     Promise.all([api<Me>('/auth/me'), api<Omit<TenantData, 'me'>>(`/tenants/${tenantId}`)])
       .then(([me, tenantRes]) => {
         if (cancelled) return;
+        if (!me.user.emailVerified) return router.replace(`/${lang}/account/email`);
         setData({ me, ...tenantRes });
         try {
           localStorage.setItem(LAST_TENANT_KEY, tenantId);
@@ -268,12 +269,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 </Link>
               )}
               {data && (
-                <span className="hidden items-center gap-2 text-sm text-ink-muted sm:flex">
+                <Link
+                  href={`/${lang}/account/email`}
+                  title={`${t.auth.changeEmailTitle}: ${data.me.user.email ?? ''}`}
+                  className="hidden items-center gap-2 rounded-lg px-1 text-sm text-ink-muted transition-colors hover:text-ink sm:flex"
+                >
                   <span className="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-hover">
                     {data.me.user.fullName.trim().charAt(0).toUpperCase()}
                   </span>
                   {data.me.user.fullName}
-                </span>
+                </Link>
               )}
               <button
                 type="button"

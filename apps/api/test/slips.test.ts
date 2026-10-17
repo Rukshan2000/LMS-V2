@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { emailFor, provision, signupUser } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -20,11 +20,7 @@ const png = (seed = 'a') =>
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   return `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`;
 }
 const call = (method: string, url: string, payload?: unknown, cookie = owner) =>
@@ -38,7 +34,14 @@ async function student(fullName: string, guardianPhone: string) {
   return (
     await call('POST', '/students', {
       fullName,
-      guardians: [{ fullName: 'Kamala', phone: guardianPhone, relationship: 'mother' }],
+      guardians: [
+        {
+          fullName: 'Kamala',
+          phone: guardianPhone,
+          email: emailFor(guardianPhone),
+          relationship: 'mother',
+        },
+      ],
     })
   ).json().student.id as string;
 }
@@ -78,7 +81,7 @@ beforeEach(async () => {
   await call('POST', '/invoices/generate', { period: '2030-01' });
   parent = await signup('0722222222');
   const code = (
-    await call('POST', `/students/${kid}/portal-invite`, { phone: '0722222222' })
+    await call('POST', `/students/${kid}/portal-invite`, { email: emailFor('0722222222') })
   ).json().code;
   await call('POST', `/api/v1/invites/${code}/accept`, undefined, parent);
 });

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision } from './provision.js';
+import { provision, signupUser } from './provision.js';
 
 // Accounts, trial caps and account state (docs/SAAS_PLAN.md §5, §7). Replaces plans.test.ts.
 
@@ -17,11 +17,7 @@ let api: string;
 
 async function signup(phone: string) {
   await provision(ownerDb, phone);
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }

@@ -177,6 +177,7 @@ export default async function studentRoutes(app: FastifyInstance) {
       const fields = {
         full_name: body.fullName,
         phone: body.phone,
+        email: body.email,
         school: body.school,
         grade: body.grade,
         notes: body.notes,
