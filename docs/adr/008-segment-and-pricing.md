@@ -1,6 +1,6 @@
 # 008 First segment and flat pricing
 
-**Status:** Accepted (provisional, from public-source user research; re-check in pilot), 2026-10-17
+**Status:** Accepted (provisional, from public-source user research; re-check in pilot), 2026-10-17. **Pricing superseded by [009](009-per-head-pricing.md)**; the segment decision stands.
 
 **Decision:** First segment is individual teachers and small classes (25–300 students) running hybrid classes. Pricing: Free (50 students), Teacher LKR 2,900/mo, Institute LKR 9,900/mo, flat per plan, not per student. WhatsApp/SMS as prepaid credit.
 

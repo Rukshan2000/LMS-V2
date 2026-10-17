@@ -10,6 +10,8 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Next up:** Beta with 3–5 teachers + v1.0 release checklist ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md)). All v1.0 slices are built. Pilot 1 can start now.
 
+**SaaS billing work:** accounts, per-head billing, trials and super admin are tracked separately in [docs/SAAS_TASKS.md](docs/SAAS_TASKS.md) (plan: [docs/SAAS_PLAN.md](docs/SAAS_PLAN.md)).
+
 ---
 
 ## Step 0: Decide and prepare
