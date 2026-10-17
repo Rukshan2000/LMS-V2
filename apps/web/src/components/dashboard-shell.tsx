@@ -243,10 +243,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 <select
                   aria-label={t.dashboard.switchInstitute}
                   value={tenantId}
-                  onChange={(e) => {
-                    if (e.target.value === 'new') router.push(`/${lang}/onboarding`);
-                    else router.push(`/${lang}/t/${e.target.value}`);
-                  }}
+                  onChange={(e) => router.push(`/${lang}/t/${e.target.value}`)}
                   className="min-w-0 max-w-[45vw] truncate border-0 bg-transparent py-1.5 font-medium focus:shadow-none"
                 >
                   {data.me.tenants.map((x) => (
@@ -254,7 +251,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                       {x.name}
                     </option>
                   ))}
-                  <option value="new">{t.dashboard.newInstitute}</option>
                 </select>
               </label>
             ) : (

@@ -21,7 +21,7 @@ export default async function tenancyRoutes(app: FastifyInstance) {
     const userId = user.id;
     try {
       const tenant = await app.db.transaction(async (trx) => {
-        const accountId = await accountForNewInstitute(trx, user, body.name);
+        const accountId = await accountForNewInstitute(trx, user);
         const [t] = await trx('tenants')
           .insert({ name: body.name, slug: body.slug, account_id: accountId })
           .returning(['id', 'slug', 'name', 'status']);

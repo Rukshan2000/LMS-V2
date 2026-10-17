@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -18,6 +19,7 @@ const png = (seed = 'a') =>
   `data:image/png;base64,${Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.from(seed)]).toString('base64')}`;
 
 async function signup(phone: string) {
+  await provision(ownerDb, phone);
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',

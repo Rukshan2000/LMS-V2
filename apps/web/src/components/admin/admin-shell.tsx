@@ -15,6 +15,7 @@ const NAV = [
   ['priceBooks', '/price-books'],
   ['settings', '/settings'],
   ['audit', '/audit'],
+  ['docs', '/docs'],
 ] as const;
 
 /**

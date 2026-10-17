@@ -224,14 +224,51 @@ export async function getEntitlements(
 }
 
 /**
+ * Inserts an account, with the `trial_caps` overrides expiring with the trial when it has one.
+ * Accounts are only created from the platform console (and tests).
+ */
+export async function openAccount(
+  trx: Knex.Transaction,
+  input: {
+    name: string;
+    ownerPhone: string;
+    priceBook: string;
+    trialEndsAt: Date | null;
+    createdBy?: string;
+  },
+) {
+  const [account] = await trx('accounts')
+    .insert({
+      name: input.name,
+      owner_phone: input.ownerPhone,
+      price_book: input.priceBook,
+      trial_ends_at: input.trialEndsAt,
+      created_by: input.createdBy,
+    })
+    .returning(['id', 'name', 'owner_phone', 'price_book', 'trial_ends_at']);
+  const caps = input.trialEndsAt ? Object.entries((await loadSettings(trx)).trialCaps) : [];
+  if (caps.length) {
+    await trx('account_overrides').insert(
+      caps.map(([key, value]) => ({
+        account_id: account.id,
+        key,
+        value: JSON.stringify(value),
+        expires_at: input.trialEndsAt,
+        note: 'Trial caps',
+      })),
+    );
+  }
+  return account;
+}
+
+/**
  * The account a new institute belongs to: the one this user owns, else an unclaimed account the
- * platform admin created for this phone, else a new self-service account with a trial (trial caps
- * are overrides that expire with it). Then checks the institutes cap.
+ * platform admin created for this phone. No account → refused: new customers are set up in the
+ * platform console only. Then checks the institutes cap.
  */
 export async function accountForNewInstitute(
   trx: Knex.Transaction,
   user: { id: string; phone: string },
-  name: string,
 ): Promise<string> {
   await lock(trx, `account-owner:${user.id}`);
   let account: AccountRow | undefined = await trx('accounts')
@@ -252,32 +289,9 @@ export async function accountForNewInstitute(
       .returning(['id', 'price_book', 'trial_ends_at', 'suspended_at']);
   }
   if (!account) {
-    const settings = await loadSettings(trx);
-    const book = await trx('price_books').where({ is_default: true }).first('key');
-    const trialEndsAt = new Date(Date.now() + settings.trialDays * 86400_000);
-    [account] = await trx('accounts')
-      .insert({
-        name,
-        owner_user_id: user.id,
-        owner_phone: user.phone,
-        price_book: book.key,
-        trial_ends_at: trialEndsAt,
-      })
-      .returning(['id', 'price_book', 'trial_ends_at', 'suspended_at']);
-    const caps = Object.entries(settings.trialCaps);
-    if (caps.length) {
-      await trx('account_overrides').insert(
-        caps.map(([key, value]) => ({
-          account_id: account!.id,
-          key,
-          value: JSON.stringify(value),
-          expires_at: trialEndsAt,
-          note: 'Trial caps',
-        })),
-      );
-    }
+    throw new HttpError(403, 'no_account', 'Contact us to set up your institute');
   }
-  const ctx = await accountContext(trx, account!);
+  const ctx = await accountContext(trx, account);
   assertCanAddHeads(ctx);
   await assertCap(trx, ctx, 'institutes', 1, async () =>
     Number(
@@ -821,8 +835,8 @@ async function assertPriceBook(trx: Knex.Transaction, key: string) {
 
 /**
  * An account created by the platform admin for a customer who has not signed up yet. The
- * customer claims it by creating an institute with this phone (SAAS_PLAN §10.3). No trial caps:
- * the admin picks the price book, and sets caps as overrides if wanted.
+ * customer claims it by creating an institute with this phone (SAAS_PLAN §10.3). With a trial it
+ * gets the trial caps; the admin can change them as overrides.
  */
 export async function createAccount(
   db: Knex,
@@ -848,15 +862,7 @@ export async function createAccount(
     }
     const trialEndsAt =
       input.trialDays > 0 ? new Date(now.getTime() + input.trialDays * 86400_000) : null;
-    const [account] = await trx('accounts')
-      .insert({
-        name: input.name,
-        owner_phone: input.ownerPhone,
-        price_book: input.priceBook,
-        trial_ends_at: trialEndsAt,
-        created_by: actor.userId,
-      })
-      .returning(['id', 'name', 'owner_phone', 'price_book', 'trial_ends_at']);
+    const account = await openAccount(trx, { ...input, trialEndsAt, createdBy: actor.userId });
     await audit(trx, actor, account.id, 'account.create', null, {
       name: account.name,
       ownerPhone: account.owner_phone,

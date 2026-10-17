@@ -24,9 +24,12 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api('/auth/me').catch((err) => {
-      if (err instanceof ApiError && err.status === 401) router.replace(`/${lang}/login`);
-    });
+    api<{ tenants: unknown[] }>('/auth/me')
+      // Only for a user's first institute; owners cannot add more themselves.
+      .then(({ tenants }) => tenants.length > 0 && router.replace(`/${lang}/app`))
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) router.replace(`/${lang}/login`);
+      });
   }, [lang, router]);
 
   async function onSubmit(e: FormEvent) {

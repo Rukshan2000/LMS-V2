@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -11,6 +12,7 @@ let owner: string;
 let tenantId: string;
 
 async function signup(phone: string, fullName = `User ${phone}`) {
+  await provision(ownerDb, phone);
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',

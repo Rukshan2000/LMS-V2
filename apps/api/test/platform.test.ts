@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision } from './provision.js';
 import { addDays, colomboToday } from '../src/lib/time.js';
 
 // Super admin console API (docs/SAAS_PLAN.md §10). Price books and settings are seeded rows that
@@ -41,6 +42,7 @@ const ROUTES: [string, string][] = [
   ['GET', '/settings'],
   ['PUT', '/settings/trial_days'],
   ['GET', '/audit'],
+  ['GET', '/docs'],
 ];
 
 async function signup(phone: string) {
@@ -90,6 +92,7 @@ beforeEach(async () => {
   await ownerDb('price_books').whereNot({ key: 'standard' }).del();
   ({ cookie: admin, userId: adminId } = await signup('0779999999'));
   await ownerDb('users').where({ id: adminId }).update({ is_platform_admin: true });
+  await provision(ownerDb, '0770000001', 'Nimal Maths');
   owner = (await signup('0770000001')).cookie;
   tenantId = (
     await call('POST', '/api/v1/tenants', { name: 'Nimal Maths', slug: 'nimal' }, owner)
@@ -107,6 +110,30 @@ describe('access', () => {
       }
     }
     expect(await auditCount()).toBe(0);
+  });
+
+  it('the docs are served to platform admins and document every console route', async () => {
+    const res = await call('GET', '/docs');
+    expect(res.statusCode).toBe(200);
+    const pages: { slug: string; blocks: Record<string, unknown>[] }[] = res.json().pages;
+    const documented = new Set(
+      pages.flatMap((p) =>
+        p.blocks.flatMap((b) => {
+          const e = b.endpoint as { method: string; path: string } | undefined;
+          return e ? [`${e.method} ${e.path}`] : [];
+        }),
+      ),
+    );
+    const route = ([method, url]: [string, string]) =>
+      `${method} /api/v1/admin${url
+        .split('?')[0]!
+        .replaceAll(ID, ':id')
+        .replace(/\/(overrides|price-books|settings)\/[^/]+$/, '/$1/:key')}`;
+    expect(ROUTES.map(route).filter((r) => !documented.has(r))).toEqual([]);
+    // Links between pages point at pages that exist.
+    const slugs = new Set(pages.map((p) => p.slug));
+    const links = JSON.stringify(pages).match(/\(docs:[a-z-]+\)/g) ?? [];
+    expect(links.map((l) => l.slice(6, -1)).filter((l) => !slugs.has(l))).toEqual([]);
   });
 
   it('an admin login older than 12 hours is refused until they log in again', async () => {

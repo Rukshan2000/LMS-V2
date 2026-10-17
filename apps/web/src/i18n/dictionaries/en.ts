@@ -35,7 +35,6 @@ const en = {
     comingNext: 'Use the menu to manage students, classes, attendance, fees and bank slips.',
     logout: 'Log out',
     switchInstitute: 'Switch institute',
-    newInstitute: '+ New institute',
     soon: 'Soon',
     menu: 'Menu',
     language: 'Language',

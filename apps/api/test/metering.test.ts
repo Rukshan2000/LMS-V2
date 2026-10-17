@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision } from './provision.js';
 import { addDays, colomboToday } from '../src/lib/time.js';
 import { generateInvoices, recordPayment, voidInvoice } from '../src/modules/billing/service.js';
 
@@ -18,6 +19,7 @@ let accountId: string;
 let api: string;
 
 async function signup(phone: string) {
+  await provision(ownerDb, phone);
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',

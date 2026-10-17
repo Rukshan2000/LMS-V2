@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision } from './provision.js';
 
 // Accounts, trial caps and account state (docs/SAAS_PLAN.md §5, §7). Replaces plans.test.ts.
 
@@ -15,6 +16,7 @@ let accountId: string;
 let api: string;
 
 async function signup(phone: string) {
+  await provision(ownerDb, phone);
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
@@ -74,8 +76,8 @@ beforeEach(async () => {
   accountId = (await ownerDb('tenants').where({ id: tenantId }).first('account_id')).account_id;
 });
 
-describe('self-service account and trial', () => {
-  it('creating the first institute creates an account with a 30-day capped trial', async () => {
+describe('account and trial', () => {
+  it('the first institute goes into the provisioned account with a 30-day capped trial', async () => {
     const account = await ownerDb('accounts').where({ id: accountId }).first();
     expect(account).toMatchObject({ price_book: 'standard', owner_phone: '94770000001' });
     expect(await entitlements()).toMatchObject({
@@ -193,6 +195,15 @@ describe('account with several institutes', () => {
     const row = await ownerDb('tenants').where({ id: res.json().tenant.id }).first('account_id');
     expect(row.account_id).not.toBe(accountId);
   });
+
+  it('without an account from the platform console, no institute can be created', async () => {
+    const other = (await signup('0770000002')).cookie;
+    await ownerDb('accounts').where({ owner_phone: '94770000002' }).del();
+    const res = await createInstitute('other-place', other);
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('no_account');
+    expect(await ownerDb('tenants').count({ n: '*' }).first()).toEqual({ n: '1' });
+  });
 });
 
 describe('account claimed by phone', () => {
@@ -205,7 +216,6 @@ describe('account claimed by phone', () => {
     expect(res.statusCode).toBe(201);
     const row = await ownerDb('tenants').where({ id: res.json().tenant.id }).first('account_id');
     expect(row.account_id).toBe(created.id);
-    // No trial or trial caps: the admin sets those for accounts they create.
     const claimed = await ownerDb('accounts').where({ id: created.id }).first();
     expect(claimed.owner_user_id).not.toBeNull();
     expect(await ownerDb('account_overrides').where({ account_id: created.id })).toEqual([]);

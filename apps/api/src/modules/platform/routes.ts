@@ -27,6 +27,7 @@ import {
   voidInvoice,
   type Actor,
 } from '../billing/index.js';
+import { DOCS } from './docs.js';
 
 // Super admin console API, /api/v1/admin (docs/SAAS_PLAN.md §10.2). Platform admins only; every
 // other caller gets 404. Reads and writes go through billing's functions, which audit each change.
@@ -169,6 +170,9 @@ export default async function platformRoutes(
     await updateSetting(app.db, key, value, actor(req));
     return reply.status(204).send();
   });
+
+  // Platform documentation for the console's Docs section (hidden like every route here).
+  app.get('/docs', async () => ({ pages: DOCS }));
 
   app.get('/audit', async (req) => {
     const q = auditQuery.parse(req.query);

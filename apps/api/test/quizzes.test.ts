@@ -4,6 +4,7 @@ import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { colomboToday } from '../src/lib/time.js';
+import { provision } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -17,6 +18,7 @@ let amal: string; // student login
 let mother: string; // parent login
 
 async function signup(phone: string) {
+  await provision(ownerDb, phone);
   const res = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
