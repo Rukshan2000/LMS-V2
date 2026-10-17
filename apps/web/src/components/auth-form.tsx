@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { Button, Card, Field, FormError } from './ui';
+import { LogIn, UserPlus } from 'lucide-react';
+import { Brand, Button, Card, Field, FormError } from './ui';
 
 export function AuthForm({
   mode,
@@ -46,6 +47,9 @@ export function AuthForm({
   const signup = mode === 'signup';
   return (
     <Card>
+      <div className="mb-5">
+        <Brand />
+      </div>
       <h1 className="mb-6 text-xl font-semibold">
         {signup ? t.auth.signupTitle : t.auth.loginTitle}
       </h1>
@@ -80,14 +84,14 @@ export function AuthForm({
           autoComplete={signup ? 'new-password' : 'current-password'}
         />
         {signup && (
-          <label className="flex items-start gap-2 text-sm text-zinc-700">
+          <label className="flex items-start gap-2 text-sm text-ink-muted">
             <input type="checkbox" name="acceptPrivacy" required className="mt-1" />
             <span>
               {t.auth.acceptPrivacy}{' '}
               <Link
                 href={`/${lang}/privacy`}
                 target="_blank"
-                className="font-medium text-indigo-600"
+                className="font-medium text-primary transition-colors hover:text-primary-hover hover:underline"
               >
                 {t.privacy.title}
               </Link>
@@ -95,20 +99,24 @@ export function AuthForm({
           </label>
         )}
         <FormError message={error} />
-        <Button type="submit" busy={busy}>
+        <Button type="submit" busy={busy} icon={signup ? UserPlus : LogIn}>
           {signup ? t.auth.signupButton : t.auth.loginButton}
         </Button>
       </form>
-      <p className="mt-6 text-center text-sm text-zinc-600">
+      <p className="mt-6 text-center text-sm text-ink-muted">
         {signup ? t.auth.haveAccount : t.auth.noAccount}{' '}
         {onSwitch ? (
-          <button type="button" onClick={onSwitch} className="font-medium text-indigo-600">
+          <button
+            type="button"
+            onClick={onSwitch}
+            className="font-medium text-primary transition-colors hover:text-primary-hover hover:underline"
+          >
             {signup ? t.landing.login : t.landing.signup}
           </button>
         ) : (
           <Link
             href={`/${lang}/${signup ? 'login' : 'signup'}`}
-            className="font-medium text-indigo-600"
+            className="font-medium text-primary transition-colors hover:text-primary-hover hover:underline"
           >
             {signup ? t.landing.login : t.landing.signup}
           </Link>

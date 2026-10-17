@@ -1,5 +1,6 @@
 'use client';
 
+import { Copy, MessageCircle, UserMinus, UserPlus, Users, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -7,7 +8,7 @@ import { api, errorMessage, fmt, type Role } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
 import { displayPhone } from '../students/types';
 import { useTenantData } from '../dashboard-shell';
-import { Button, Field, FormError } from '../ui';
+import { btn, Button, card, ConfirmButton, Field, FormError, useToast } from '../ui';
 
 interface Member {
   membershipId: string;
@@ -34,7 +35,7 @@ export function StaffSettings() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [form, setForm] = useState({ fullName: '', phone: '', role: 'teacher' });
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   const fail = useCallback((err: unknown) => setError(errorMessage(t, err)), [t]);
@@ -88,45 +89,56 @@ export function StaffSettings() {
       <h1 className="text-2xl font-semibold">{st.title}</h1>
       <FormError message={error} />
 
-      <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="font-medium">{st.staff}</h2>
-        <ul className="divide-y divide-zinc-100">
+      <section className={`${card} space-y-3 p-4`}>
+        <h2 className="flex items-center gap-2 font-medium">
+          <Users aria-hidden className="size-5 text-primary" />
+          {st.staff}
+        </h2>
+        <ul className="divide-y divide-line">
           {members.map((m) => (
             <li
               key={m.membershipId}
               className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
             >
+              <span
+                aria-hidden
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft font-semibold text-primary-hover"
+              >
+                {m.fullName.trim().charAt(0).toUpperCase()}
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="font-medium">{m.fullName}</span>
                 {m.fullName === me.user.fullName && m.phone === me.user.phone && (
-                  <span className="text-zinc-500"> {st.you}</span>
+                  <span className="text-ink-subtle"> {st.you}</span>
                 )}
-                <span className="block text-zinc-500">
+                <span className="block text-ink-subtle">
                   {displayPhone(m.phone)} · {m.roles.map((r) => t.roles[r]).join(', ')}
                 </span>
               </span>
               {!m.roles.includes('owner') && m.phone !== me.user.phone && (
-                <button
-                  type="button"
-                  onClick={() =>
+                <ConfirmButton
+                  icon={UserMinus}
+                  onConfirm={() =>
                     api(`/tenants/${tenantId}/members/${m.membershipId}`, { method: 'DELETE' })
                       .then(() =>
                         setMembers((ms) => ms.filter((x) => x.membershipId !== m.membershipId)),
                       )
                       .catch(fail)
                   }
-                  className="text-red-600"
                 >
                   {st.remove}
-                </button>
+                </ConfirmButton>
               )}
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="font-medium">{st.invite}</h2>
+      <section className={`${card} space-y-3 p-4`}>
+        <h2 className="flex items-center gap-2 font-medium">
+          <UserPlus aria-hidden className="size-5 text-primary" />
+          {st.invite}
+        </h2>
         <form
           onSubmit={onInvite}
           className="grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
@@ -147,11 +159,11 @@ export function StaffSettings() {
             placeholder="077 123 4567"
           />
           <label className="block text-sm">
-            <span className="mb-1 block font-medium text-zinc-700">{st.role}</span>
+            <span className="mb-1 block font-medium text-ink-muted">{st.role}</span>
             <select
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2.5"
+              className="rounded-lg border border-line-strong bg-surface px-3 py-2.5"
             >
               {(['teacher', 'receptionist', 'admin'] as const).map((r) => (
                 <option key={r} value={r}>
@@ -165,14 +177,14 @@ export function StaffSettings() {
           </Button>
         </form>
 
-        <h3 className="pt-2 text-sm font-medium text-zinc-700">{st.pending}</h3>
-        {invites.length === 0 && <p className="text-sm text-zinc-500">{st.noPending}</p>}
-        <ul className="divide-y divide-zinc-100">
+        <h3 className="pt-2 text-sm font-medium text-ink-muted">{st.pending}</h3>
+        {invites.length === 0 && <p className="text-sm text-ink-subtle">{st.noPending}</p>}
+        <ul className="divide-y divide-line">
           {invites.map((i) => (
             <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
               <span className="min-w-0 flex-1">
                 <span className="font-medium">{i.fullName}</span> · {t.roles[i.role]}
-                <span className="block text-zinc-500">
+                <span className="block text-ink-subtle">
                   {displayPhone(i.phone)} · {fmt(st.expires, { date: colomboDate(i.expiresAt) })}
                 </span>
               </span>
@@ -182,43 +194,39 @@ export function StaffSettings() {
                     href={whatsapp(i)}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-lg bg-green-600 px-3 py-1.5 font-medium text-white"
+                    className={btn('whatsapp')}
                   >
+                    <MessageCircle aria-hidden className="size-4" />
                     {st.sendWhatsApp}
                   </a>
                   <button
                     type="button"
                     onClick={() =>
                       navigator.clipboard.writeText(i.link!).then(
-                        () => setNotice(st.copied),
+                        () => toast(st.copied),
                         () => {},
                       )
                     }
-                    className="text-indigo-600"
+                    className={btn('link', 'none')}
                   >
+                    <Copy aria-hidden className="size-4" />
                     {st.copyLink}
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={() =>
+              <ConfirmButton
+                icon={X}
+                onConfirm={() =>
                   api(`/tenants/${tenantId}/invites/${i.id}`, { method: 'DELETE' })
                     .then(() => setInvites((list) => list.filter((x) => x.id !== i.id)))
                     .catch(fail)
                 }
-                className="text-red-600"
               >
                 {st.revoke}
-              </button>
+              </ConfirmButton>
             </li>
           ))}
         </ul>
-        {notice && (
-          <p role="status" className="text-sm text-green-700">
-            {notice}
-          </p>
-        )}
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarX, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -7,7 +8,7 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { colomboDate, fmtTime } from '@/lib/datetime';
 import type { Session } from '../classes/types';
-import { FormError } from '../ui';
+import { EmptyState, FormError, Skeleton } from '../ui';
 
 /** Classes on one day, each linking to its register. */
 export function AttendanceDay() {
@@ -28,36 +29,35 @@ export function AttendanceDay() {
     <div className="max-w-2xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-semibold">{a.title}</h1>
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-ink-muted">
           {a.date}{' '}
           <input
             type="date"
             value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="ml-1 rounded-lg border border-zinc-300 px-2 py-1"
+            className="ml-1 rounded-lg border border-line-strong px-2 py-1"
           />
         </label>
       </div>
       <FormError message={error} />
       {sessions === null ? (
-        <p className="text-zinc-500">{t.loading}</p>
+        <Skeleton />
       ) : sessions.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-zinc-500">
-          {a.noClasses}
-        </p>
+        <EmptyState icon={CalendarX}>{a.noClasses}</EmptyState>
       ) : (
-        <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-card">
           {sessions.map((s) => (
             <li key={s.id}>
               <Link
                 href={`/${lang}/t/${tenantId}/attendance/${s.id}`}
-                className={`flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 ${s.status === 'cancelled' ? 'text-zinc-400 line-through' : ''}`}
+                className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-soft ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
               >
                 <span className="w-24 font-mono text-sm">
                   {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
                 </span>
                 <span className="flex-1 font-medium">{s.batchName}</span>
-                <span className="text-sm text-zinc-500">{s.subjectName}</span>
+                <span className="text-sm text-ink-subtle">{s.subjectName}</span>
+                <ChevronRight aria-hidden className="size-4 text-ink-subtle" />
               </Link>
             </li>
           ))}

@@ -1,5 +1,15 @@
 'use client';
 
+import {
+  Camera,
+  CameraOff,
+  CircleAlert,
+  CircleCheck,
+  CircleX,
+  Clock,
+  MessageCircle,
+  ScanLine,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -8,6 +18,7 @@ import { colomboTime } from '@/lib/datetime';
 import { fmtMoney } from '@/lib/money';
 import { waLink } from '@/lib/whatsapp';
 import { useTenantData } from '../dashboard-shell';
+import { btn, card } from '../ui';
 
 interface ScanResult {
   student: { id: string; studentNumber: string; fullName: string };
@@ -17,7 +28,10 @@ interface ScanResult {
   guardians: { fullName: string; phone: string }[];
   feeDue: string | null;
 }
-type Outcome = { ok: true; result: ScanResult } | { ok: false; message: string; name?: string };
+// `id` restarts the result animation on every scan, even a repeat of the same card.
+type Outcome = { id: number } & (
+  { ok: true; result: ScanResult } | { ok: false; message: string; name?: string }
+);
 
 // Minimal typing for the browser's built-in QR reader (Chrome on Android/desktop).
 interface Detector {
@@ -51,14 +65,14 @@ export function ScanPage() {
           method: 'POST',
           body: { code: value.trim() },
         });
-        setLast({ ok: true, result });
+        setLast({ id: Date.now(), ok: true, result });
         if (!result.duplicate) setRecent((r) => [result, ...r].slice(0, 20));
       } catch (err) {
         const name =
           err instanceof ApiError
             ? (err.details as { student?: { fullName: string } })?.student?.fullName
             : undefined;
-        setLast({ ok: false, message: errorMessage(t, err), name });
+        setLast({ id: Date.now(), ok: false, message: errorMessage(t, err), name });
       }
       busy.current = false;
       setCode('');
@@ -110,8 +124,12 @@ export function ScanPage() {
   return (
     <div className="max-w-xl space-y-4">
       <h1 className="text-2xl font-semibold">{sc.title}</h1>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} className="relative">
         {/* USB/Bluetooth barcode scanners type the code and press Enter. */}
+        <ScanLine
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-4 size-6 -translate-y-1/2 text-primary"
+        />
         <input
           ref={inputRef}
           autoFocus
@@ -120,16 +138,13 @@ export function ScanPage() {
           placeholder={sc.placeholder}
           aria-label={sc.placeholder}
           autoComplete="off"
-          className="w-full rounded-xl border-2 border-indigo-300 px-4 py-3 text-lg outline-none focus:border-indigo-600"
+          className="w-full rounded-xl border-2 border-primary-ring bg-surface py-3 pr-4 pl-13 text-lg shadow-card"
         />
       </form>
       <div>
         {camera === 'on' ? (
-          <button
-            type="button"
-            onClick={() => setCamera('off')}
-            className="text-sm text-indigo-600"
-          >
+          <button type="button" onClick={() => setCamera('off')} className={btn('link', 'none')}>
+            <CameraOff aria-hidden className="size-4" />
             {sc.stopCamera}
           </button>
         ) : (
@@ -138,78 +153,103 @@ export function ScanPage() {
             onClick={() =>
               setCamera(window.BarcodeDetector && navigator.mediaDevices ? 'on' : 'unsupported')
             }
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+            className={btn('secondary')}
           >
+            <Camera aria-hidden className="size-4" />
             {sc.camera}
           </button>
         )}
         {camera === 'unsupported' && (
-          <p className="mt-2 text-sm text-amber-700">{sc.cameraUnsupported}</p>
+          <p className="mt-2 text-sm text-warning">{sc.cameraUnsupported}</p>
         )}
         {camera === 'on' && (
-          <video ref={videoRef} muted playsInline className="mt-2 w-full rounded-xl bg-black" />
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            className="mt-2 w-full animate-fade-in rounded-xl bg-black shadow-card"
+          />
         )}
       </div>
 
       {last && (
         <div
+          key={last.id}
           role="status"
-          className={`rounded-2xl p-5 ${
+          className={`flex animate-pop-in gap-4 rounded-2xl p-5 shadow-card ${
             !last.ok
-              ? 'bg-red-50 text-red-800'
+              ? 'bg-danger-soft text-danger'
               : last.result.duplicate
-                ? 'bg-amber-50 text-amber-900'
+                ? 'bg-warning-soft text-warning'
                 : last.result.attendance.status === 'late'
-                  ? 'bg-orange-50 text-orange-900'
-                  : 'bg-green-50 text-green-900'
+                  ? 'bg-late-soft text-late'
+                  : 'bg-success-soft text-success'
           }`}
         >
-          {last.ok ? (
-            <>
-              <p className="text-2xl font-semibold">{last.result.student.fullName}</p>
-              <p>
-                {last.result.student.studentNumber} · {last.result.session.batchName} ·{' '}
-                {last.result.duplicate ? sc.already : sc[last.result.attendance.status]}
-              </p>
-              {last.result.feeDue && (
-                <p className="mt-2 rounded-lg bg-red-100 px-3 py-1.5 font-medium text-red-800">
-                  {fmt(t.fees.feeDue, { amount: fmtMoney(last.result.feeDue) })}
+          {(() => {
+            const Icon = !last.ok
+              ? CircleX
+              : last.result.duplicate
+                ? CircleAlert
+                : last.result.attendance.status === 'late'
+                  ? Clock
+                  : CircleCheck;
+            return <Icon aria-hidden className="size-10 shrink-0" strokeWidth={1.75} />;
+          })()}
+          <div className="min-w-0 flex-1">
+            {last.ok ? (
+              <>
+                <p className="text-2xl font-semibold">{last.result.student.fullName}</p>
+                <p>
+                  {last.result.student.studentNumber} · {last.result.session.batchName} ·{' '}
+                  {last.result.duplicate ? sc.already : sc[last.result.attendance.status]}
                 </p>
-              )}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {last.result.guardians.map((g) => (
-                  <a
-                    key={g.phone}
-                    href={waLink(g.phone, message(last.result))}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white"
-                  >
-                    {fmt(sc.notifyParent, { name: g.fullName })}
-                  </a>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              {last.name && <p className="text-xl font-semibold">{last.name}</p>}
-              <p>{last.message}</p>
-            </>
-          )}
+                {last.result.feeDue && (
+                  <p className="mt-2 rounded-lg bg-danger-soft px-3 py-1.5 font-medium text-danger">
+                    {fmt(t.fees.feeDue, { amount: fmtMoney(last.result.feeDue) })}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {last.result.guardians.map((g) => (
+                    <a
+                      key={g.phone}
+                      href={waLink(g.phone, message(last.result))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={btn('whatsapp')}
+                    >
+                      <MessageCircle aria-hidden className="size-4" />
+                      {fmt(sc.notifyParent, { name: g.fullName })}
+                    </a>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {last.name && <p className="text-xl font-semibold">{last.name}</p>}
+                <p>{last.message}</p>
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {recent.length > 0 && (
-        <section className="rounded-xl border border-zinc-200 bg-white">
-          <h2 className="border-b border-zinc-100 px-4 py-2 text-sm font-medium">{sc.recent}</h2>
-          <ul className="divide-y divide-zinc-100 text-sm">
+        <section className={`${card} overflow-hidden`}>
+          <h2 className="border-b border-line bg-surface-soft px-4 py-2 text-sm font-medium">
+            {sc.recent}
+          </h2>
+          <ul className="divide-y divide-line text-sm">
             {recent.map((r) => (
-              <li key={`${r.student.id}-${r.session.id}`} className="flex gap-3 px-4 py-2">
-                <span className="font-mono text-zinc-500">
+              <li
+                key={`${r.student.id}-${r.session.id}`}
+                className="flex animate-fade-in gap-3 px-4 py-2"
+              >
+                <span className="font-mono text-ink-subtle">
                   {colomboTime(r.attendance.markedAt)}
                 </span>
                 <span className="flex-1">{r.student.fullName}</span>
-                <span className="text-zinc-500">{r.session.batchName}</span>
+                <span className="text-ink-subtle">{r.session.batchName}</span>
               </li>
             ))}
           </ul>

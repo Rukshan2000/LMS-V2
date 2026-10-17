@@ -1,5 +1,13 @@
 'use client';
 
+import {
+  CircleAlert,
+  CircleCheck,
+  FilePlus,
+  FileText,
+  MessageCircle,
+  PartyPopper,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -9,7 +17,7 @@ import { colomboDate } from '@/lib/datetime';
 import { fmtMoney } from '@/lib/money';
 import { waLink } from '@/lib/whatsapp';
 import { useTenantData } from '../dashboard-shell';
-import { FormError } from '../ui';
+import { btn, card, FormError, FormSuccess, Skeleton } from '../ui';
 
 interface Unpaid {
   invoiceId: string;
@@ -67,56 +75,66 @@ export function FeesMonth() {
     <div className="max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-semibold">{f.title}</h1>
-        <label className="text-sm text-zinc-700">
+        <label className="text-sm text-ink-muted">
           {f.month}{' '}
           <input
             type="month"
             value={period}
             onChange={(e) => e.target.value && setPeriod(e.target.value)}
-            className="ml-1 rounded-lg border border-zinc-300 px-2 py-1"
+            className="ml-1 rounded-lg border border-line-strong px-2 py-1"
           />
         </label>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={generate}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
+        <button type="button" disabled={busy} onClick={generate} className={btn('primary', 'md')}>
+          <FilePlus aria-hidden className="size-4" />
           {f.generate}
         </button>
       </div>
-      {notice && (
-        <p role="status" className="text-sm text-green-700">
-          {notice}
-        </p>
-      )}
+      {notice && <FormSuccess>{notice}</FormSuccess>}
       <FormError message={error} />
+      {!data && !error && <Skeleton rows={3} />}
       {data && (
         <>
           <dl className="grid grid-cols-3 gap-3">
-            {(['billed', 'collected', 'outstanding'] as const).map((k) => (
-              <div key={k} className="rounded-xl border border-zinc-200 bg-white p-4">
-                <dt className="text-sm text-zinc-500">{f[k]}</dt>
-                <dd className="mt-1 text-lg font-semibold">LKR {fmtMoney(data.summary[k])}</dd>
+            {(
+              [
+                ['billed', FileText, 'text-primary'],
+                ['collected', CircleCheck, 'text-success'],
+                ['outstanding', CircleAlert, 'text-danger'],
+              ] as const
+            ).map(([k, Icon, color]) => (
+              <div key={k} className={`${card} p-3 sm:p-4`}>
+                <dt className="flex items-center gap-1.5 text-sm text-ink-subtle">
+                  <Icon aria-hidden className={`size-4 shrink-0 ${color}`} />
+                  {f[k]}
+                </dt>
+                <dd className="mt-1 font-mono text-base font-semibold sm:text-lg">
+                  <span className="mr-1 text-xs font-normal text-ink-subtle">LKR</span>
+                  {fmtMoney(data.summary[k])}
+                </dd>
               </div>
             ))}
           </dl>
-          <section className="rounded-xl border border-zinc-200 bg-white">
-            <h2 className="border-b border-zinc-100 px-4 py-2 font-medium">
+          <section className={`${card} overflow-hidden`}>
+            <h2 className="border-b border-line bg-surface-soft px-4 py-2 font-medium">
               {f.notPaid} ({data.unpaid.length})
             </h2>
             {data.unpaid.length === 0 ? (
-              <p className="p-4 text-sm text-zinc-500">
+              <p className="flex items-center gap-2 p-4 text-sm text-ink-subtle">
+                {data.summary.invoices ? (
+                  <PartyPopper aria-hidden className="size-4 text-success" />
+                ) : (
+                  <FileText aria-hidden className="size-4" />
+                )}
                 {data.summary.invoices ? f.allPaid : f.noInvoices}
               </p>
             ) : (
-              <ul className="divide-y divide-zinc-100">
+              <ul className="divide-y divide-line">
                 {data.unpaid.map((u) => (
                   <li
                     key={u.invoiceId}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm"
                   >
-                    <span className="w-12 font-mono text-zinc-500">{u.studentNumber}</span>
+                    <span className="w-12 font-mono text-ink-subtle">{u.studentNumber}</span>
                     <Link
                       href={`/${lang}/t/${tenantId}/students/${u.studentId}`}
                       className="min-w-0 flex-1 font-medium hover:underline"
@@ -139,8 +157,9 @@ export function FeesMonth() {
                         )}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white"
+                        className={btn('whatsapp', 'xs')}
                       >
+                        <MessageCircle aria-hidden className="size-3.5" />
                         {f.remind}: {g.fullName}
                       </a>
                     ))}

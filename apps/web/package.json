@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "lucide-react": "^1.58.0",
     "next": "16.4.2",
     "qrcode": "^1.5.4",
     "react": "19.3.0",

@@ -1,11 +1,12 @@
 'use client';
 
+import { Printer, RefreshCw, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { FormError } from '../ui';
+import { btn, card, FormError, FormSuccess } from '../ui';
 
 /** Print a student's QR card, or replace a lost one (the old QR stops working). */
 export function StudentCard({ studentId }: { studentId: string }) {
@@ -27,30 +28,30 @@ export function StudentCard({ studentId }: { studentId: string }) {
   }
 
   return (
-    <section className="flex max-w-xl flex-wrap items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 text-sm">
-      <Link
-        href={`/${lang}/t/${tenantId}/students/${studentId}/card`}
-        className="rounded-lg border border-zinc-300 px-3 py-1.5 font-medium"
-      >
+    <section className={`${card} flex max-w-xl flex-wrap items-center gap-3 p-4 text-sm`}>
+      <Link href={`/${lang}/t/${tenantId}/students/${studentId}/card`} className={btn('secondary')}>
+        <Printer aria-hidden className="size-4" />
         {c.printOne}
       </Link>
       {confirming ? (
-        <button
-          type="button"
-          onClick={replace}
-          className="rounded-lg bg-red-600 px-3 py-1.5 font-medium text-white"
-        >
+        <button type="button" onClick={replace} className={`${btn('danger')} animate-pop-in`}>
+          <TriangleAlert aria-hidden className="size-4" />
           {c.confirmReplace}
         </button>
       ) : (
-        <button type="button" onClick={() => setConfirming(true)} className="text-red-600">
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className={btn('linkDanger', 'none')}
+        >
+          <RefreshCw aria-hidden className="size-4" />
           {c.replace}
         </button>
       )}
       {done && (
-        <p role="status" className="w-full text-green-700">
-          {c.replaced}
-        </p>
+        <div className="w-full">
+          <FormSuccess>{c.replaced}</FormSuccess>
+        </div>
       )}
       <FormError message={error} />
     </section>

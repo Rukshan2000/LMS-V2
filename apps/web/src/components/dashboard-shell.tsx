@@ -1,15 +1,46 @@
 'use client';
 
+import {
+  BookOpen,
+  Building2,
+  CalendarDays,
+  ChartColumn,
+  ClipboardCheck,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Receipt,
+  ScanLine,
+  Settings,
+  Users,
+  Wallet,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { createContext, use, useEffect, useState, type ReactNode } from 'react';
+import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, type Me, type Role } from '@/lib/api';
-import { navForRoles } from '@/lib/nav';
+import { navForRoles, type NavItem } from '@/lib/nav';
 import { LanguageSwitcher } from './language-switcher';
-import { Spinner } from './ui';
+import { Skeleton, ToastProvider } from './ui';
 
 export const LAST_TENANT_KEY = 'lastTenantId';
+
+export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
+  overview: LayoutDashboard,
+  scan: ScanLine,
+  students: Users,
+  classes: BookOpen,
+  attendance: ClipboardCheck,
+  fees: Wallet,
+  slips: Receipt,
+  timetable: CalendarDays,
+  reports: ChartColumn,
+  settings: Settings,
+};
 
 interface TenantData {
   me: Me;
@@ -32,6 +63,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [data, setData] = useState<TenantData | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +85,16 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     };
   }, [tenantId, lang, router]);
 
-  if (!data) return <Spinner label={t.loading} />;
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setMenuOpen(false);
+      menuButton.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   async function logout() {
     await api('/auth/logout', { method: 'POST' }).catch(() => {});
@@ -66,87 +107,146 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     path === ''
       ? pathname === base
       : pathname === `${base}${path}` || pathname.startsWith(`${base}${path}/`);
-  const sidebar = (
+  const navItem =
+    'flex items-center gap-3 rounded-lg px-3 py-2 font-medium transition-colors duration-200';
+  const sidebar = data ? (
     <nav className="flex flex-col gap-1 p-3">
-      {navForRoles(data.roles).map((item) =>
-        item.path !== undefined ? (
+      {navForRoles(data.roles).map((item) => {
+        const Icon = NAV_ICONS[item.key];
+        if (item.path === undefined)
+          return (
+            <span key={item.key} className={`${navItem} text-ink-subtle`}>
+              <Icon aria-hidden className="size-5" />
+              <span className="flex-1">{t.nav[item.key]}</span>
+              <span className="rounded-full bg-neutral-soft px-2 py-0.5 text-xs">
+                {t.dashboard.soon}
+              </span>
+            </span>
+          );
+        const active = isActive(item.path);
+        return (
           <Link
             key={item.key}
             href={`${base}${item.path}`}
             onClick={() => setMenuOpen(false)}
-            aria-current={isActive(item.path) ? 'page' : undefined}
-            className={`rounded-lg px-3 py-2 font-medium ${
-              isActive(item.path)
-                ? 'bg-indigo-50 text-indigo-700'
-                : 'text-zinc-700 hover:bg-zinc-50'
+            aria-current={active ? 'page' : undefined}
+            className={`${navItem} ${
+              active
+                ? 'bg-primary-soft text-primary-hover'
+                : 'text-ink-muted hover:bg-surface-soft hover:text-ink'
             }`}
           >
+            <Icon aria-hidden className={`size-5 ${active ? 'text-primary' : 'text-ink-subtle'}`} />
             {t.nav[item.key]}
           </Link>
-        ) : (
-          <span
-            key={item.key}
-            className="flex items-center justify-between rounded-lg px-3 py-2 text-zinc-400"
-          >
-            {t.nav[item.key]}
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs">{t.dashboard.soon}</span>
-          </span>
-        ),
-      )}
+        );
+      })}
     </nav>
+  ) : (
+    <div className="space-y-2 p-3" aria-hidden>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="h-9 animate-shimmer rounded-lg bg-surface-soft" />
+      ))}
+    </div>
   );
 
   return (
     <TenantDataContext value={data}>
-      <div className="flex min-h-full flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 print:hidden">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-expanded={menuOpen}
-            className="rounded-md border border-zinc-300 px-2 py-1 text-sm md:hidden"
-          >
-            {t.dashboard.menu}
-          </button>
-          <select
-            aria-label={t.dashboard.switchInstitute}
-            value={tenantId}
-            onChange={(e) => {
-              if (e.target.value === 'new') router.push(`/${lang}/onboarding`);
-              else router.push(`/${lang}/t/${e.target.value}`);
-            }}
-            className="min-w-0 max-w-[50vw] truncate rounded-md border border-zinc-300 bg-white px-2 py-1 font-medium"
-          >
-            {data.me.tenants.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-            <option value="new">{t.dashboard.newInstitute}</option>
-          </select>
-          <div className="ml-auto flex items-center gap-3">
-            <LanguageSwitcher className="hidden sm:block" />
-            <span className="hidden text-sm text-zinc-600 sm:inline">{data.me.user.fullName}</span>
-            <button type="button" onClick={logout} className="text-sm text-zinc-600 underline">
-              {t.dashboard.logout}
+      <ToastProvider>
+        <div className="flex min-h-full flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur print:hidden">
+            <button
+              ref={menuButton}
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              aria-label={t.dashboard.menu}
+              className="-ml-1 rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-surface-soft md:hidden"
+            >
+              {menuOpen ? (
+                <X aria-hidden className="size-5" />
+              ) : (
+                <Menu aria-hidden className="size-5" />
+              )}
             </button>
-          </div>
-        </header>
-        <div className="flex flex-1">
-          <aside className="hidden w-60 shrink-0 border-r border-zinc-200 bg-white md:block print:hidden">
-            {sidebar}
-          </aside>
-          {menuOpen && (
-            <div className="fixed inset-x-0 top-[57px] bottom-0 z-10 bg-white md:hidden">
-              {sidebar}
-              <div className="px-6">
-                <LanguageSwitcher />
-              </div>
+            <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white md:flex">
+              <GraduationCap aria-hidden className="size-5" />
+            </span>
+            {data ? (
+              <label className="flex min-w-0 items-center gap-2 rounded-lg border border-line px-2 transition-colors focus-within:border-primary focus-within:ring-3 focus-within:ring-primary-ring hover:border-line-strong">
+                <Building2 aria-hidden className="size-4 shrink-0 text-ink-subtle" />
+                <select
+                  aria-label={t.dashboard.switchInstitute}
+                  value={tenantId}
+                  onChange={(e) => {
+                    if (e.target.value === 'new') router.push(`/${lang}/onboarding`);
+                    else router.push(`/${lang}/t/${e.target.value}`);
+                  }}
+                  className="min-w-0 max-w-[45vw] truncate border-0 bg-transparent py-1.5 font-medium focus:shadow-none"
+                >
+                  {data.me.tenants.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                  <option value="new">{t.dashboard.newInstitute}</option>
+                </select>
+              </label>
+            ) : (
+              <span className="h-8 w-40 animate-shimmer rounded-lg bg-surface-soft" />
+            )}
+            <div className="ml-auto flex items-center gap-3">
+              <LanguageSwitcher className="max-sm:hidden" />
+              {data && (
+                <span className="hidden items-center gap-2 text-sm text-ink-muted sm:flex">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-hover">
+                    {data.me.user.fullName.trim().charAt(0).toUpperCase()}
+                  </span>
+                  {data.me.user.fullName}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={logout}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-ink-muted transition-colors hover:bg-surface-soft hover:text-ink"
+              >
+                <LogOut aria-hidden className="size-4" />
+                <span className="hidden sm:inline">{t.dashboard.logout}</span>
+                <span className="sr-only sm:hidden">{t.dashboard.logout}</span>
+              </button>
             </div>
-          )}
-          <main className="min-w-0 flex-1 p-4 sm:p-8 print:p-0">{children}</main>
+          </header>
+          <div className="flex flex-1">
+            <aside className="hidden w-60 shrink-0 border-r border-line bg-surface md:block print:hidden">
+              <div className="sticky top-14">{sidebar}</div>
+            </aside>
+            {menuOpen && (
+              <div
+                id="mobile-menu"
+                className="fixed inset-x-0 top-14 bottom-0 z-10 animate-slide-down overflow-y-auto bg-surface md:hidden"
+              >
+                {sidebar}
+                <div className="px-6 pb-6">
+                  <LanguageSwitcher />
+                </div>
+              </div>
+            )}
+            <main className="min-w-0 flex-1 p-4 sm:p-8 print:p-0">
+              {data ? (
+                <div key={pathname} className="animate-fade-in">
+                  {children}
+                </div>
+              ) : (
+                <div className="max-w-3xl space-y-4">
+                  <div className="h-8 w-48 animate-shimmer rounded-lg bg-line" />
+                  <Skeleton />
+                </div>
+              )}
+            </main>
+          </div>
         </div>
-      </div>
+      </ToastProvider>
     </TenantDataContext>
   );
 }

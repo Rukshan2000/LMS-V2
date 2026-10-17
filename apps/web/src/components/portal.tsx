@@ -1,5 +1,14 @@
 'use client';
 
+import {
+  CalendarClock,
+  CircleCheck,
+  ClipboardCheck,
+  UsersRound,
+  Video,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -7,7 +16,7 @@ import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate, fmtDay, fmtTime } from '@/lib/datetime';
 import { cents, fmtMoney, fromCents } from '@/lib/money';
 import { SlipUpload } from './slip-upload';
-import { FormError } from './ui';
+import { Badge, btn, card, EmptyState, FormError, Skeleton } from './ui';
 
 interface Child {
   id: string;
@@ -44,16 +53,21 @@ interface Child {
   outstanding: string;
 }
 
-const STATUS_COLOR = {
-  present: 'bg-green-100 text-green-800',
-  late: 'bg-amber-100 text-amber-800',
-  absent: 'bg-red-100 text-red-800',
-};
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
   return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-4">
-      <h3 className="mb-2 font-medium">{title}</h3>
+    <section className={`${card} animate-fade-in p-4`}>
+      <h3 className="mb-2 flex items-center gap-2 font-medium">
+        <Icon aria-hidden className="size-5 text-primary" />
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -75,33 +89,45 @@ export function Portal() {
   useEffect(load, [load]);
 
   if (error) return <FormError message={error} />;
-  if (!children) return <p className="text-zinc-500">{t.loading}</p>;
-  if (children.length === 0) return <p className="text-zinc-600">{p.noChildren}</p>;
+  if (!children) return <Skeleton />;
+  if (children.length === 0) return <EmptyState icon={UsersRound}>{p.noChildren}</EmptyState>;
 
   return (
     <div className="max-w-3xl space-y-10">
       {children.map((c) => (
         <div key={c.id} className="space-y-4">
-          <h2 className="text-xl font-semibold">
-            {c.fullName} <span className="font-mono text-sm text-zinc-500">{c.studentNumber}</span>
+          <h2 className="flex items-center gap-3 text-xl font-semibold">
+            <span
+              aria-hidden
+              className="flex size-10 items-center justify-center rounded-full bg-primary text-base text-white"
+            >
+              {c.fullName.trim().charAt(0).toUpperCase()}
+            </span>
+            {c.fullName}{' '}
+            <span className="rounded-lg bg-primary-soft px-2 py-0.5 font-mono text-sm text-primary-hover">
+              {c.studentNumber}
+            </span>
           </h2>
 
-          <Section title={t.fees.title}>
+          <Section title={t.fees.title} icon={Wallet}>
             {cents(c.outstanding) === 0 ? (
-              <p className="text-green-700">{p.allPaid}</p>
+              <p className="flex items-center gap-2 text-success">
+                <CircleCheck aria-hidden className="size-5" />
+                {p.allPaid}
+              </p>
             ) : (
               <>
-                <p className="font-medium text-red-700">
+                <p className="font-medium text-danger">
                   {fmt(t.fees.outstandingTotal, { amount: fmtMoney(c.outstanding) })}
                 </p>
-                <ul className="mt-2 divide-y divide-zinc-100 text-sm">
+                <ul className="mt-2 divide-y divide-line text-sm">
                   {c.invoices.map((i) => (
                     <li key={i.invoiceNumber} className="flex justify-between gap-2 py-1.5">
                       <span>
                         {i.period
                           ? `${t.calendar.months[Number(i.period.slice(5)) - 1]} ${i.period.slice(0, 4)}`
                           : fmt(t.fees.invoiceNo, { number: i.invoiceNumber })}
-                        <span className="ml-2 text-zinc-500">
+                        <span className="ml-2 text-ink-subtle">
                           {t.fees.due} {i.dueDate}
                         </span>
                       </span>
@@ -116,13 +142,10 @@ export function Portal() {
             {c.slips.length > 0 && (
               <ul className="mt-3 space-y-1 text-sm">
                 {c.slips.map((slip) => (
-                  <li
-                    key={slip.id}
-                    className={slip.status === 'pending' ? 'text-amber-700' : 'text-red-700'}
-                  >
-                    {colomboDate(slip.submittedAt)} · LKR {fmtMoney(slip.amount)} ·{' '}
-                    {t.slips.status[slip.status]}
-                    {slip.reviewNote && `: ${slip.reviewNote}`}
+                  <li key={slip.id} className="flex flex-wrap items-center gap-2">
+                    <Badge status={slip.status}>{t.slips.status[slip.status]}</Badge>
+                    {colomboDate(slip.submittedAt)} · LKR {fmtMoney(slip.amount)}
+                    {slip.reviewNote && <span className="text-danger">: {slip.reviewNote}</span>}
                   </li>
                 ))}
               </ul>
@@ -132,7 +155,7 @@ export function Portal() {
             )}
             {c.payments.length > 0 && (
               <>
-                <h4 className="mt-4 text-sm text-zinc-500">{p.recentPayments}</h4>
+                <h4 className="mt-4 text-sm text-ink-subtle">{p.recentPayments}</h4>
                 <ul className="text-sm">
                   {c.payments.map((pay) => (
                     <li key={pay.receiptNumber} className="flex justify-between gap-2 py-1">
@@ -148,19 +171,19 @@ export function Portal() {
             )}
           </Section>
 
-          <Section title={p.upcoming}>
+          <Section title={p.upcoming} icon={CalendarClock}>
             {c.sessions.length === 0 ? (
-              <p className="text-sm text-zinc-500">{p.noUpcoming}</p>
+              <p className="text-sm text-ink-subtle">{p.noUpcoming}</p>
             ) : (
-              <ul className="divide-y divide-zinc-100 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {c.sessions.map((s) => (
                   <li
                     key={s.id}
-                    className={`py-1.5 ${s.status === 'cancelled' ? 'text-zinc-400 line-through' : ''}`}
+                    className={`py-1.5 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
                   >
                     {fmtDay(s.startsAt, t.calendar)} · {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)} ·{' '}
                     {s.batchName}
-                    {s.room && <span className="text-zinc-500"> · {s.room}</span>}
+                    {s.room && <span className="text-ink-subtle"> · {s.room}</span>}
                     {s.status === 'cancelled' && (
                       <span className="ml-2 no-underline">({p.cancelled})</span>
                     )}
@@ -169,14 +192,15 @@ export function Portal() {
                         href={s.liveUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="ml-2 inline-block rounded-lg bg-green-600 px-3 py-1 font-medium text-white"
+                        className={`ml-2 ${btn('success', 'xs')}`}
                       >
+                        <Video aria-hidden className="size-3.5" />
                         {p.join}
                       </a>
                     ) : (
                       s.status === 'scheduled' &&
                       s.online && (
-                        <span className={`ml-2 ${s.feeDue ? 'text-red-700' : 'text-zinc-500'}`}>
+                        <span className={`ml-2 ${s.feeDue ? 'text-danger' : 'text-ink-subtle'}`}>
                           ({s.feeDue ? p.payToJoin : p.linkSoon})
                         </span>
                       )
@@ -186,25 +210,23 @@ export function Portal() {
               </ul>
             )}
             {c.classes.length > 0 && (
-              <p className="mt-3 text-xs text-zinc-500">
+              <p className="mt-3 text-xs text-ink-subtle">
                 {p.classes}: {c.classes.map((b) => `${b.name} (${b.subjectName})`).join(', ')}
               </p>
             )}
           </Section>
 
-          <Section title={p.attendance}>
+          <Section title={p.attendance} icon={ClipboardCheck}>
             {c.attendance.length === 0 ? (
-              <p className="text-sm text-zinc-500">{p.noAttendance}</p>
+              <p className="text-sm text-ink-subtle">{p.noAttendance}</p>
             ) : (
-              <ul className="divide-y divide-zinc-100 text-sm">
+              <ul className="divide-y divide-line text-sm">
                 {c.attendance.map((a) => (
                   <li key={a.startsAt + a.batchName} className="flex justify-between gap-2 py-1.5">
                     <span>
                       {fmtDay(a.startsAt, t.calendar)} · {a.batchName}
                     </span>
-                    <span className={`rounded px-2 text-xs leading-5 ${STATUS_COLOR[a.status]}`}>
-                      {t.attendance[a.status]}
-                    </span>
+                    <Badge status={a.status}>{t.attendance[a.status]}</Badge>
                   </li>
                 ))}
               </ul>

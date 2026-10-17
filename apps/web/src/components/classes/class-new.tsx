@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { Button, Field, FormError } from '../ui';
+import { BackLink, Button, card, Field, FormError } from '../ui';
 import type { BatchDetail, Member } from './types';
 
 export function ClassNew() {
@@ -65,14 +64,9 @@ export function ClassNew() {
 
   return (
     <div className="max-w-xl space-y-4">
-      <Link href={`/${lang}/t/${tenantId}/classes`} className="text-sm text-indigo-600">
-        {c.back}
-      </Link>
+      <BackLink href={`/${lang}/t/${tenantId}/classes`}>{c.back}</BackLink>
       <h1 className="text-2xl font-semibold">{c.add}</h1>
-      <form
-        onSubmit={onSubmit}
-        className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4"
-      >
+      <form onSubmit={onSubmit} className={`${card} space-y-4 p-5`}>
         <Field
           label={c.name}
           value={form.name}
@@ -96,11 +90,11 @@ export function ClassNew() {
           ))}
         </datalist>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-zinc-700">{c.teacher}</span>
+          <span className="mb-1 block font-medium text-ink-muted">{c.teacher}</span>
           <select
             value={form.teacherMembershipId}
             onChange={set('teacherMembershipId')}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5"
+            className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5"
           >
             <option value="">{c.noTeacher}</option>
             {teachers.map((m) => (
@@ -111,11 +105,11 @@ export function ClassNew() {
           </select>
         </label>
         <label className="block text-sm">
-          <span className="mb-1 block font-medium text-zinc-700">{c.mode}</span>
+          <span className="mb-1 block font-medium text-ink-muted">{c.mode}</span>
           <select
             value={form.mode}
             onChange={set('mode')}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5"
+            className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5"
           >
             <option value="physical">{c.physical}</option>
             <option value="online">{c.online}</option>

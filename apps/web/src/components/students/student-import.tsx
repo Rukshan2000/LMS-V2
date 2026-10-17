@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
+import { CircleAlert, CircleCheck, Download, FileUp, SkipForward } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, errorMessage, fmt } from '@/lib/api';
-import { Button, FormError } from '../ui';
+import { BackLink, btn, Button, card, FormError, FormSuccess } from '../ui';
 
 interface Issue {
   line: number;
@@ -67,27 +67,29 @@ export function StudentImport() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <Link href={`/${lang}/t/${tenantId}/students`} className="text-sm text-indigo-600">
-        {s.back}
-      </Link>
+      <BackLink href={`/${lang}/t/${tenantId}/students`}>{s.back}</BackLink>
       <h1 className="text-2xl font-semibold">{s.importTitle}</h1>
-      <p className="text-zinc-600">{s.importHelp}</p>
+      <p className="text-ink-muted">{s.importHelp}</p>
       <a
         href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE)}`}
         download="students-template.csv"
-        className="inline-block text-sm font-medium text-indigo-600"
+        className={btn('link', 'none')}
       >
+        <Download aria-hidden className="size-4" />
         {s.template}
       </a>
 
-      <label className="block rounded-xl border border-dashed border-zinc-300 bg-white p-4">
-        <span className="mb-2 block text-sm font-medium">{s.chooseFile}</span>
+      <label className="block cursor-pointer rounded-xl border-2 border-dashed border-line-strong bg-surface p-5 transition-colors hover:border-primary-ring hover:bg-surface-soft">
+        <span className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <FileUp aria-hidden className="size-5 text-primary" />
+          {s.chooseFile}
+        </span>
         <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files?.[0])} />
       </label>
 
       {csv !== null && !result?.created && (
-        <div className="max-w-56">
-          <Button type="button" busy={busy} onClick={() => run(true)}>
+        <div>
+          <Button type="button" full={false} busy={busy} onClick={() => run(true)}>
             {s.preview}
           </Button>
         </div>
@@ -95,32 +97,35 @@ export function StudentImport() {
       <FormError message={error} />
 
       {result && (
-        <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
+        <div className={`${card} animate-fade-in space-y-3 p-4`}>
           {result.created > 0 ? (
-            <p role="status" className="font-medium text-green-700">
-              {fmt(s.imported, { count: result.created })}
-            </p>
+            <FormSuccess>{fmt(s.imported, { count: result.created })}</FormSuccess>
           ) : (
             <ul className="space-y-1 text-sm">
-              <li className="text-green-700">{fmt(s.summaryReady, { count: result.ready })}</li>
+              <li className="flex items-center gap-2 text-success">
+                <CircleCheck aria-hidden className="size-4" />
+                {fmt(s.summaryReady, { count: result.ready })}
+              </li>
               {result.skipped.length > 0 && (
-                <li className="text-zinc-600">
+                <li className="flex items-center gap-2 text-ink-muted">
+                  <SkipForward aria-hidden className="size-4" />
                   {fmt(s.summarySkipped, { count: result.skipped.length })}
                 </li>
               )}
               {result.errors.length > 0 && (
-                <li className="text-red-700">
+                <li className="flex items-center gap-2 text-danger">
+                  <CircleAlert aria-hidden className="size-4" />
                   {fmt(s.summaryErrors, { count: result.errors.length })}
                 </li>
               )}
             </ul>
           )}
           {[...result.errors, ...result.skipped].length > 0 && (
-            <ul className="max-h-64 overflow-auto text-sm">
+            <ul className="max-h-64 space-y-0.5 overflow-auto rounded-lg bg-surface-soft p-3 text-sm">
               {[...result.errors, ...result.skipped]
                 .sort((a, b) => a.line - b.line)
                 .map((i, n) => (
-                  <li key={n} className={i.code === 'invalid' ? 'text-red-700' : 'text-zinc-600'}>
+                  <li key={n} className={i.code === 'invalid' ? 'text-danger' : 'text-ink-muted'}>
                     {s.line} {i.line}:{' '}
                     {i.code === 'invalid' ? issueText(i) : `${i.message} — ${issueText(i)}`}
                   </li>
@@ -128,8 +133,8 @@ export function StudentImport() {
             </ul>
           )}
           {result.created === 0 && result.errors.length === 0 && result.ready > 0 && (
-            <div className="max-w-64">
-              <Button type="button" busy={busy} onClick={() => run(false)}>
+            <div>
+              <Button type="button" full={false} busy={busy} onClick={() => run(false)}>
                 {fmt(s.importNow, { count: result.ready })}
               </Button>
             </div>

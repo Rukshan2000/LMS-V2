@@ -1,12 +1,13 @@
 'use client';
 
+import { LogOut, TicketCheck } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt, type Me, type Role } from '@/lib/api';
 import { AuthForm } from './auth-form';
 import { displayPhone } from './students/types';
-import { Button, Card, FormError, Spinner } from './ui';
+import { btn, Button, Card, FormError, Spinner } from './ui';
 
 interface Invite {
   fullName: string;
@@ -62,9 +63,9 @@ export function JoinInvite() {
   if (invite === null || me === null) return <Spinner label={t.loading} />;
   if (invite === 'invalid') {
     return (
-      <main className="flex flex-1 items-center justify-center px-4 py-10">
+      <main className="flex flex-1 items-center justify-center bg-linear-to-b from-canvas to-accent-sky/50 px-4 py-10">
         <Card>
-          <p className="text-zinc-700">{j.invalid}</p>
+          <p className="text-ink-muted">{j.invalid}</p>
         </Card>
       </main>
     );
@@ -76,14 +77,17 @@ export function JoinInvite() {
     role: t.roles[invite.role],
   });
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-10">
-      <div className="max-w-sm text-center">
+    <main className="flex flex-1 flex-col items-center justify-center gap-6 bg-linear-to-b from-canvas to-accent-sky/50 px-4 py-10">
+      <div className="flex max-w-sm animate-fade-in flex-col items-center text-center">
+        <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-accent-sky/70 text-primary">
+          <TicketCheck aria-hidden className="size-6" />
+        </span>
         <h1 className="text-xl font-semibold">{j.title}</h1>
-        <p className="mt-2 text-zinc-700">{intro}</p>
+        <p className="mt-2 text-ink-muted">{intro}</p>
       </div>
       {me === 'anonymous' ? (
         <>
-          <p className="max-w-sm text-center text-sm text-zinc-600">{j.signupFirst}</p>
+          <p className="max-w-sm text-center text-sm text-ink-muted">{j.signupFirst}</p>
           <AuthForm
             key={mode}
             mode={mode}
@@ -95,14 +99,11 @@ export function JoinInvite() {
         </>
       ) : me.user.phone !== invite.phone ? (
         <Card>
-          <p className="text-zinc-700">
+          <p className="text-ink-muted">
             {fmt(j.wrongPhone, { phone: displayPhone(invite.phone) })}
           </p>
-          <button
-            type="button"
-            onClick={logout}
-            className="mt-4 text-sm font-medium text-indigo-600"
-          >
+          <button type="button" onClick={logout} className={`mt-4 text-sm ${btn('link', 'none')}`}>
+            <LogOut aria-hidden className="size-4" />
             {t.dashboard.logout}
           </button>
         </Card>

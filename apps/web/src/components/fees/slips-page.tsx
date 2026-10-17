@@ -1,5 +1,14 @@
 'use client';
 
+import {
+  CircleCheck,
+  CircleX,
+  FileText,
+  Hourglass,
+  Inbox,
+  MessageCircle,
+  TriangleAlert,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -10,7 +19,7 @@ import { fmtMoney } from '@/lib/money';
 import { waLink } from '@/lib/whatsapp';
 import { useTenantData } from '../dashboard-shell';
 import { displayPhone } from '../students/types';
-import { FormError } from '../ui';
+import { btn, card, EmptyState, FormError, Skeleton } from '../ui';
 
 type Status = 'pending' | 'verified' | 'rejected';
 interface Slip {
@@ -51,25 +60,35 @@ export function SlipsPage() {
   return (
     <div className="max-w-4xl space-y-4">
       <h1 className="text-2xl font-semibold">{t.nav.slips}</h1>
-      <div className="flex gap-2 text-sm">
-        {(['pending', 'verified', 'rejected'] as const).map((st) => (
+      <div className="inline-flex flex-wrap gap-1 rounded-xl bg-primary-soft/60 p-1 text-sm">
+        {(
+          [
+            ['pending', Hourglass],
+            ['verified', CircleCheck],
+            ['rejected', CircleX],
+          ] as const
+        ).map(([st, Icon]) => (
           <button
             key={st}
             type="button"
+            aria-pressed={status === st}
             onClick={() => setStatus(st)}
-            className={`rounded-lg px-3 py-1.5 font-medium ${
-              status === st ? 'bg-indigo-600 text-white' : 'border border-zinc-300'
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition duration-200 ${
+              status === st
+                ? 'bg-surface text-primary-hover shadow-card'
+                : 'text-ink-muted hover:text-ink'
             }`}
           >
+            <Icon aria-hidden className="size-4" />
             {s.status[st]}
           </button>
         ))}
       </div>
       <FormError message={error} />
       {slips === null ? (
-        <p className="text-zinc-500">{t.loading}</p>
+        <Skeleton />
       ) : slips.length === 0 ? (
-        <p className="text-zinc-500">{s.none}</p>
+        <EmptyState icon={Inbox}>{s.none}</EmptyState>
       ) : (
         <ul className="space-y-4">
           {slips.map((slip) => (
@@ -127,19 +146,21 @@ function SlipCard({
       institute: tenant.name,
     });
     return (
-      <li className="flex flex-wrap items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm">
-        <span className="mr-auto text-green-800">
+      <li className="flex animate-pop-in flex-wrap items-center gap-3 rounded-xl border border-success/20 bg-success-soft p-4 text-sm">
+        <span className="mr-auto flex items-center gap-2 text-success">
+          <CircleCheck aria-hidden className="size-5 shrink-0" />
           {slip.studentName} · {fmt(t.fees.receiptNo, { number: receipt.receiptNumber })}
         </span>
         <a
           href={waLink(slip.submittedByPhone!, text)}
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg bg-green-600 px-3 py-1.5 font-medium text-white"
+          className={btn('whatsapp')}
         >
+          <MessageCircle aria-hidden className="size-4" />
           {t.fees.sendReceipt}
         </a>
-        <button type="button" onClick={onChange} className="font-medium text-zinc-600">
+        <button type="button" onClick={onChange} className={btn('linkMuted', 'sm')}>
           {s.done}
         </button>
       </li>
@@ -147,10 +168,16 @@ function SlipCard({
   }
 
   return (
-    <li className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-4 sm:flex-row">
-      <a href={fileUrl} target="_blank" rel="noreferrer" className="shrink-0">
+    <li className={`${card} flex animate-fade-in flex-col gap-4 p-4 sm:flex-row`}>
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 rounded-lg transition-opacity hover:opacity-90"
+      >
         {slip.contentType === 'application/pdf' ? (
-          <span className="flex h-40 w-32 items-center justify-center rounded-lg border border-zinc-300 text-sm">
+          <span className="flex h-40 w-32 flex-col items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface-soft text-sm text-primary">
+            <FileText aria-hidden className="size-8" />
             PDF
           </span>
         ) : (
@@ -158,7 +185,7 @@ function SlipCard({
           <img
             src={fileUrl}
             alt={s.photo}
-            className="h-40 w-full rounded-lg border border-zinc-200 object-contain sm:w-48"
+            className="h-40 w-full rounded-lg border border-line object-contain sm:w-48"
           />
         )}
       </a>
@@ -166,44 +193,53 @@ function SlipCard({
         <p>
           <Link
             href={`/${lang}/t/${tenantId}/students/${slip.studentId}`}
-            className="font-medium text-indigo-600"
+            className="font-medium text-primary"
           >
             {slip.studentNumber} {slip.studentName}
           </Link>
         </p>
         <p>
           LKR <span className="font-mono">{fmtMoney(slip.amount)}</span>
-          {slip.reference && <span className="text-zinc-500"> · {slip.reference}</span>}
+          {slip.reference && <span className="text-ink-subtle"> · {slip.reference}</span>}
         </p>
-        <p className="text-zinc-500">
+        <p className="text-ink-subtle">
           {colomboDate(slip.submittedAt)} {fmtTime(slip.submittedAt)} · {slip.submittedBy}{' '}
           {displayPhone(slip.submittedByPhone)}
         </p>
-        {slip.duplicateFile && <p className="font-medium text-red-700">{s.duplicateFile}</p>}
+        {slip.duplicateFile && (
+          <p className="flex items-center gap-1.5 rounded-lg bg-danger-soft px-2 py-1 font-medium text-danger">
+            <TriangleAlert aria-hidden className="size-4 shrink-0" />
+            {s.duplicateFile}
+          </p>
+        )}
         {slip.duplicateReference && (
-          <p className="font-medium text-red-700">{s.duplicateReference}</p>
+          <p className="flex items-center gap-1.5 rounded-lg bg-danger-soft px-2 py-1 font-medium text-danger">
+            <TriangleAlert aria-hidden className="size-4 shrink-0" />
+            {s.duplicateReference}
+          </p>
         )}
         {slip.status === 'pending' && (
           <>
-            <p className="text-zinc-600">
+            <p className="text-ink-muted">
               {fmt(t.fees.outstandingTotal, { amount: fmtMoney(slip.outstanding) })}
             </p>
             <div className="flex flex-wrap items-end gap-2">
               <label>
-                <span className="block text-zinc-600">{t.fees.amount}</span>
+                <span className="block text-ink-muted">{t.fees.amount}</span>
                 <input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   inputMode="decimal"
-                  className="mt-1 w-32 rounded-lg border border-zinc-300 px-2 py-1.5"
+                  className="mt-1 w-32 rounded-lg border border-line-strong px-2 py-1.5"
                 />
               </label>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => act('verify')}
-                className="rounded-lg bg-green-600 px-3 py-1.5 font-medium text-white disabled:opacity-60"
+                className={btn('success')}
               >
+                <CircleCheck aria-hidden className="size-4" />
                 {s.verify}
               </button>
             </div>
@@ -213,14 +249,15 @@ function SlipCard({
                 onChange={(e) => setNote(e.target.value)}
                 maxLength={200}
                 placeholder={s.rejectReason}
-                className="w-56 rounded-lg border border-zinc-300 px-2 py-1.5"
+                className="w-56 rounded-lg border border-line-strong px-2 py-1.5"
               />
               <button
                 type="button"
                 disabled={busy || !note.trim()}
                 onClick={() => act('reject')}
-                className="rounded-lg border border-red-300 px-3 py-1.5 font-medium text-red-700 disabled:opacity-60"
+                className={btn('dangerOutline')}
               >
+                <CircleX aria-hidden className="size-4" />
                 {s.reject}
               </button>
             </div>
@@ -229,12 +266,12 @@ function SlipCard({
         {slip.status === 'verified' && (
           <Link
             href={`/${lang}/t/${tenantId}/payments/${slip.id}`}
-            className="font-medium text-indigo-600"
+            className="font-medium text-primary"
           >
             {fmt(t.fees.receiptNo, { number: slip.receiptNumber ?? '' })}
           </Link>
         )}
-        {slip.status === 'rejected' && <p className="text-red-700">{slip.reviewNote}</p>}
+        {slip.status === 'rejected' && <p className="text-danger">{slip.reviewNote}</p>}
         <FormError message={error} />
       </div>
     </li>

@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt } from '@/lib/api';
 import { fmtDay, fmtTime } from '@/lib/datetime';
-import { FormError } from '../ui';
+import { BackLink, card, FormError, Skeleton } from '../ui';
 
 type Status = 'present' | 'late' | 'absent';
 interface Row {
@@ -21,9 +20,9 @@ interface Register {
 }
 
 const colors: Record<Status, string> = {
-  present: 'bg-green-600 text-white',
-  late: 'bg-orange-500 text-white',
-  absent: 'bg-red-600 text-white',
+  present: 'border-success-solid bg-success-solid text-white',
+  late: 'border-late-solid bg-late-solid text-white',
+  absent: 'border-danger-solid bg-danger-solid text-white',
 };
 
 export function AttendanceRegister() {
@@ -57,22 +56,19 @@ export function AttendanceRegister() {
     }
   }
 
-  if (!data)
-    return error ? <FormError message={error} /> : <p className="text-zinc-500">{t.loading}</p>;
+  if (!data) return error ? <FormError message={error} /> : <Skeleton />;
   const count = (s: Status | null) => data.students.filter((x) => x.status === s).length;
 
   return (
     <div className="max-w-2xl space-y-4">
-      <Link href={`/${lang}/t/${tenantId}/attendance`} className="text-sm text-indigo-600">
-        {a.back}
-      </Link>
+      <BackLink href={`/${lang}/t/${tenantId}/attendance`}>{a.back}</BackLink>
       <div>
         <h1 className="text-2xl font-semibold">{data.session.batchName}</h1>
-        <p className="text-zinc-600">
+        <p className="text-ink-muted">
           {fmtDay(data.session.startsAt, t.calendar)} · {fmtTime(data.session.startsAt)}–
           {fmtTime(data.session.endsAt)} · {data.session.subjectName}
         </p>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-ink-subtle">
           {fmt(a.summary, {
             present: count('present'),
             late: count('late'),
@@ -82,10 +78,10 @@ export function AttendanceRegister() {
         </p>
       </div>
       <FormError message={error} />
-      <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
+      <ul className={`${card} divide-y divide-line`}>
         {data.students.map((s) => (
           <li key={s.id} className="flex flex-wrap items-center gap-3 px-4 py-2">
-            <span className="w-12 font-mono text-sm text-zinc-500">{s.studentNumber}</span>
+            <span className="w-12 font-mono text-sm text-ink-subtle">{s.studentNumber}</span>
             <span className="min-w-0 flex-1">{s.fullName}</span>
             <span className="flex gap-1" role="group" aria-label={s.fullName}>
               {(['present', 'late', 'absent'] as const).map((st) => (
@@ -94,7 +90,7 @@ export function AttendanceRegister() {
                   type="button"
                   aria-pressed={s.status === st}
                   onClick={() => mark(s.id, st)}
-                  className={`rounded-md px-2.5 py-1 text-sm ${s.status === st ? colors[st] : 'border border-zinc-300 bg-white text-zinc-700'}`}
+                  className={`rounded-lg border px-2.5 py-1 text-sm font-medium transition duration-150 active:scale-95 ${s.status === st ? colors[st] : 'border-line-strong bg-surface text-ink-muted hover:bg-surface-soft'}`}
                 >
                   {a[st]}
                 </button>

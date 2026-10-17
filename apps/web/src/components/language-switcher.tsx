@@ -1,5 +1,6 @@
 'use client';
 
+import { Languages } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LOCALE_COOKIE, localeNames, locales, type Locale } from '@/i18n/config';
 import { useI18n } from '@/i18n/provider';
@@ -15,17 +16,22 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
   }
 
   return (
-    <select
-      aria-label={t.dashboard.language}
-      value={lang}
-      onChange={(e) => change(e.target.value as Locale)}
-      className={`rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm ${className}`}
+    <label
+      className={`flex w-fit items-center gap-1.5 rounded-lg border border-line bg-surface px-2 text-sm transition-colors focus-within:border-primary focus-within:ring-3 focus-within:ring-primary-ring hover:border-line-strong ${className}`}
     >
-      {locales.map((l) => (
-        <option key={l} value={l}>
-          {localeNames[l]}
-        </option>
-      ))}
-    </select>
+      <Languages aria-hidden className="size-4 text-ink-subtle" />
+      <select
+        aria-label={t.dashboard.language}
+        value={lang}
+        onChange={(e) => change(e.target.value as Locale)}
+        className="border-0 bg-transparent py-1.5 focus:shadow-none"
+      >
+        {locales.map((l) => (
+          <option key={l} value={l}>
+            {localeNames[l]}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

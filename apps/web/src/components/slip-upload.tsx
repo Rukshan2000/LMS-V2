@@ -1,10 +1,11 @@
 'use client';
 
+import { Send, Upload } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { Button, FormError } from './ui';
+import { btn, Button, FormError } from './ui';
 
 const MAX_SIDE = 1600;
 
@@ -75,19 +76,19 @@ export function SlipUpload({
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mt-3 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium"
-      >
+      <button type="button" onClick={() => setOpen(true)} className={`mt-3 ${btn('secondary')}`}>
+        <Upload aria-hidden className="size-4" />
         {s.upload}
       </button>
     );
   }
   return (
-    <form onSubmit={submit} className="mt-3 space-y-3 rounded-lg bg-zinc-50 p-3 text-sm">
+    <form
+      onSubmit={submit}
+      className="mt-3 animate-fade-in space-y-3 rounded-lg bg-surface-soft p-3 text-sm"
+    >
       <label className="block">
-        <span className="text-zinc-600">{s.photo}</span>
+        <span className="text-ink-muted">{s.photo}</span>
         <input
           name="file"
           type="file"
@@ -98,26 +99,26 @@ export function SlipUpload({
       </label>
       <div className="flex flex-wrap gap-3">
         <label className="block">
-          <span className="text-zinc-600">{t.fees.amount}</span>
+          <span className="text-ink-muted">{t.fees.amount}</span>
           <input
             name="amount"
             inputMode="decimal"
             required
             defaultValue={outstanding}
-            className="mt-1 block w-32 rounded-lg border border-zinc-300 px-2 py-1.5"
+            className="mt-1 block w-32 rounded-lg border border-line-strong px-2 py-1.5"
           />
         </label>
         <label className="block">
-          <span className="text-zinc-600">{t.fees.reference}</span>
+          <span className="text-ink-muted">{t.fees.reference}</span>
           <input
             name="reference"
             maxLength={100}
-            className="mt-1 block w-44 rounded-lg border border-zinc-300 px-2 py-1.5"
+            className="mt-1 block w-44 rounded-lg border border-line-strong px-2 py-1.5"
           />
         </label>
       </div>
       <FormError message={error} />
-      <Button type="submit" busy={busy}>
+      <Button type="submit" busy={busy} icon={Send}>
         {s.send}
       </Button>
     </form>

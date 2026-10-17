@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, Card, Field, FormError } from '@/components/ui';
+import { Building2 } from 'lucide-react';
+import { Brand, Button, Card, Field, FormError } from '@/components/ui';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, errorMessage } from '@/lib/api';
 
@@ -45,8 +46,11 @@ export default function Onboarding() {
   }
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-10">
+    <main className="flex flex-1 items-center justify-center bg-linear-to-b from-canvas to-accent-sky/50 px-4 py-10">
       <Card>
+        <div className="mb-5">
+          <Brand />
+        </div>
         <h1 className="mb-6 text-xl font-semibold">{t.onboarding.title}</h1>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field
@@ -71,7 +75,7 @@ export default function Onboarding() {
             }}
           />
           <FormError message={error} />
-          <Button type="submit" busy={busy}>
+          <Button type="submit" busy={busy} icon={Building2}>
             {t.onboarding.create}
           </Button>
         </form>

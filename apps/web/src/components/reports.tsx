@@ -1,12 +1,13 @@
 'use client';
 
+import { Banknote, ChevronRight, ClipboardCheck, Download, Wallet } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
 import { fmtMoney } from '@/lib/money';
-import { FormError } from './ui';
+import { btn, card, FormError } from './ui';
 
 interface Summary {
   months: { period: string; invoices: number; billed: string; paid: string; outstanding: string }[];
@@ -25,9 +26,9 @@ interface Summary {
 
 function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+    <div className={`${card} overflow-x-auto`}>
       <table className="w-full text-sm">
-        <thead className="bg-zinc-50 text-left text-zinc-500">
+        <thead className="bg-surface-soft text-left text-ink-muted">
           <tr>
             {head.map((h, i) => (
               <th key={i} className={`px-3 py-2 font-medium ${i > 0 ? 'text-right' : ''}`}>
@@ -36,7 +37,9 @@ function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-100">{children}</tbody>
+        <tbody className="divide-y divide-line [&>tr]:transition-colors [&>tr:hover]:bg-surface-soft/60">
+          {children}
+        </tbody>
       </table>
     </div>
   );
@@ -74,8 +77,9 @@ export function Reports() {
     <a
       href={`/api/v1${base}/${name}.csv${withRange ? `?${range}` : ''}`}
       download
-      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium"
+      className={btn('secondary')}
     >
+      <Download aria-hidden className="size-4" />
       {r.csv[name as keyof typeof r.csv]}
     </a>
   );
@@ -85,30 +89,33 @@ export function Reports() {
       <h1 className="text-2xl font-semibold">{t.nav.reports}</h1>
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label>
-          <span className="block text-zinc-600">{r.from}</span>
+          <span className="block text-ink-muted">{r.from}</span>
           <input
             type="month"
             value={from}
             max={to}
             onChange={(e) => e.target.value && setFrom(e.target.value)}
-            className="mt-1 rounded-lg border border-zinc-300 px-2 py-1.5"
+            className="mt-1 rounded-lg border border-line-strong px-2 py-1.5"
           />
         </label>
         <label>
-          <span className="block text-zinc-600">{r.to}</span>
+          <span className="block text-ink-muted">{r.to}</span>
           <input
             type="month"
             value={to}
             min={from}
             onChange={(e) => e.target.value && setTo(e.target.value)}
-            className="mt-1 rounded-lg border border-zinc-300 px-2 py-1.5"
+            className="mt-1 rounded-lg border border-line-strong px-2 py-1.5"
           />
         </label>
       </div>
       <FormError message={error} />
 
       <section className="space-y-2">
-        <h2 className="font-medium">{r.feesByMonth}</h2>
+        <h2 className="flex items-center gap-2 font-medium">
+          <Wallet aria-hidden className="size-5 text-primary" />
+          {r.feesByMonth}
+        </h2>
         <Table head={[f.month, r.invoices, f.billed, f.collected, f.outstanding]}>
           {data?.months.map((m) => (
             <tr key={m.period}>
@@ -123,7 +130,10 @@ export function Reports() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">{r.received}</h2>
+        <h2 className="flex items-center gap-2 font-medium">
+          <Banknote aria-hidden className="size-5 text-primary" />
+          {r.received}
+        </h2>
         <Table head={[f.month, f.method, f.payments, f.amount]}>
           {data?.received.map((m) => (
             <tr key={m.month + m.method}>
@@ -136,8 +146,14 @@ export function Reports() {
         </Table>
       </section>
 
-      <details className="space-y-2">
-        <summary className="cursor-pointer font-medium">{r.daily}</summary>
+      <details className="group space-y-2">
+        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-lg font-medium transition-colors hover:text-primary [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            aria-hidden
+            className="size-5 text-primary transition-transform duration-200 group-open:rotate-90"
+          />
+          {r.daily}
+        </summary>
         <Table head={[f.date, f.payments, f.amount]}>
           {data?.daily.map((d) => (
             <tr key={d.day}>
@@ -150,7 +166,10 @@ export function Reports() {
       </details>
 
       <section className="space-y-2">
-        <h2 className="font-medium">{r.attendance}</h2>
+        <h2 className="flex items-center gap-2 font-medium">
+          <ClipboardCheck aria-hidden className="size-5 text-primary" />
+          {r.attendance}
+        </h2>
         <Table
           head={[
             r.class,
@@ -177,7 +196,10 @@ export function Reports() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="font-medium">{r.exports}</h2>
+        <h2 className="flex items-center gap-2 font-medium">
+          <Download aria-hidden className="size-5 text-primary" />
+          {r.exports}
+        </h2>
         <div className="flex flex-wrap gap-2">
           {csv('payments', true)}
           {csv('unpaid')}

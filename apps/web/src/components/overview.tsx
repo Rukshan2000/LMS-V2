@@ -1,13 +1,18 @@
 'use client';
 
-import { useTenantData } from './dashboard-shell';
+import { Building2, ChevronRight, UserRound } from 'lucide-react';
+import Link from 'next/link';
+import { NAV_ICONS, useTenantData } from './dashboard-shell';
 import { useI18n } from '@/i18n/provider';
+import { navForRoles } from '@/lib/nav';
 import { Portal } from './portal';
+import { card } from './ui';
 
 export function Overview() {
-  const { t } = useI18n();
+  const { lang, t } = useI18n();
   const { me, tenant, roles } = useTenantData();
   const family = roles.every((r) => r === 'student' || r === 'parent');
+  const base = `/${lang}/t/${tenant.id}`;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -19,16 +24,48 @@ export function Overview() {
       ) : (
         <>
           <dl className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 bg-white p-4">
-              <dt className="text-sm text-zinc-500">{t.dashboard.institute}</dt>
-              <dd className="mt-1 font-medium">{tenant.name}</dd>
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-white p-4">
-              <dt className="text-sm text-zinc-500">{t.dashboard.yourRole}</dt>
-              <dd className="mt-1 font-medium">{roles.map((r) => t.roles[r]).join(', ')}</dd>
-            </div>
+            {[
+              { icon: Building2, label: t.dashboard.institute, value: tenant.name },
+              {
+                icon: UserRound,
+                label: t.dashboard.yourRole,
+                value: roles.map((r) => t.roles[r]).join(', '),
+              },
+            ].map(({ icon: Icon, label, value }) => (
+              <div key={label} className={`${card} flex items-center gap-3 p-4`}>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                  <Icon aria-hidden className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <dt className="text-sm text-ink-subtle">{label}</dt>
+                  <dd className="truncate font-medium">{value}</dd>
+                </div>
+              </div>
+            ))}
           </dl>
-          <p className="text-zinc-600">{t.dashboard.comingNext}</p>
+          <p className="text-ink-muted">{t.dashboard.comingNext}</p>
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {navForRoles(roles)
+              .filter((item) => item.path)
+              .map((item) => {
+                const Icon = NAV_ICONS[item.key];
+                return (
+                  <li key={item.key}>
+                    <Link
+                      href={`${base}${item.path}`}
+                      className={`${card} group flex items-center gap-3 p-4 font-medium transition duration-200 hover:-translate-y-px hover:border-primary-ring hover:shadow-raised`}
+                    >
+                      <Icon aria-hidden className="size-5 text-primary" />
+                      <span className="flex-1">{t.nav[item.key]}</span>
+                      <ChevronRight
+                        aria-hidden
+                        className="size-4 text-ink-subtle transition-transform duration-200 group-hover:translate-x-0.5"
+                      />
+                    </Link>
+                  </li>
+                );
+              })}
+          </ul>
         </>
       )}
     </div>

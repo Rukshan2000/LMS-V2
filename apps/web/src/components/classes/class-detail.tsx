@@ -1,5 +1,17 @@
 'use client';
 
+import {
+  Archive,
+  ArchiveRestore,
+  CalendarClock,
+  CalendarDays,
+  Plus,
+  Search,
+  Trash2,
+  UserMinus,
+  Users,
+  Video,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -7,13 +19,13 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { addDays, colomboDate, fmtDay, fmtTime, weekdayName } from '@/lib/datetime';
 import { useTenantData } from '../dashboard-shell';
-import { FormError } from '../ui';
+import { BackLink, btn, ConfirmButton, FormError, Skeleton } from '../ui';
 import type { StudentRow } from '../students/types';
 import type { BatchDetail, Session } from './types';
 import { ClassFees } from '../fees/class-fees';
 import { SessionActions } from './session-actions';
 
-const input = 'rounded-lg border border-zinc-300 bg-white px-2 py-1.5';
+const input = 'rounded-lg border border-line-strong bg-surface px-2 py-1.5';
 
 export function ClassDetail() {
   const { lang, t } = useI18n();
@@ -87,19 +99,16 @@ export function ClassDetail() {
     );
   }
 
-  if (!batch)
-    return error ? <FormError message={error} /> : <p className="text-zinc-500">{t.loading}</p>;
+  if (!batch) return error ? <FormError message={error} /> : <Skeleton />;
   const enrolled = new Set(batch.students.map((s) => s.id));
 
   return (
     <div className="max-w-3xl space-y-6">
-      <Link href={`/${lang}/t/${tenantId}/classes`} className="text-sm text-indigo-600">
-        {c.back}
-      </Link>
+      <BackLink href={`/${lang}/t/${tenantId}/classes`}>{c.back}</BackLink>
       <div className="flex flex-wrap items-start gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-semibold">{batch.name}</h1>
-          <p className="text-zinc-600">
+          <p className="text-ink-muted">
             {[batch.subjectName, batch.teacherName ?? c.noTeacher, c[batch.mode]].join(' · ')}
           </p>
         </div>
@@ -114,8 +123,13 @@ export function ClassDetail() {
                 }),
               )
             }
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+            className={btn('secondary')}
           >
+            {batch.status === 'active' ? (
+              <Archive aria-hidden className="size-4" />
+            ) : (
+              <ArchiveRestore aria-hidden className="size-4" />
+            )}
             {batch.status === 'active' ? c.archive : c.restore}
           </button>
         )}
@@ -130,30 +144,31 @@ export function ClassDetail() {
             const liveUrl = String(new FormData(e.currentTarget).get('liveUrl')).trim() || null;
             void run(api(url, { method: 'PATCH', body: { liveUrl } }));
           }}
-          className="space-y-2 rounded-xl border border-zinc-200 bg-white p-4 text-sm"
+          className="space-y-2 rounded-xl border border-line bg-surface shadow-card p-4 text-sm"
         >
           <label className="block">
-            <span className="font-medium">{c.liveUrl}</span>
-            <span className="block text-zinc-500">{c.liveUrlHint}</span>
+            <span className="flex items-center gap-2 font-medium">
+              <Video aria-hidden className="size-4 text-primary" />
+              {c.liveUrl}
+            </span>
+            <span className="block text-ink-subtle">{c.liveUrlHint}</span>
             <input
               name="liveUrl"
               type="url"
               pattern="https://.*"
               defaultValue={batch.liveUrl ?? ''}
               placeholder="https://zoom.us/j/…"
-              className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2"
+              className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2"
             />
           </label>
-          <button
-            type="submit"
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 font-medium"
-          >
+          <button type="submit" className={btn('secondary')}>
             {c.saveLink}
           </button>
         </form>
       ) : (
         batch.liveUrl && (
-          <a href={batch.liveUrl} target="_blank" rel="noreferrer" className="text-indigo-600">
+          <a href={batch.liveUrl} target="_blank" rel="noreferrer" className={btn('primary', 'md')}>
+            <Video aria-hidden className="size-4" />
             {c.liveUrl}
           </a>
         )
@@ -161,24 +176,26 @@ export function ClassDetail() {
 
       {manager && <ClassFees batchId={batch.id} />}
 
-      <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="font-medium">{c.schedule}</h2>
-        {batch.schedule.length === 0 && <p className="text-sm text-zinc-500">{c.noSchedule}</p>}
-        <ul className="divide-y divide-zinc-100">
+      <section className="space-y-3 rounded-xl border border-line bg-surface shadow-card p-4">
+        <h2 className="flex items-center gap-2 font-medium">
+          <CalendarDays aria-hidden className="size-5 text-primary" />
+          {c.schedule}
+        </h2>
+        {batch.schedule.length === 0 && <p className="text-sm text-ink-subtle">{c.noSchedule}</p>}
+        <ul className="divide-y divide-line">
           {batch.schedule.map((s) => (
             <li key={s.id} className="flex items-center gap-3 py-2">
               <span className="flex-1">
                 {weekdayName(s.weekday, t.calendar)} {s.startTime}–{s.endTime}
-                {s.room && <span className="text-zinc-500"> · {s.room}</span>}
+                {s.room && <span className="text-ink-subtle"> · {s.room}</span>}
               </span>
               {manager && (
-                <button
-                  type="button"
-                  onClick={() => run(api(`${url}/schedule/${s.id}`, { method: 'DELETE' }))}
-                  className="text-sm text-red-600"
+                <ConfirmButton
+                  icon={Trash2}
+                  onConfirm={() => run(api(`${url}/schedule/${s.id}`, { method: 'DELETE' }))}
                 >
-                  {c.remove}
-                </button>
+                  <span className="text-sm">{c.remove}</span>
+                </ConfirmButton>
               )}
             </li>
           ))}
@@ -186,7 +203,7 @@ export function ClassDetail() {
         {manager && (
           <form
             onSubmit={addSlot}
-            className="flex flex-wrap items-end gap-2 border-t border-zinc-100 pt-3 text-sm"
+            className="flex flex-wrap items-end gap-2 border-t border-line pt-3 text-sm"
           >
             <label className="flex flex-col gap-1">
               {c.day}
@@ -241,35 +258,38 @@ export function ClassDetail() {
                 className={input}
               />
             </label>
-            <button
-              type="submit"
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white"
-            >
+            <button type="submit" className={btn()}>
+              <Plus aria-hidden className="size-4" />
               {c.addTime}
             </button>
           </form>
         )}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="font-medium">
+      <section className="space-y-3 rounded-xl border border-line bg-surface shadow-card p-4">
+        <h2 className="flex items-center gap-2 font-medium">
+          <Users aria-hidden className="size-5 text-primary" />
           {c.enrolled} ({batch.students.length})
         </h2>
         {desk && (
           <div className="relative">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-2.5 left-3 size-4 text-ink-subtle"
+            />
             <input
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={c.searchStudents}
               aria-label={c.searchStudents}
-              className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+              className="w-full rounded-lg border border-line-strong py-2 pr-3 pl-9"
             />
             {searching && found.length > 0 && (
-              <ul className="mt-1 divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+              <ul className="mt-1 animate-fade-in divide-y divide-line rounded-lg border border-line bg-surface shadow-card">
                 {found.map((s) => (
                   <li key={s.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <span className="w-12 font-mono text-zinc-500">{s.studentNumber}</span>
+                    <span className="w-12 font-mono text-ink-subtle">{s.studentNumber}</span>
                     <span className="flex-1">{s.fullName}</span>
                     {!enrolled.has(s.id) && (
                       <button
@@ -282,8 +302,9 @@ export function ClassDetail() {
                             }),
                           )
                         }
-                        className="font-medium text-indigo-600"
+                        className={btn('link', 'none')}
                       >
+                        <Plus aria-hidden className="size-4" />
                         {c.addButton}
                       </button>
                     )}
@@ -294,12 +315,12 @@ export function ClassDetail() {
           </div>
         )}
         {batch.students.length === 0 ? (
-          <p className="text-sm text-zinc-500">{c.noStudents}</p>
+          <p className="text-sm text-ink-subtle">{c.noStudents}</p>
         ) : (
-          <ul className="divide-y divide-zinc-100">
+          <ul className="divide-y divide-line">
             {batch.students.map((s) => (
               <li key={s.id} className="flex items-center gap-3 py-2 text-sm">
-                <span className="w-12 font-mono text-zinc-500">{s.studentNumber}</span>
+                <span className="w-12 font-mono text-ink-subtle">{s.studentNumber}</span>
                 <Link
                   href={`/${lang}/t/${tenantId}/students/${s.id}`}
                   className="flex-1 hover:underline"
@@ -307,9 +328,9 @@ export function ClassDetail() {
                   {s.fullName}
                 </Link>
                 {desk && (
-                  <button
-                    type="button"
-                    onClick={async () => {
+                  <ConfirmButton
+                    icon={UserMinus}
+                    onConfirm={async () => {
                       try {
                         await api(`${url}/enrollments/${s.id}`, { method: 'DELETE' });
                         setBatch(
@@ -319,10 +340,9 @@ export function ClassDetail() {
                         fail(err);
                       }
                     }}
-                    className="text-red-600"
                   >
                     {c.removeStudent}
-                  </button>
+                  </ConfirmButton>
                 )}
               </li>
             ))}
@@ -330,13 +350,16 @@ export function ClassDetail() {
         )}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="font-medium">{c.upcoming}</h2>
-        <ul className="divide-y divide-zinc-100">
+      <section className="space-y-3 rounded-xl border border-line bg-surface shadow-card p-4">
+        <h2 className="flex items-center gap-2 font-medium">
+          <CalendarClock aria-hidden className="size-5 text-primary" />
+          {c.upcoming}
+        </h2>
+        <ul className="divide-y divide-line">
           {sessions.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
               <span
-                className={`flex-1 ${s.status === 'cancelled' ? 'text-zinc-400 line-through' : ''}`}
+                className={`flex-1 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
               >
                 {fmtDay(s.startsAt, t.calendar)} · {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
               </span>

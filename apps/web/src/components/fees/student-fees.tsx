@@ -1,5 +1,6 @@
 'use client';
 
+import { Plus, Trash2, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -8,8 +9,8 @@ import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
 import { cents, fmtMoney } from '@/lib/money';
 import { useTenantData } from '../dashboard-shell';
-import { Button, FormError } from '../ui';
-import { statusColor, type Concession, type Invoice, type Receipt } from './types';
+import { Badge, btn, Button, card, ConfirmButton, FormError, FormSuccess } from '../ui';
+import type { Concession, Invoice, Receipt } from './types';
 
 interface StudentFeesData {
   concessions: Concession[];
@@ -103,21 +104,22 @@ export function StudentFees({
   const label = (c: Concession) =>
     c.type === 'percent' ? `${f.percent.replace('%', '')} ${Number(c.percent)}%` : f[c.type];
   return (
-    <section className="max-w-xl space-y-4 rounded-xl border border-zinc-200 bg-white p-4">
+    <section className={`${card} max-w-xl space-y-4 p-4`}>
       <div className="flex items-center gap-3">
-        <h2 className="mr-auto font-medium">{f.title}</h2>
-        <span
-          className={`rounded px-2 py-0.5 text-sm ${cents(data.outstanding) > 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}
-        >
+        <h2 className="mr-auto flex items-center gap-2 font-medium">
+          <Wallet aria-hidden className="size-5 text-primary" />
+          {f.title}
+        </h2>
+        <Badge status={cents(data.outstanding) > 0 ? 'issued' : 'paid'}>
           {fmt(f.outstandingTotal, { amount: fmtMoney(data.outstanding) })}
-        </span>
+        </Badge>
       </div>
       <FormError message={error} />
 
       {cents(data.outstanding) > 0 && (
         <form
           onSubmit={takePayment}
-          className="flex flex-wrap items-end gap-2 rounded-lg bg-zinc-50 p-3 text-sm"
+          className="flex flex-wrap items-end gap-2 rounded-lg bg-surface-soft p-3 text-sm"
         >
           <label className="flex flex-col gap-1">
             {f.amount}
@@ -127,7 +129,7 @@ export function StudentFees({
               pattern="\d{1,10}(\.\d{1,2})?"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              className="w-32 rounded-lg border border-zinc-300 px-2 py-1.5"
+              className="w-32 rounded-lg border border-line-strong px-2 py-1.5"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -135,7 +137,7 @@ export function StudentFees({
             <select
               value={form.method}
               onChange={(e) => setForm({ ...form, method: e.target.value })}
-              className="rounded-lg border border-zinc-300 bg-white px-2 py-1.5"
+              className="rounded-lg border border-line-strong bg-surface px-2 py-1.5"
             >
               <option value="cash">{f.cash}</option>
               <option value="bank_transfer">{f.bank_transfer}</option>
@@ -148,7 +150,7 @@ export function StudentFees({
                 value={form.reference}
                 maxLength={100}
                 onChange={(e) => setForm({ ...form, reference: e.target.value })}
-                className="rounded-lg border border-zinc-300 px-2 py-1.5"
+                className="rounded-lg border border-line-strong px-2 py-1.5"
               />
             </label>
           )}
@@ -160,7 +162,7 @@ export function StudentFees({
         </form>
       )}
       {lastReceipt && (
-        <p role="status" className="text-sm text-green-700">
+        <FormSuccess>
           {fmt(f.receiptNo, { number: lastReceipt.receiptNumber })} · LKR{' '}
           {fmtMoney(lastReceipt.amount)} ·{' '}
           <Link
@@ -169,28 +171,27 @@ export function StudentFees({
           >
             {f.receipt}
           </Link>
-        </p>
+        </FormSuccess>
       )}
 
       <div>
-        <h3 className="mb-1 text-sm font-medium text-zinc-700">{f.concessions}</h3>
+        <h3 className="mb-1 text-sm font-medium text-ink-muted">{f.concessions}</h3>
         <ul className="space-y-1 text-sm">
-          {data.concessions.length === 0 && <li className="text-zinc-500">{f.noConcessions}</li>}
+          {data.concessions.length === 0 && <li className="text-ink-subtle">{f.noConcessions}</li>}
           {data.concessions.map((c) => (
             <li key={c.id} className="flex items-center gap-2">
               <span className="flex-1">
                 {label(c)} · {c.batchName ?? f.allClasses}
               </span>
               {manager && (
-                <button
-                  type="button"
-                  onClick={() =>
+                <ConfirmButton
+                  icon={Trash2}
+                  onConfirm={() =>
                     api(`${base}/concessions/${c.id}`, { method: 'DELETE' }).then(load, fail)
                   }
-                  className="text-red-600"
                 >
                   {f.remove}
-                </button>
+                </ConfirmButton>
               )}
             </li>
           ))}
@@ -200,7 +201,7 @@ export function StudentFees({
             <select
               value={concession.type}
               onChange={(e) => setConcession({ ...concession, type: e.target.value })}
-              className="rounded-lg border border-zinc-300 bg-white px-2 py-1"
+              className="rounded-lg border border-line-strong bg-surface px-2 py-1"
             >
               <option value="free_card">{f.free_card}</option>
               <option value="half_card">{f.half_card}</option>
@@ -214,13 +215,13 @@ export function StudentFees({
                 value={concession.percent}
                 onChange={(e) => setConcession({ ...concession, percent: e.target.value })}
                 aria-label={f.percent}
-                className="w-20 rounded-lg border border-zinc-300 px-2 py-1"
+                className="w-20 rounded-lg border border-line-strong px-2 py-1"
               />
             )}
             <select
               value={concession.batchId}
               onChange={(e) => setConcession({ ...concession, batchId: e.target.value })}
-              className="rounded-lg border border-zinc-300 bg-white px-2 py-1"
+              className="rounded-lg border border-line-strong bg-surface px-2 py-1"
             >
               <option value="">{f.allClasses}</option>
               {classes.map((c) => (
@@ -229,20 +230,21 @@ export function StudentFees({
                 </option>
               ))}
             </select>
-            <button type="submit" className="font-medium text-indigo-600">
+            <button type="submit" className={btn('link', 'none')}>
+              <Plus aria-hidden className="size-4" />
               {f.addConcession}
             </button>
-            <p className="w-full text-xs text-zinc-500">{f.concessionHint}</p>
+            <p className="w-full text-xs text-ink-subtle">{f.concessionHint}</p>
           </form>
         )}
       </div>
 
       <div>
-        <h3 className="mb-1 text-sm font-medium text-zinc-700">{f.invoices}</h3>
+        <h3 className="mb-1 text-sm font-medium text-ink-muted">{f.invoices}</h3>
         {data.invoices.length === 0 ? (
-          <p className="text-sm text-zinc-500">{f.noInvoices}</p>
+          <p className="text-sm text-ink-subtle">{f.noInvoices}</p>
         ) : (
-          <ul className="divide-y divide-zinc-100 text-sm">
+          <ul className="divide-y divide-line text-sm">
             {data.invoices.map((inv) => (
               <li key={inv.id} className="py-2">
                 <div className="flex items-center gap-2">
@@ -252,11 +254,9 @@ export function StudentFees({
                       : fmt(f.invoiceNo, { number: inv.invoiceNumber })}
                   </span>
                   <span className="font-mono">LKR {fmtMoney(inv.total)}</span>
-                  <span className={`rounded px-2 py-0.5 text-xs ${statusColor[inv.status]}`}>
-                    {f.status[inv.status]}
-                  </span>
+                  <Badge status={inv.status}>{f.status[inv.status]}</Badge>
                 </div>
-                <ul className="mt-1 text-xs text-zinc-500">
+                <ul className="mt-1 text-xs text-ink-subtle">
                   {(inv.lines ?? []).map((l, i) => (
                     <li key={i} className="flex gap-2">
                       <span className="flex-1">
@@ -279,17 +279,17 @@ export function StudentFees({
 
       {data.payments.length > 0 && (
         <div>
-          <h3 className="mb-1 text-sm font-medium text-zinc-700">{f.payments}</h3>
-          <ul className="divide-y divide-zinc-100 text-sm">
+          <h3 className="mb-1 text-sm font-medium text-ink-muted">{f.payments}</h3>
+          <ul className="divide-y divide-line text-sm">
             {data.payments.map((p) => (
               <li key={p.id} className="flex gap-2 py-1.5">
                 <Link
                   href={`/${lang}/t/${tenantId}/payments/${p.id}`}
-                  className="flex-1 text-indigo-600 hover:underline"
+                  className="flex-1 text-primary hover:underline"
                 >
                   {fmt(f.receiptNo, { number: p.receiptNumber })}
                 </Link>
-                <span className="text-zinc-500">{colomboDate(p.receivedAt)}</span>
+                <span className="text-ink-subtle">{colomboDate(p.receivedAt)}</span>
                 <span className="font-mono">LKR {fmtMoney(p.amount)}</span>
               </li>
             ))}

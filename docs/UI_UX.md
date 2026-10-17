@@ -1,6 +1,6 @@
 # Tuition LMS: UI and UX (current state)
 
-**As of:** 2026-10-17, production commit `e7a87d8` (v1.0 slices 1–9 live at https://lms.kwingsmedia.com)
+**As of:** 2026-10-17, production commit `e7a87d8` + UI upgrade (blue/white pastel tokens, icons, motion) (v1.0 slices 1–9 live at https://lms.kwingsmedia.com)
 **Code:** `apps/web/src` (Next.js 16 App Router, React 19, Tailwind CSS 4)
 **Purpose:** a record of how the product looks and behaves today, for anyone designing or building the next screens. It describes what exists, not what is planned; gaps are listed in [§11](#11-known-gaps-and-inconsistencies).
 
@@ -124,77 +124,76 @@ Pages outside the shell (landing, login, signup, join, onboarding, privacy) are 
 
 ## 5. Visual design
 
-There is no separate design-token file yet; the system is Tailwind's default palette used consistently. These are the values in use.
+A blue and white pastel system. All colours, radii, shadows and animations are tokens in `app/globals.css` (`@theme`); screens use the token utilities (`bg-primary`, `text-ink-muted`, `border-line`…) and never raw Tailwind palette colours. The full rationale is in [UI_UX_UPGRADE_PLAN.md](UI_UX_UPGRADE_PLAN.md).
 
 ### 5.1 Colour
 
-| Use | Colour (Tailwind) |
-|---|---|
-| Page background | `#f8fafc` (slate-50) |
-| Text | `#18181b` (zinc-900); secondary `zinc-500/600/700` |
-| Surfaces | white cards with `border-zinc-200` |
-| Primary action | `indigo-600`, hover `indigo-700`; links `indigo-600` |
-| Focus | `border-indigo-600` + `ring-2 ring-indigo-200` |
-| WhatsApp / approve / join | `green-600` button, white text |
-| Success / present / paid | `green-50…700` |
-| Late | `orange-500` (register buttons), `orange-50` (scan result) |
-| Warning / part paid / pending / duplicate scan | `amber-50…900` |
-| Error / unpaid / absent / reject | `red-50…800`, solid `red-600` for absent |
-| Disabled / void / "Soon" | `zinc-100…400` |
+| Token | Hex | Use |
+|---|---|---|
+| `canvas` | `#F5F9FF` | Page background |
+| `surface` / `surface-soft` | `#FFFFFF` / `#EEF5FF` | Cards, inputs / hover rows, table headers, inset forms |
+| `line` / `line-strong` | `#DCE7F5` / `#C3D5EC` | Card borders, dividers / input and secondary-button borders |
+| `ink` / `ink-muted` / `ink-subtle` | `#0F1E36` / `#475569` / `#64748B` | Text, secondary text, hints |
+| `primary` / `primary-hover` | `#2563EB` / `#1D4ED8` | Primary buttons, links, active menu |
+| `primary-soft` / `primary-ring` / `accent-sky` | `#E0ECFF` / `#BFD6FF` / `#CFE6FF` | Active menu pill, chips / focus ring / decorative washes |
 
-Status colours are fixed across the app:
+Status colours are fixed across the app and always shown with an icon and the word (`Badge` in `ui.tsx`):
 
-| Meaning | Badge / panel |
-|---|---|
-| Present | green |
-| Late | orange |
-| Absent | red |
-| Invoice unpaid | red-50 / red-700 |
-| Part paid | amber-50 / amber-800 |
-| Paid | green-50 / green-700 |
-| Void | zinc-100 / zinc-500 |
-| Slip waiting for check | amber-700 text |
-| Slip rejected | red-700 text |
+| Meaning | Tone (soft bg / text) | Icon |
+|---|---|---|
+| Present, paid, verified | success `#E7F7EF` / `#166534` | CircleCheck |
+| Late | late `#FFEFE3` / `#9A3412` | Clock |
+| Part paid, slip waiting | warning `#FFF6DE` / `#92400E` | CircleDashed / Hourglass |
+| Absent, unpaid, rejected, cancelled | danger `#FDECEC` / `#B91C1C` | CircleX / CircleAlert |
+| Void, archived, inactive | neutral `#F1F5F9` / `#64748B` | Ban / none |
+
+Solid buttons: WhatsApp and approve `#15803D`, late register button `#C2410C`, danger `#DC2626` (all ≥ 4.5:1 with white text).
 
 ### 5.2 Typography
 
-- **Fonts**: Noto Sans (Latin), Noto Sans Sinhala, Noto Sans Tamil, loaded with `next/font`. The stack is Latin → Sinhala → Tamil, so each script uses its own Noto face and only downloads when that script appears.
-- **Scale**: page title `text-2xl font-semibold`; section title `font-medium` (base size); body `text-sm`/`text-base`; hints `text-xs zinc-500`; scan result name `text-2xl`.
-- **Numbers**: money, times, student numbers and receipt numbers use `font-mono` so columns line up.
+- **Fonts**: Noto Sans (Latin), Noto Sans Sinhala, Noto Sans Tamil, loaded with `next/font`. Each script uses its own Noto face and only downloads when that script appears.
+- **Scale**: page title `text-2xl font-semibold`; section title `font-medium` with a 20px primary icon; body `text-sm`/`text-base`; hints `text-xs text-ink-subtle`.
+- **Numbers**: money, times, student and receipt numbers use `font-mono`.
 - Form inputs use `text-base` (16px) so iPhones do not zoom on focus.
 
-### 5.3 Shape and spacing
+### 5.3 Shape, depth and spacing
 
-- Radius: inputs/buttons `rounded-lg`, sections `rounded-xl`, auth cards and scan result `rounded-2xl`.
-- Borders are 1px `zinc-200`; shadows only on the auth card (`shadow-sm`).
-- Section padding `p-4`; vertical rhythm `space-y-4`/`space-y-6`; lists use `divide-y divide-zinc-100`.
-- Content widths: forms `max-w-sm`/`max-w-xl`, most pages `max-w-3xl`, slips and reports `max-w-4xl`.
+- Radius: inputs/buttons `rounded-lg` (10px), sections `rounded-xl` (14px), auth card and scan result `rounded-2xl` (20px); badges are pills.
+- Sections use `card` from `components/styles.ts`: white, `line` border, `shadow-card` (soft blue-tinted). Raised elements (auth card, toasts, hovered link cards) use `shadow-raised`.
+- Section padding `p-4`; rhythm `space-y-4`/`space-y-6`; lists `divide-y divide-line`.
+- Content widths unchanged: forms `max-w-sm`/`max-w-xl`, most pages `max-w-3xl`, slips and reports `max-w-4xl`.
 
-### 5.4 Icons and imagery
+### 5.4 Icons
 
-None. The UI uses words only (plus `←`/`→` in back links and week navigation). Slip photos and QR codes are the only images.
+`lucide-react` (tree-shaken; only imported icons ship). 16px inline, 20px in the menu and section titles; always next to a word, `aria-hidden`, colour from `currentColor`. Each menu section has a fixed icon (`NAV_ICONS` in `dashboard-shell.tsx`). Icons are hidden when printing.
+
+### 5.5 Motion
+
+CSS only. Tokens: `animate-fade-in` (page change, panels), `animate-pop-in` (scan result, confirm state, auth card), `animate-slide-down` (mobile menu), `animate-toast-in`, `animate-shimmer` (skeletons). Hovers and focus use 150–200ms colour/transform transitions; buttons scale to 0.98 when pressed. A global `prefers-reduced-motion` rule turns all of it off.
 
 ---
 
 ## 6. Components
 
-Shared primitives live in `components/ui.tsx`; everything else is page-level Tailwind.
+Shared primitives live in `components/ui.tsx` (client) and `components/styles.ts` (class helpers usable from server pages).
 
 | Component | Look and behaviour |
 |---|---|
-| `Field` | Label above (`text-sm font-medium`), full-width input, optional hint below linked with `aria-describedby`. |
-| `Button` | Full-width primary button (indigo). `busy` disables it to stop double submits. |
-| `FormError` | Red-50 box with `role="alert"`; shows the translated API error. |
-| `Card` | Centred white card, `max-w-sm`, used by login, signup, join, onboarding. |
-| `Spinner` | Text "Loading…" with `role="status"` (no animation). |
-| `LanguageSwitcher` | Native select showing සිංහල / தமிழ் / English; stores the choice in a cookie for a year and swaps the URL prefix. |
-| Secondary button | `rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm` (Print, Previous week, Create link…). |
-| WhatsApp button | `rounded-lg bg-green-600 text-white` link that opens `https://wa.me/94…?text=…` in a new tab. |
-| Section | `rounded-xl border border-zinc-200 bg-white p-4` with a `font-medium` heading. |
-| List | `ul` inside a section, `divide-y`, rows `px-4 py-2/3`. |
-| Status badge | `rounded px-2 text-xs` with the status colours above. |
-| Empty state | grey text; the timetable uses a dashed-border box. |
-| Data table (reports) | white bordered table, grey header row, numbers right-aligned in mono, horizontal scroll inside the table on phones. |
+| `btn(variant, size, full)` | Class string for `<button>`, `<Link>` and `<a>`. Variants: `primary`, `secondary`, `danger`, `dangerOutline`, `whatsapp`, `success`, `link`, `linkDanger`, `linkMuted`. Sizes `none`, `xs`, `sm`, `md`. |
+| `Button` | Same variants; full width by default (`full={false}` for inline); optional `icon`; `busy` shows a spinner and disables it to stop double submits. |
+| `ConfirmButton` | Two-step removal: first tap shows a red "Confirm" button that resets after 4s. Used for every removal (schedule slot, enrolment, concession, staff member, invite). |
+| `Badge` | Status pill with icon + word (`status="paid"`) or a plain `tone`. |
+| `Field` | Label above, full-width input, hint linked with `aria-describedby`. All inputs, selects and textareas share one focus ring from `globals.css`. |
+| `FormError` / `FormSuccess` | Soft danger/success panel with icon; `role="alert"` / `role="status"`. |
+| `useToast()` | Short "Saved" / "Link copied" message at the bottom, hides after 3s (provider in the dashboard shell). |
+| `Skeleton` | Shimmering placeholder rows while a list loads. |
+| `EmptyState` | Icon in a sky circle + one line, dashed border. |
+| `BackLink` | Chevron + section name at the top of sub-pages. |
+| `Card` | Auth/onboarding card: white, `rounded-2xl`, raised, pops in. |
+| `Brand` | Blue logo mark + app name. |
+| `Spinner` | Animated icon + "Loading…", `role="status"`. |
+| `LanguageSwitcher` | Native select inside a bordered pill with a language icon. |
+| Data table (reports) | Card, soft header row, hover rows, numbers right-aligned in mono, scrolls inside its box on phones. |
 
 ---
 
@@ -408,16 +407,10 @@ Settings → Invite staff (name, mobile, role) → Send on WhatsApp → staff op
 | Area | Gap | Suggested fix |
 |---|---|---|
 | Staff overview | Only a welcome message; no daily summary. | Today's classes, money received today, slips waiting, not-paid count, with links. |
-| Design tokens | Colours and sizes are repeated Tailwind classes; no shared tokens. | Move colours to `@theme` tokens (primary, success, warning, danger, surface) and reuse them. |
-| Buttons | `Button` is always full width, so most pages hand-write button classes; several slightly different secondary buttons exist. | Add size/variant props (primary, secondary, danger, whatsapp; full or auto width). |
-| Feedback | No toasts; success messages are inline text in different styles. | One inline success style, or a small toast for saves. |
-| Loading | "Loading…" text only; no skeletons; whole page waits for the shell. | Skeleton rows for lists; keep the shell visible while a page loads. |
-| Confirmations | Only card replacement and slip reject are two-step; removing a student from a class or revoking an invite is one tap. | Same two-step pattern for every removal. |
 | Teachers | Teachers have no Students menu item (they reach students through their classes). | Add a Students view filtered to their classes. |
 | iPhone | Camera scanning not supported in Safari. | Add a JS QR decoder fallback. |
 | Native pickers | Month/date pickers show the device language (often English). | Acceptable for v1; custom pickers only if users struggle. |
 | Dark mode | None; light only. | Not planned for v1. |
-| Icons | None. | Optional: a small icon set for the menu and status. |
 | Portal | One long page; no notifications (web push deferred). | Keep single page; add push for slip approved/rejected and class changes. |
 | Password reset | No "Forgot password" link (email reset not built yet). | Add with Gmail SMTP (v1 scope). |
 | Upgrade | Plan card says "send us the slip on WhatsApp" without a number. | Add the support WhatsApp number. |
@@ -429,8 +422,9 @@ Settings → Invite staff (name, mobile, role) → Send on WhatsApp → staff op
 
 1. Put every string in all three dictionaries; no hard-coded text.
 2. Start at phone width; no sideways scrolling; wrap actions under content.
-3. Use the shell, a `text-2xl font-semibold` page title, and white `rounded-xl` sections.
-4. Use the fixed status colours from §5.1 and always show the status word.
+3. Use the shell, a `text-2xl font-semibold` page title, and `card` sections; use tokens only, never raw Tailwind colours.
+4. Show statuses with `Badge` (icon + word, fixed colours from §5.1); buttons with `btn`/`Button`; removals with `ConfirmButton`.
+4a. Icons from `lucide-react`, paired with a word; motion only via the §5.5 tokens (opacity/transform).
 5. Money with `fmtMoney` (mono, two decimals); times with the Sri Lanka helpers in `lib/datetime.ts`.
 6. Messages to parents: build the text from the dictionary and open WhatsApp with `waLink`; never send silently.
 7. Every create/pay/upload action must survive a double tap (disable while busy and send a one-time id).

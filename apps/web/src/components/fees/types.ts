@@ -40,10 +40,3 @@ export interface Concession {
   batchName: string | null;
   note: string | null;
 }
-
-export const statusColor: Record<InvoiceStatus, string> = {
-  issued: 'bg-red-50 text-red-700',
-  part_paid: 'bg-amber-50 text-amber-800',
-  paid: 'bg-green-50 text-green-700',
-  void: 'bg-zinc-100 text-zinc-500',
-};

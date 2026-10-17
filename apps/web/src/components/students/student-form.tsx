@@ -1,11 +1,12 @@
 'use client';
 
+import { Plus, Save, TriangleAlert, UserMinus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, errorMessage, fmt } from '@/lib/api';
-import { Button, Field, FormError } from '../ui';
+import { btn, Button, card, Field, FormError, useToast } from '../ui';
 import { displayPhone, type Guardian, type Relationship, type Student } from './types';
 
 const emptyGuardian: Guardian = { fullName: '', phone: '', relationship: 'mother' };
@@ -40,7 +41,7 @@ export function StudentForm({ student }: { student?: Student }) {
   const [error, setError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
   const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -50,7 +51,6 @@ export function StudentForm({ student }: { student?: Student }) {
   async function save(allowDuplicate = false) {
     setBusy(true);
     setError(null);
-    setSaved(false);
     const body = {
       ...form,
       // A guardian row left completely empty is not sent.
@@ -60,7 +60,7 @@ export function StudentForm({ student }: { student?: Student }) {
     try {
       if (student) {
         await api(`/tenants/${tenantId}/students/${student.id}`, { method: 'PATCH', body });
-        setSaved(true);
+        toast(s.saved);
         setBusy(false);
       } else {
         const res = await api<{ student: Student }>(`/tenants/${tenantId}/students`, {
@@ -86,7 +86,7 @@ export function StudentForm({ student }: { student?: Student }) {
 
   return (
     <form onSubmit={onSubmit} className="max-w-xl space-y-6">
-      <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className={`${card} space-y-4 p-4`}>
         <Field
           label={s.name}
           value={form.fullName}
@@ -113,10 +113,10 @@ export function StudentForm({ student }: { student?: Student }) {
         />
       </div>
 
-      <fieldset className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4">
+      <fieldset className={`${card} space-y-4 p-4`}>
         <legend className="px-1 font-medium">{s.guardian}</legend>
         {guardians.map((g, i) => (
-          <div key={i} className="space-y-3 border-b border-zinc-100 pb-4 last:border-0 last:pb-0">
+          <div key={i} className="space-y-3 border-b border-line pb-4 last:border-0 last:pb-0">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
                 label={s.guardianName}
@@ -133,12 +133,12 @@ export function StudentForm({ student }: { student?: Student }) {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-sm text-zinc-700">
+              <label className="text-sm text-ink-muted">
                 {s.relationship}{' '}
                 <select
                   value={g.relationship}
                   onChange={(e) => setGuardian(i, 'relationship', e.target.value as Relationship)}
-                  className="ml-1 rounded-md border border-zinc-300 bg-white px-2 py-1"
+                  className="ml-1 rounded-lg border border-line-strong bg-surface px-2 py-1"
                 >
                   <option value="mother">{s.mother}</option>
                   <option value="father">{s.father}</option>
@@ -149,8 +149,9 @@ export function StudentForm({ student }: { student?: Student }) {
                 <button
                   type="button"
                   onClick={() => setGuardians((gs) => gs.filter((_, j) => j !== i))}
-                  className="ml-auto text-sm text-red-600"
+                  className={`ml-auto text-sm ${btn('linkDanger', 'none')}`}
                 >
+                  <UserMinus aria-hidden className="size-4" />
                   {s.removeGuardian}
                 </button>
               )}
@@ -163,31 +164,32 @@ export function StudentForm({ student }: { student?: Student }) {
             onClick={() =>
               setGuardians((gs) => [...gs, { ...emptyGuardian, relationship: 'father' }])
             }
-            className="text-sm font-medium text-indigo-600"
+            className={`text-sm ${btn('link', 'none')}`}
           >
+            <Plus aria-hidden className="size-4" />
             {s.addGuardian}
           </button>
         )}
       </fieldset>
 
-      <div className="space-y-4 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className={`${card} space-y-4 p-4`}>
         <label className="block">
-          <span className="mb-1 block text-sm font-medium text-zinc-700">{s.notes}</span>
+          <span className="mb-1 block text-sm font-medium text-ink-muted">{s.notes}</span>
           <textarea
             value={form.notes}
             onChange={set('notes')}
             maxLength={2000}
             rows={3}
-            className="w-full rounded-lg border border-zinc-300 px-3 py-2"
+            className="w-full rounded-lg border border-line-strong px-3 py-2"
           />
         </label>
         {student && (
-          <label className="block text-sm text-zinc-700">
+          <label className="block text-sm text-ink-muted">
             {s.status}{' '}
             <select
               value={form.status}
               onChange={set('status')}
-              className="ml-1 rounded-md border border-zinc-300 bg-white px-2 py-1"
+              className="ml-1 rounded-lg border border-line-strong bg-surface px-2 py-1"
             >
               <option value="active">{s.active}</option>
               <option value="inactive">{s.inactive}</option>
@@ -197,8 +199,14 @@ export function StudentForm({ student }: { student?: Student }) {
       </div>
 
       {duplicate && (
-        <div role="alert" className="space-y-3 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-          <p>{fmt(s.duplicate, { name: duplicate.fullName, number: duplicate.studentNumber })}</p>
+        <div
+          role="alert"
+          className="animate-fade-in space-y-3 rounded-lg bg-warning-soft p-4 text-sm text-warning"
+        >
+          <p className="flex items-start gap-2">
+            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+            {fmt(s.duplicate, { name: duplicate.fullName, number: duplicate.studentNumber })}
+          </p>
           <div className="flex gap-3">
             <Link href={`${base}/${duplicate.id}`} className="font-medium underline">
               {s.openExisting}
@@ -210,16 +218,9 @@ export function StudentForm({ student }: { student?: Student }) {
         </div>
       )}
       <FormError message={error} />
-      {saved && (
-        <p role="status" className="text-sm text-green-700">
-          {s.saved}
-        </p>
-      )}
-      <div className="max-w-40">
-        <Button type="submit" busy={busy}>
-          {s.save}
-        </Button>
-      </div>
+      <Button type="submit" busy={busy} full={false} icon={Save}>
+        {s.save}
+      </Button>
     </form>
   );
 }

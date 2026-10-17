@@ -1,10 +1,12 @@
 'use client';
 
+import { ArrowRightLeft, Ban, Check, RotateCcw, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api } from '@/lib/api';
 import { colomboDate, colomboTime, toIso } from '@/lib/datetime';
+import { Badge, btn } from '../ui';
 import type { Session } from './types';
 
 /** Cancel / restore / move one class. Teachers (own classes), admins and owners. */
@@ -40,17 +42,18 @@ export function SessionActions({
     }
   }
 
-  const input = 'rounded border border-zinc-300 px-1.5 py-1';
+  const input = 'rounded-lg border border-line-strong px-1.5 py-1';
   return (
     <span className="flex flex-wrap items-center gap-2">
       {session.status === 'cancelled' ? (
         <>
-          <span className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-700">{tt.cancelled}</span>
+          <Badge status="cancelled">{tt.cancelled}</Badge>
           <button
             type="button"
             onClick={() => patch({ status: 'scheduled' })}
-            className="text-indigo-600"
+            className={btn('link', 'none')}
           >
+            <RotateCcw aria-hidden className="size-4" />
             {tt.restore}
           </button>
         </>
@@ -82,24 +85,32 @@ export function SessionActions({
             onClick={() =>
               patch({ startsAt: toIso(to.date, to.start), endsAt: toIso(to.date, to.end) })
             }
-            className="font-medium text-indigo-600"
+            className={btn('link', 'none')}
           >
+            <Check aria-hidden className="size-4" />
             {tt.save}
           </button>
-          <button type="button" onClick={() => setMoving(false)} className="text-zinc-500">
+          <button
+            type="button"
+            onClick={() => setMoving(false)}
+            className={btn('linkMuted', 'none')}
+          >
+            <X aria-hidden className="size-4" />
             {tt.close}
           </button>
         </>
       ) : (
         <>
-          <button type="button" onClick={() => setMoving(true)} className="text-indigo-600">
+          <button type="button" onClick={() => setMoving(true)} className={btn('link', 'none')}>
+            <ArrowRightLeft aria-hidden className="size-4" />
             {tt.move}
           </button>
           <button
             type="button"
             onClick={() => patch({ status: 'cancelled' })}
-            className="text-red-600"
+            className={btn('linkDanger', 'none')}
           >
+            <Ban aria-hidden className="size-4" />
             {tt.cancel}
           </button>
         </>

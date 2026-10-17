@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { FormError } from '../ui';
+import { BackLink, FormError, Skeleton } from '../ui';
 import { useTenantData } from '../dashboard-shell';
 import { StudentFees } from '../fees/student-fees';
 import { StudentCard } from './student-card';
@@ -19,9 +18,7 @@ function Page({ title, children }: { title: ReactNode; children: ReactNode }) {
   const { tenantId } = useParams<{ tenantId: string }>();
   return (
     <div className="space-y-4">
-      <Link href={`/${lang}/t/${tenantId}/students`} className="text-sm text-indigo-600">
-        {t.students.back}
-      </Link>
+      <BackLink href={`/${lang}/t/${tenantId}/students`}>{t.students.back}</BackLink>
       <h1 className="text-2xl font-semibold">{title}</h1>
       {children}
     </div>
@@ -52,12 +49,14 @@ export function StudentDetail() {
   }, [tenantId, studentId, t]);
 
   if (error) return <FormError message={error} />;
-  if (!student) return <p className="text-zinc-500">{t.loading}</p>;
+  if (!student) return <Skeleton />;
   return (
     <Page
       title={
         <>
-          <span className="mr-2 font-mono text-base text-zinc-500">{student.studentNumber}</span>
+          <span className="mr-2 rounded-lg bg-primary-soft px-2 py-0.5 align-middle font-mono text-base text-primary-hover">
+            {student.studentNumber}
+          </span>
           {student.fullName}
         </>
       }

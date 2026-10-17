@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarCheck, CalendarX, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import { addDays, colomboDate, fmtDay, fmtTime, mondayOf } from '@/lib/datetime';
 import { SessionActions } from './classes/session-actions';
 import type { Session } from './classes/types';
-import { FormError } from './ui';
+import { btn, card, EmptyState, FormError, Skeleton } from './ui';
 
 export function Timetable() {
   const { lang, t } = useI18n();
@@ -43,39 +44,40 @@ export function Timetable() {
         <button
           type="button"
           onClick={() => setMonday(addDays(monday, -7))}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className={btn('secondary')}
         >
+          <ChevronLeft aria-hidden className="size-4" />
           {tt.prevWeek}
         </button>
         <button
           type="button"
           onClick={() => setMonday(mondayOf(colomboDate()))}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className={btn('secondary')}
         >
+          <CalendarCheck aria-hidden className="size-4" />
           {tt.thisWeek}
         </button>
         <button
           type="button"
           onClick={() => setMonday(addDays(monday, 7))}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm"
+          className={btn('secondary')}
         >
           {tt.nextWeek}
+          <ChevronRight aria-hidden className="size-4" />
         </button>
       </div>
       <FormError message={error} />
       {sessions === null ? (
-        <p className="text-zinc-500">{t.loading}</p>
+        <Skeleton />
       ) : sessions.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-zinc-500">
-          {tt.noClasses}
-        </p>
+        <EmptyState icon={CalendarX}>{tt.noClasses}</EmptyState>
       ) : (
         [...byDay.entries()].map(([day, list]) => (
-          <section key={day} className="rounded-xl border border-zinc-200 bg-white">
-            <h2 className="border-b border-zinc-100 px-4 py-2 font-medium">
+          <section key={day} className={`${card} animate-fade-in overflow-hidden`}>
+            <h2 className="border-b border-line bg-surface-soft px-4 py-2 font-medium">
               {fmtDay(list[0]!.startsAt, t.calendar)}
             </h2>
-            <ul className="divide-y divide-zinc-100">
+            <ul className="divide-y divide-line">
               {list.map((s) => (
                 <li
                   key={s.id}
@@ -85,7 +87,7 @@ export function Timetable() {
                     {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}
                   </span>
                   <span
-                    className={`min-w-0 flex-1 ${s.status === 'cancelled' ? 'text-zinc-400 line-through' : ''}`}
+                    className={`min-w-0 flex-1 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
                   >
                     <Link
                       href={`/${lang}/t/${tenantId}/classes/${s.batchId}`}
@@ -93,7 +95,7 @@ export function Timetable() {
                     >
                       {s.batchName}
                     </Link>
-                    <span className="text-zinc-500">
+                    <span className="text-ink-subtle">
                       {' '}
                       ·{' '}
                       {[s.subjectName, s.teacherName, s.room, s.isExtra ? tt.extra : null, s.note]

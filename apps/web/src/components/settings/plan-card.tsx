@@ -1,10 +1,12 @@
 'use client';
 
+import { CircleAlert, CreditCard } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, fmt } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
+import { card } from '../ui';
 
 export interface Usage {
   plan: 'free' | 'teacher' | 'institute';
@@ -32,31 +34,37 @@ export function PlanCard() {
   const full = limit !== null && active >= limit;
   const expired = usage.plan !== usage.effectivePlan;
   return (
-    <section className="max-w-xl space-y-3 rounded-xl border border-zinc-200 bg-white p-4 text-sm">
-      <h2 className="font-medium">
+    <section className={`${card} max-w-xl space-y-3 p-4 text-sm`}>
+      <h2 className="flex items-center gap-2 text-base font-medium">
+        <CreditCard aria-hidden className="size-5 text-primary" />
         {p.title}: {p.names[usage.effectivePlan]}
       </h2>
       <p>
         {limit === null ? fmt(p.studentsUnlimited, { active }) : fmt(p.students, { active, limit })}
       </p>
       {limit !== null && (
-        <div className="h-2 overflow-hidden rounded bg-zinc-100">
+        <div className="h-2 overflow-hidden rounded-full bg-surface-soft">
           <div
-            className={`h-full ${full ? 'bg-red-600' : 'bg-indigo-600'}`}
+            className={`h-full rounded-full transition-[width] duration-700 ease-out ${full ? 'bg-danger-solid' : 'bg-primary'}`}
             style={{ width: `${Math.min(100, (active * 100) / limit)}%` }}
           />
         </div>
       )}
       {usage.planExpiresAt && (
-        <p className={expired ? 'font-medium text-red-700' : 'text-zinc-600'}>
+        <p className={expired ? 'font-medium text-danger' : 'text-ink-muted'}>
           {fmt(expired ? p.expired : p.paidUntil, {
             plan: p.names[usage.plan],
             date: colomboDate(usage.planExpiresAt),
           })}
         </p>
       )}
-      {full && <p className="font-medium text-red-700">{p.full}</p>}
-      <p className="text-zinc-500">{p.upgrade}</p>
+      {full && (
+        <p className="flex items-center gap-1.5 font-medium text-danger">
+          <CircleAlert aria-hidden className="size-4" />
+          {p.full}
+        </p>
+      )}
+      <p className="text-ink-subtle">{p.upgrade}</p>
     </section>
   );
 }

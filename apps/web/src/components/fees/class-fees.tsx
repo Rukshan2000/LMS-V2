@@ -1,10 +1,11 @@
 'use client';
 
+import { Save, Wallet } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
-import { FormError } from '../ui';
+import { btn, card, FormError, useToast } from '../ui';
 
 type Kind = 'class' | 'ac' | 'tute';
 
@@ -15,7 +16,7 @@ export function ClassFees({ batchId }: { batchId: string }) {
   const { tenantId } = useParams<{ tenantId: string }>();
   const url = `/tenants/${tenantId}/batches/${batchId}/fees`;
   const [fees, setFees] = useState<Record<Kind, string>>({ class: '', ac: '', tute: '' });
-  const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,11 +32,11 @@ export function ClassFees({ batchId }: { batchId: string }) {
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    setSaved(false);
+    setError(null);
     try {
       const body = Object.fromEntries(Object.entries(fees).filter(([, v]) => v !== ''));
       await api(url, { method: 'PUT', body });
-      setSaved(true);
+      toast(f.saved);
     } catch (err) {
       setError(errorMessage(t, err));
     }
@@ -43,8 +44,11 @@ export function ClassFees({ batchId }: { batchId: string }) {
 
   const labels: Record<Kind, string> = { class: f.classFee, ac: f.acFee, tute: f.tuteFee };
   return (
-    <section className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
-      <h2 className="font-medium">{f.classFees}</h2>
+    <section className={`${card} space-y-3 p-4`}>
+      <h2 className="flex items-center gap-2 font-medium">
+        <Wallet aria-hidden className="size-5 text-primary" />
+        {f.classFees}
+      </h2>
       <form onSubmit={save} className="flex flex-wrap items-end gap-2 text-sm">
         {(['class', 'ac', 'tute'] as const).map((k) => (
           <label key={k} className="flex flex-col gap-1">
@@ -54,21 +58,14 @@ export function ClassFees({ batchId }: { batchId: string }) {
               pattern="\d{1,10}(\.\d{1,2})?"
               value={fees[k]}
               onChange={(e) => setFees({ ...fees, [k]: e.target.value })}
-              className="w-28 rounded-lg border border-zinc-300 px-2 py-1.5"
+              className="w-28 rounded-lg border border-line-strong px-2 py-1.5"
             />
           </label>
         ))}
-        <button
-          type="submit"
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white"
-        >
+        <button type="submit" className={btn()}>
+          <Save aria-hidden className="size-4" />
           {f.saveFees}
         </button>
-        {saved && (
-          <span role="status" className="text-green-700">
-            {f.saved}
-          </span>
-        )}
       </form>
       <FormError message={error} />
     </section>

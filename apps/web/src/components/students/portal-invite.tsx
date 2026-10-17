@@ -1,12 +1,13 @@
 'use client';
 
+import { Link2, MessageCircle, Smartphone } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt } from '@/lib/api';
 import { waLink } from '@/lib/whatsapp';
 import { useTenantData } from '../dashboard-shell';
-import { FormError } from '../ui';
+import { btn, card, FormError } from '../ui';
 import { displayPhone, type Student } from './types';
 
 /** Send the parent/student app link on WhatsApp. Only the chosen mobile can open it. */
@@ -44,33 +45,38 @@ export function PortalInvite({ student }: { student: Student }) {
   }
 
   return (
-    <section className="max-w-xl space-y-3 rounded-xl border border-zinc-200 bg-white p-4 text-sm">
+    <section className={`${card} max-w-xl space-y-3 p-4 text-sm`}>
       <div>
-        <h2 className="font-medium">{p.invite}</h2>
-        <p className="text-zinc-500">{p.inviteHint}</p>
+        <h2 className="flex items-center gap-2 text-base font-medium">
+          <Smartphone aria-hidden className="size-5 text-primary" />
+          {p.invite}
+        </h2>
+        <p className="text-ink-subtle">{p.inviteHint}</p>
       </div>
-      {people.length === 0 && <p className="text-zinc-500">{p.noPhones}</p>}
+      {people.length === 0 && <p className="text-ink-subtle">{p.noPhones}</p>}
       <ul className="space-y-2">
         {people.map(({ name, phone }) => (
           <li key={phone} className="flex flex-wrap items-center justify-between gap-2">
             <span>
-              {name} <span className="text-zinc-500">{displayPhone(phone)}</span>
+              {name} <span className="text-ink-subtle">{displayPhone(phone)}</span>
             </span>
             {links[phone] ? (
               <a
                 href={links[phone]}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-lg bg-green-600 px-3 py-1.5 font-medium text-white"
+                className={`${btn('whatsapp')} animate-pop-in`}
               >
+                <MessageCircle aria-hidden className="size-4" />
                 {p.openWhatsApp}
               </a>
             ) : (
               <button
                 type="button"
                 onClick={() => create(name, phone)}
-                className="rounded-lg border border-zinc-300 px-3 py-1.5 font-medium"
+                className={btn('secondary')}
               >
+                <Link2 aria-hidden className="size-4" />
                 {p.createLink}
               </button>
             )}
