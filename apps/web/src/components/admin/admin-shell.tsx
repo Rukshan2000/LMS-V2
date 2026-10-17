@@ -32,7 +32,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     api<Me>('/auth/me')
       .then(async (res) => {
-        if (!res.isPlatformAdmin || !res.user.emailVerified) return router.replace(`/${lang}/app`);
+        if (!res.isPlatformAdmin) return router.replace(`/${lang}/app`);
         // Checks the 12-hour rule before any page loads.
         await api('/admin/settings');
         setMe(res);

@@ -20,9 +20,7 @@ interface Member {
 interface Invite {
   id: string;
   fullName: string;
-  email: string | null;
-  /** Invites from before email login. */
-  phone?: string | null;
+  email: string;
   role: Role;
   expiresAt: string;
   /** Only known right after creating it in this browser (the server stores a hash). */
@@ -101,7 +99,7 @@ export function StaffSettings() {
 
   // No number: WhatsApp lets the sender pick the chat.
   const whatsapp = (i: Invite) =>
-    `https://wa.me/${i.phone ?? ''}?text=${encodeURIComponent(
+    `https://wa.me/?text=${encodeURIComponent(
       fmt(st.message, {
         name: i.fullName,
         institute: tenant.name,
@@ -222,20 +220,17 @@ export function StaffSettings() {
                       <span className="min-w-0 flex-1">
                         <span className="font-medium">{i.fullName}</span> · {t.roles[i.role]}
                         <span className="block text-ink-subtle">
-                          {i.email ?? displayPhone(i.phone)} ·{' '}
-                          {fmt(st.expires, { date: colomboDate(i.expiresAt) })}
+                          {i.email} · {fmt(st.expires, { date: colomboDate(i.expiresAt) })}
                         </span>
                       </span>
-                      {i.email && (
-                        <button
-                          type="button"
-                          onClick={() => resend(i)}
-                          className={btn('link', 'none')}
-                        >
-                          <Mail aria-hidden className="size-4" />
-                          {st.resend}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => resend(i)}
+                        className={btn('link', 'none')}
+                      >
+                        <Mail aria-hidden className="size-4" />
+                        {st.resend}
+                      </button>
                       {i.link && (
                         <>
                           <a

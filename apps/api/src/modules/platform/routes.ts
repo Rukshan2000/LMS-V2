@@ -6,7 +6,6 @@ import { amountInput } from '../../lib/money.js';
 import { normalizePhone } from '../../lib/phone.js';
 import {
   clearOverride,
-  countUnverifiedUsers,
   createAccount,
   createPriceBook,
   extendTrial,
@@ -103,7 +102,6 @@ export default async function platformRoutes(
 
   app.get('/accounts', async (req) => ({
     accounts: await listAccounts(app.db, accountsQuery.parse(req.query)),
-    unverifiedUsers: await countUnverifiedUsers(app.db),
   }));
   app.post('/accounts', mutation, async (req, reply) => {
     const account = await createAccount(app.db, createAccountBody.parse(req.body), actor(req));

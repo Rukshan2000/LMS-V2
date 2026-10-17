@@ -1,6 +1,6 @@
 # Tuition LMS: email identity, OTP verification and email invitations
 
-**Status:** Phases 1–4 built, 2026-10-17 (on top of `7e8840b`). Phase 5 waits until no user logs in by phone (the console shows the count).
+**Status:** All phases built, 2026-10-17. Phases 1–4 are on branch `email-auth`. Phase 5 is on `email-auth-phase5` and is held until the console shows 0 users logging in by phone; its migration (019) refuses to run before that.
 **Changes:** login identity moves from **phone + password** to **verified email + password**. Every account, password reset and invitation goes through email, sent via Gmail SMTP.
 **Supersedes:** "Phone OTP for students/parents later" in [ADR 003](adr/003-session-cookies.md). Recorded as [ADR 010](adr/010-email-identity.md).
 **Does not change:** [ADR 006](adr/006-whatsapp-first.md). WhatsApp/SMS stays the channel for parent *notifications*. Email is only for identity and invitations.
@@ -288,7 +288,7 @@ Existing users have a phone and a password but usually no email. No one is locke
 1. **Transition login.** `/auth/login` accepts `{ identifier, password }`: an `@` means email, otherwise phone. Phone login works only for users **without** a verified email.
 2. **Verify gate.** After a phone login, `/auth/me` returns `emailVerified: false`; the web sends the user to `/account/email`, where they enter an email, get a code and confirm (`/auth/email/change` without a password). Nothing else in the app opens until then.
 3. **Console view.** The accounts list shows how many users are still unverified.
-4. **Close the gap.** When the count is zero (or after a set date), a follow-up migration sets `users.email NOT NULL`, and the phone branch of login is deleted.
+4. **Close the gap (Phase 5, migration 019).** When the count is zero and every unclaimed account has an owner email (set it in console → account → Manage), merge `email-auth-phase5`. The migration adds constraints instead of `NOT NULL`, so disabled users may keep no email: every active user has a verified email, every unclaimed account has an owner email, and every pending invite has an email (pending phone-only invites are revoked). Phone login, the verify gate and phone claiming are deleted.
 
 Platform admins go through the same gate on their next login.
 
@@ -304,7 +304,7 @@ Each phase is one PR, green CI, deployable on its own.
 | **2. Identity** | signup start/verify, email login + transition login, forgot/reset, email change, verify gate, web pages | Users sign up and log in by email |
 | **3. Invites by email** | staff + portal invites by email, resend, accept by email, student/guardian email fields | Invites arrive in the inbox |
 | **4. Console** | `ownerEmail`, account-ready mail, resend, claim by email, unverified-user count | Console accounts start with an email |
-| **5. Cleanup** | `email NOT NULL`, remove phone login, ADR 010, update [DEMO_ACCOUNTS.md](DEMO_ACCOUNTS.md) and the console Docs page | Phone login gone |
+| **5. Cleanup** | Migration 019 (constraints, refuses while phone-only users exist), remove phone login, verify gate and phone claiming; console Docs page updated | Phone login gone |
 
 ---
 

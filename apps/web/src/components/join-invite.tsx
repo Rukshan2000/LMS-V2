@@ -6,14 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage, fmt, type Me, type Role } from '@/lib/api';
 import { AuthForm } from './auth-form';
-import { displayPhone } from './students/types';
 import { btn, Button, Card, FormError, Spinner } from './ui';
 
 interface Invite {
   fullName: string;
-  /** Who may accept. Invites from before email login have only a phone. */
-  email: string | null;
-  phone: string | null;
+  /** Only the user who logs in with this email can accept. */
+  email: string;
   role: Role;
   tenantId: string;
   tenantName: string;
@@ -93,21 +91,15 @@ export function JoinInvite() {
           <AuthForm
             key={mode}
             mode={mode}
-            email={invite.email ?? undefined}
+            email={invite.email}
             fullName={invite.fullName}
             onDone={loadMe}
             onSwitch={() => setMode((m) => (m === 'signup' ? 'login' : 'signup'))}
           />
         </>
-      ) : invite.email ? (
-        !me.user.emailVerified || me.user.email !== invite.email
-      ) : me.user.phone !== invite.phone ? (
+      ) : me.user.email !== invite.email ? (
         <Card>
-          <p className="text-ink-muted">
-            {invite.email
-              ? fmt(j.wrongEmail, { email: invite.email })
-              : fmt(j.wrongPhone, { phone: displayPhone(invite.phone ?? '') })}
-          </p>
+          <p className="text-ink-muted">{fmt(j.wrongEmail, { email: invite.email })}</p>
           <button type="button" onClick={logout} className={`mt-4 text-sm ${btn('link', 'none')}`}>
             <LogOut aria-hidden className="size-4" />
             {t.dashboard.logout}

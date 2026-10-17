@@ -270,7 +270,7 @@ export async function openAccount(
  */
 export async function accountForNewInstitute(
   trx: Knex.Transaction,
-  user: { id: string; email: string | null; emailVerified: boolean; phone: string | null },
+  user: { id: string; email: string },
 ): Promise<string> {
   await lock(trx, `account-owner:${user.id}`);
   let account: AccountRow | undefined = await trx('accounts')
@@ -282,15 +282,8 @@ export async function accountForNewInstitute(
         'id',
         trx('accounts')
           .whereNull('owner_user_id')
-          // By verified email; accounts made before email login (no owner_email) by phone.
-          .where((w) => {
-            if (user.emailVerified) w.whereRaw('lower(owner_email) = ?', [user.email]);
-            if (user.phone)
-              w.orWhere((o) => o.whereNull('owner_email').where({ owner_phone: user.phone }));
-          })
-          .modify((q) => {
-            if (!user.emailVerified && !user.phone) q.whereRaw('false');
-          })
+          // The login email is verified, so only that inbox's owner can claim the account.
+          .whereRaw('lower(owner_email) = ?', [user.email])
           .orderBy('created_at')
           .limit(1)
           .select('id'),
@@ -912,16 +905,6 @@ export async function unclaimedOwnerEmail(db: Knex, accountId: string) {
   }
   if (!row.owner_email) throw new HttpError(409, 'no_owner_email', 'This account has no email');
   return { name: row.name as string, email: row.owner_email as string };
-}
-
-/** Users who still log in by phone (EMAIL_AUTH_PLAN §9): when 0, phone login can go. */
-export async function countUnverifiedUsers(db: Knex) {
-  const row = await db('users')
-    .where({ status: 'active' })
-    .where((w) => w.whereNull('email').orWhereNull('email_verified_at'))
-    .count({ n: '*' })
-    .first();
-  return Number(row?.n ?? 0);
 }
 
 export async function updateAccount(

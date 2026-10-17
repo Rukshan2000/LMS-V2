@@ -61,7 +61,6 @@ describe('auth', () => {
     const { cookie, user } = await signup('077 123 4567');
     expect(user).toMatchObject({
       email: '94771234567@test.lk',
-      emailVerified: true,
       phone: '94771234567',
     });
     const mail = sentMail(app).at(-1)!;
@@ -89,7 +88,12 @@ describe('auth', () => {
     expect(lastCode(app, '94771234567@test.lk')).toBe('');
     // The database also refuses a second user with the same email in another case.
     await expect(
-      ownerDb('users').insert({ email: '94771234567@Test.LK', full_name: 'X', password_hash: 'x' }),
+      ownerDb('users').insert({
+        email: '94771234567@Test.LK',
+        email_verified_at: new Date(),
+        full_name: 'X',
+        password_hash: 'x',
+      }),
     ).rejects.toThrow(/users_email_unique/);
   });
 
@@ -162,17 +166,15 @@ describe('auth', () => {
   it('login: wrong password and unknown email give the same 401; email case is ignored', async () => {
     await signup('0771234567');
     for (const payload of [
-      { identifier: '94771234567@test.lk', password: 'wrong-password' },
-      { identifier: 'nobody@test.lk', password: 'correct-horse' },
-      // Users with a verified email cannot log in by phone.
-      { identifier: '0771234567', password: 'correct-horse' },
+      { email: '94771234567@test.lk', password: 'wrong-password' },
+      { email: 'nobody@test.lk', password: 'correct-horse' },
     ]) {
       const res = await post('/login', payload);
       expect(res.statusCode).toBe(401);
       expect(res.json().code).toBe('invalid_credentials');
     }
     const ok = await post('/login', {
-      identifier: '94771234567@Test.LK',
+      email: '94771234567@Test.LK',
       password: 'correct-horse',
     });
     expect(ok.statusCode).toBe(200);
@@ -210,12 +212,10 @@ describe('auth', () => {
     expect(
       (await app.inject({ url: '/api/v1/auth/me', headers: { cookie: cookieOf(res) } })).statusCode,
     ).toBe(200);
-    expect(
-      (await post('/login', { identifier: email, password: 'correct-horse' })).statusCode,
-    ).toBe(401);
-    expect((await post('/login', { identifier: email, password: 'new-password' })).statusCode).toBe(
-      200,
+    expect((await post('/login', { email: email, password: 'correct-horse' })).statusCode).toBe(
+      401,
     );
+    expect((await post('/login', { email: email, password: 'new-password' })).statusCode).toBe(200);
   });
 
   it('change email: needs the password, a code at the new address, and tells the old one', async () => {
@@ -233,13 +233,13 @@ describe('auth', () => {
       { email: 'new@test.lk', code: lastCode(app, 'new@test.lk') },
       cookie,
     );
-    expect(confirm.json().user).toMatchObject({ email: 'new@test.lk', emailVerified: true });
+    expect(confirm.json().user).toMatchObject({ email: 'new@test.lk' });
     expect(sentMail(app).at(-1)).toMatchObject({
       to: old,
       subject: 'Your login email was changed',
     });
     expect(
-      (await post('/login', { identifier: 'new@test.lk', password: 'correct-horse' })).statusCode,
+      (await post('/login', { email: 'new@test.lk', password: 'correct-horse' })).statusCode,
     ).toBe(200);
     // Someone else's email cannot be taken.
     await signupUser(app, { email: 'taken@test.lk' });
@@ -250,28 +250,19 @@ describe('auth', () => {
     ).toBe('email_taken');
   });
 
-  it('a user from before email login logs in by phone, adds an email, then phone login stops', async () => {
-    await ownerDb('users').insert({
-      phone: '94771234567',
-      full_name: 'Old User',
-      password_hash: await hashPassword('correct-horse'),
-    });
-    const login = await post('/login', { identifier: '077 123 4567', password: 'correct-horse' });
-    expect(login.json().user).toMatchObject({ email: null, emailVerified: false });
-    const cookie = cookieOf(login);
-    // No password needed: there is no verified email to protect yet.
-    expect((await post('/email/change', { email: 'old@test.lk' }, cookie)).statusCode).toBe(202);
-    await post(
-      '/email/confirm',
-      { email: 'old@test.lk', code: lastCode(app, 'old@test.lk') },
-      cookie,
-    );
-    expect(
-      (await post('/login', { identifier: '0771234567', password: 'correct-horse' })).statusCode,
-    ).toBe(401);
-    expect(
-      (await post('/login', { identifier: 'old@test.lk', password: 'correct-horse' })).statusCode,
-    ).toBe(200);
+  it('phone numbers do not log in, and the database refuses an active user without a verified email', async () => {
+    await signup('0771234567');
+    const byPhone = await post('/login', { email: '0771234567', password: 'correct-horse' });
+    expect(byPhone.json().code).toBe('validation_error');
+    const hash = await hashPassword('correct-horse');
+    await expect(
+      ownerDb('users').insert({ phone: '94770000009', full_name: 'X', password_hash: hash }),
+    ).rejects.toThrow(/users_active_email_verified/);
+    await expect(
+      ownerDb('users').insert({ email: 'x@test.lk', full_name: 'X', password_hash: hash }),
+    ).rejects.toThrow(/users_active_email_verified/);
+    // Disabled users may keep no email: they cannot log in.
+    await ownerDb('users').insert({ status: 'disabled', full_name: 'X', password_hash: hash });
   });
 
   it('stores only hashes of the password, session token and codes', async () => {
@@ -325,7 +316,7 @@ describe('auth', () => {
       const res = await limited.inject({
         method: 'POST',
         url: '/api/v1/auth/login',
-        payload: { identifier: 'a@test.lk', password: 'x' },
+        payload: { email: 'a@test.lk', password: 'x' },
       });
       codes.push(res.statusCode);
     }

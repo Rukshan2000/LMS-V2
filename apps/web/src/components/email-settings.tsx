@@ -9,10 +9,7 @@ import { api, ApiError, errorMessage, fmt, type Me } from '@/lib/api';
 import { CodeField } from './auth-form';
 import { Brand, Button, Card, Field, FormError, Spinner } from './ui';
 
-/**
- * Login email. Users from before email login land here until they add one (the app sends them
- * here); everyone else can change theirs (password + code to the new address).
- */
+/** Change the login email: password + a code sent to the new address. */
 export function EmailSettings() {
   const { lang, t } = useI18n();
   const router = useRouter();
@@ -50,21 +47,16 @@ export function EmailSettings() {
   }
 
   if (!me) return <Spinner label={t.loading} />;
-  const verified = me.user.emailVerified;
   return (
     <Card>
       <div className="mb-5">
         <Brand />
       </div>
-      <h1 className="mb-2 text-xl font-semibold">
-        {verified ? t.auth.changeEmailTitle : t.auth.addEmailTitle}
-      </h1>
+      <h1 className="mb-2 text-xl font-semibold">{t.auth.changeEmailTitle}</h1>
       <p className="mb-6 text-sm text-ink-muted">
         {sentTo
           ? fmt(t.auth.codeSent, { email: sentTo })
-          : verified
-            ? fmt(t.auth.currentEmail, { email: me.user.email ?? '' })
-            : t.auth.addEmailIntro}
+          : fmt(t.auth.currentEmail, { email: me.user.email })}
       </p>
       <form onSubmit={onSubmit} className="space-y-4">
         {sentTo ? (
@@ -72,15 +64,13 @@ export function EmailSettings() {
         ) : (
           <>
             <Field label={t.auth.email} name="email" type="email" required autoComplete="email" />
-            {verified && (
-              <Field
-                label={t.auth.password}
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-            )}
+            <Field
+              label={t.auth.password}
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
           </>
         )}
         <FormError message={error} />
@@ -88,16 +78,14 @@ export function EmailSettings() {
           {sentTo ? t.auth.confirmButton : t.auth.sendCode}
         </Button>
       </form>
-      {verified && (
-        <p className="mt-6 text-sm">
-          <Link
-            href={`/${lang}/app`}
-            className="font-medium text-primary transition-colors hover:text-primary-hover hover:underline"
-          >
-            {t.auth.back}
-          </Link>
-        </p>
-      )}
+      <p className="mt-6 text-sm">
+        <Link
+          href={`/${lang}/app`}
+          className="font-medium text-primary transition-colors hover:text-primary-hover hover:underline"
+        >
+          {t.auth.back}
+        </Link>
+      </p>
     </Card>
   );
 }

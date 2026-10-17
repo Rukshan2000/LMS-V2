@@ -9,23 +9,21 @@ export const SESSION_DAYS = 30;
 
 export interface SessionUser {
   id: string;
-  /** The login identity. Null only for users from before email login (they must add one). */
-  email: string | null;
-  emailVerified: boolean;
+  /** The login identity, always verified (users_active_email_verified, migration 019). */
+  email: string;
+  /** Contact only (WhatsApp). */
   phone: string | null;
   fullName: string;
 }
 
 export const sessionUser = (row: {
   id: string;
-  email: string | null;
-  email_verified_at: Date | null;
+  email: string;
   phone: string | null;
   full_name: string;
 }): SessionUser => ({
   id: row.id,
   email: row.email,
-  emailVerified: row.email !== null && row.email_verified_at !== null,
   phone: row.phone,
   fullName: row.full_name,
 });
@@ -67,15 +65,7 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
       .whereNull('s.revoked_at')
       .where('s.expires_at', '>', app.db.fn.now())
       .where('u.status', 'active')
-      .first(
-        'u.id',
-        'u.email',
-        'u.email_verified_at',
-        'u.phone',
-        'u.full_name',
-        'u.is_platform_admin',
-        's.created_at',
-      );
+      .first('u.id', 'u.email', 'u.phone', 'u.full_name', 'u.is_platform_admin', 's.created_at');
     if (!row) return;
     req.user = sessionUser(row);
     req.authSession = { createdAt: row.created_at, isPlatformAdmin: row.is_platform_admin };

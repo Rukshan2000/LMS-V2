@@ -38,16 +38,15 @@ const signupBody = z.object({
     error: 'privacy_not_accepted',
   }),
 });
-// identifier: an email, or (until every user has one) the phone of a user without a verified email.
 const loginBody = z.object({
-  identifier: z.string().trim().min(3).max(254),
+  email: emailSchema,
   password: z.string().min(1).max(200),
 });
 const resetBody = z.object({ email: emailSchema, code, password });
-const changeBody = z.object({ email: emailSchema, password: z.string().max(200).optional() });
+const changeBody = z.object({ email: emailSchema, password: z.string().max(200) });
 const confirmBody = z.object({ email: emailSchema, code });
 
-const USER_COLUMNS = ['id', 'email', 'email_verified_at', 'phone', 'full_name'];
+const USER_COLUMNS = ['id', 'email', 'phone', 'full_name'];
 
 function duplicate(err: unknown): never {
   if (isUniqueViolation(err)) {
@@ -114,20 +113,7 @@ export default async function identityRoutes(
 
   app.post('/login', limited, async (req, reply) => {
     const body = loginBody.parse(req.body);
-    let user;
-    if (body.identifier.includes('@')) {
-      user = await findByEmail(body.identifier.toLowerCase());
-    } else {
-      // Phone login only for users who have not verified an email yet (EMAIL_AUTH_PLAN §9).
-      const phone = parsePhone(body.identifier);
-      user = phone
-        ? await app
-            .db('users')
-            .where({ phone })
-            .where((w) => w.whereNull('email').orWhereNull('email_verified_at'))
-            .first([...USER_COLUMNS, 'status', 'password_hash'])
-        : undefined;
-    }
+    let user = await findByEmail(body.email);
     if (user?.status !== 'active') user = undefined;
     // Same answer (and timing) as a wrong password.
     if (!(await verifyPassword(user?.password_hash, body.password)) || !user) {
@@ -147,7 +133,7 @@ export default async function identityRoutes(
     const { email } = emailOnly.parse(req.body);
     const otp = await issueOtp(app.db, { email, purpose: 'password_reset' });
     const user = await findByEmail(email);
-    if (user?.status === 'active' && user.email_verified_at) {
+    if (user?.status === 'active') {
       await send(otpMail(email, otp, 'password_reset'));
     }
     return reply.status(202).send({ sent: true });
@@ -173,16 +159,13 @@ export default async function identityRoutes(
     return { user: sessionUser(user) };
   });
 
-  // Set or change the login email (also how a phone-only user adds one). Re-checks the password
-  // when the account already has a verified email; the code goes to the new address.
+  // Change the login email: re-checks the password; the code goes to the new address.
   app.post('/email/change', authed, async (req, reply) => {
     const body = changeBody.parse(req.body);
     const user = req.user!;
-    if (user.emailVerified) {
-      const row = await app.db('users').where({ id: user.id }).first('password_hash');
-      if (!(await verifyPassword(row.password_hash, body.password ?? ''))) {
-        throw new HttpError(401, 'invalid_credentials', 'Wrong password');
-      }
+    const row = await app.db('users').where({ id: user.id }).first('password_hash');
+    if (!(await verifyPassword(row.password_hash, body.password))) {
+      throw new HttpError(401, 'invalid_credentials', 'Wrong password');
     }
     const taken = await findByEmail(body.email);
     if (taken && taken.id !== user.id) {
@@ -220,9 +203,7 @@ export default async function identityRoutes(
     } catch (err) {
       duplicate(err);
     }
-    if (user.emailVerified && user.email !== body.email) {
-      await app.sendMail(emailChangedMail(user.email!, body.email));
-    }
+    if (user.email !== body.email) await app.sendMail(emailChangedMail(user.email, body.email));
     return { user: sessionUser(row) };
   });
 

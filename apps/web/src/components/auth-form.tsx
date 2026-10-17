@@ -97,13 +97,11 @@ export function AuthForm({
           <>
             <Field
               label={t.auth.email}
-              name="identifier"
-              type="text"
-              inputMode="email"
+              name="email"
+              type="email"
               autoComplete="username"
               required
               defaultValue={lockedEmail}
-              hint={t.auth.identifierHint}
             />
             <Field
               label={t.auth.password}

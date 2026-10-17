@@ -84,7 +84,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     Promise.all([api<Me>('/auth/me'), api<Omit<TenantData, 'me'>>(`/tenants/${tenantId}`)])
       .then(([me, tenantRes]) => {
         if (cancelled) return;
-        if (!me.user.emailVerified) return router.replace(`/${lang}/account/email`);
         setData({ me, ...tenantRes });
         try {
           localStorage.setItem(LAST_TENANT_KEY, tenantId);

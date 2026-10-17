@@ -179,7 +179,6 @@ export async function inviteRoutes(app: FastifyInstance) {
         'i.id',
         'i.full_name as fullName',
         'i.email',
-        'i.phone',
         'i.role',
         'i.student_id as studentId',
         't.id as tenantId',
@@ -199,13 +198,8 @@ export async function inviteRoutes(app: FastifyInstance) {
     await withTenant(app.db, { tenantId, userId: user.id }, async (trx) => {
       const invite = await findInvite(trx, tokenHash).forUpdate('i');
       if (!invite) throw notFound();
-      // Email invites: only the user who proved that email. Phone invites from before email
-      // login (expire within 14 days): matched on phone as before.
-      if (
-        invite.email
-          ? !user.emailVerified || invite.email !== user.email
-          : invite.phone !== user.phone
-      ) {
+      // Only the user who proved that email (every login email is verified).
+      if (invite.email !== user.email) {
         throw new HttpError(403, 'wrong_email', 'This invite is for a different email address');
       }
       // Portal invites need the portal feature. Accepting adds a billable head only if the user

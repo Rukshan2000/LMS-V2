@@ -14,7 +14,6 @@ const en = {
     passwordHint: 'At least 8 characters',
     fullName: 'Your name',
     email: 'Email',
-    identifierHint: 'Not added an email yet? Use your mobile number this one time.',
     phoneOptional: 'Mobile number (optional)',
     newPassword: 'New password',
     code: 'Code from the email',
@@ -28,9 +27,6 @@ const en = {
     resetIntro:
       'Enter your login email. If it has an account, we send a code to reset the password.',
     resetButton: 'Set new password',
-    addEmailTitle: 'Add your email',
-    addEmailIntro:
-      'From now on you log in with your email. Add it and confirm it with the code we send.',
     changeEmailTitle: 'Login email',
     currentEmail: 'You log in with {email}. To change it, enter the new email and your password.',
     confirmButton: 'Confirm',
@@ -385,7 +381,6 @@ const en = {
     signupFirst:
       'Create your account with this email to accept, or log in if you already have one.',
     invalid: 'This invite link is invalid or has expired. Ask for a new one.',
-    wrongPhone: 'You are logged in with a different mobile number. Log out, then use {phone}.',
     wrongEmail: 'This invite is for {email}. Log out, then log in or sign up with that email.',
     haveAccount: 'I already have an account',
     newAccount: 'Create a new account',
@@ -685,7 +680,6 @@ const en = {
       due: 'Due',
       remind: 'Remind',
       unclaimed: 'Not signed up yet',
-      unverified: '{count} users still log in with a mobile number (no verified email yet).',
       daysLeft: '{days} days left',
       reminderDue:
         'Hello {name}, your Tuition LMS invoice {number} of LKR {amount} is due. Please pay by bank transfer and send the slip here. Thank you.',
@@ -881,7 +875,6 @@ const en = {
     subject_exists: 'This subject already exists',
     invalid_range: 'Choose a shorter date range',
     already_member: 'This person is already staff here',
-    wrong_phone: 'This invite is for a different mobile number',
     wrong_email: 'This invite is for a different email address',
     cannot_remove_self: 'You cannot remove yourself',
     cannot_remove_owner: 'The owner cannot be removed',

@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { hashPassword } from '../src/modules/identity/service.js';
 import { emailFor, provision, sentMail, signupUser } from './provision.js';
 
 let app: FastifyInstance;
@@ -90,31 +89,11 @@ describe('staff invites', () => {
     expect(res.json().code).toBe('wrong_email');
   });
 
-  it('an email invite needs that email verified; old phone invites still match by phone', async () => {
-    const { code } = await invite();
-    // A user from before email login: phone only, then claims the invited email unverified.
-    const [legacy] = await ownerDb('users')
-      .insert({
-        phone: '94712345678',
-        email: '94712345678@test.lk',
-        full_name: 'Old',
-        password_hash: await hashPassword('correct-horse'),
-      })
-      .returning('id');
-    const login = await req('POST', '/api/v1/auth/login', undefined, {
-      identifier: '0712345678',
-      password: 'correct-horse',
-    });
-    expect(login.statusCode).toBe(200);
-    expect(login.json().user).toMatchObject({ id: legacy.id, emailVerified: false });
-    const cookie = `sid=${login.cookies.find((c) => c.name === 'sid')!.value}`;
-    expect((await req('POST', `/api/v1/invites/${code}/accept`, cookie)).json().code).toBe(
-      'wrong_email',
-    );
-
-    // An invite made before the change (phone, no email) is still accepted by phone.
-    await ownerDb('tenant_invites').update({ email: null, phone: '94712345678' });
-    expect((await req('POST', `/api/v1/invites/${code}/accept`, cookie)).statusCode).toBe(200);
+  it('a pending invite always has an email (migration 019)', async () => {
+    await invite();
+    await expect(
+      ownerDb('tenant_invites').update({ email: null, phone: '94712345678' }),
+    ).rejects.toThrow(/tenant_invites_pending_email/);
   });
 
   it('resend mails a new link and the old one stops working', async () => {

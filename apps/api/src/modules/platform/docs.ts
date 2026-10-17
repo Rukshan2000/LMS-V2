@@ -193,13 +193,10 @@ export const DOCS: DocPage[] = [
       },
       { h2: 'Claiming by email' },
       {
-        p: 'When someone creates an institute, the API looks for, in order: the account they already own; an **unclaimed** account whose owner email matches their **verified** login email (it becomes theirs); for accounts made before email login (no owner email), one whose owner mobile matches theirs; otherwise it is refused with `403 no_account`. Signing up proves the email with a 6-digit code, so only the person who reads that inbox can claim the account.',
+        p: 'When someone creates an institute, the API looks for, in order: the account they already own; an **unclaimed** account whose owner email matches their **verified** login email (it becomes theirs); otherwise it is refused with `403 no_account`. Signing up proves the email with a 6-digit code, so only the person who reads that inbox can claim the account.',
       },
       {
         note: 'An email that already has an account is refused with `409 account_exists`. The list shows "Not signed up yet" until the account is claimed; **Resend invitation** emails the owner again.',
-      },
-      {
-        p: 'The accounts list also shows how many users still log in by phone (no verified email yet). When it reaches 0, phone login can be removed (docs/EMAIL_AUTH_PLAN.md §9).',
       },
       { h2: 'The accounts list' },
       {
@@ -655,7 +652,7 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
               description: '`trial` `trial_ending` `active` `overdue` `restricted` `suspended`',
             },
           ],
-          response: `{ "unverifiedUsers": 0, "accounts": [ { "id": "…", "name": "Nimal Maths",
+          response: `{ "accounts": [ { "id": "…", "name": "Nimal Maths",
   "ownerEmail": "nimal@example.com", "ownerPhone": "94771234567",
   "ownerName": "Nimal", "claimed": true, "priceBook": "standard", "state": "trial",
   "daysLeft": 21, "amountDue": "0.00", "institutes": 1,

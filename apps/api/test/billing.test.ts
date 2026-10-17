@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
-import { provision, signupUser } from './provision.js';
+import { emailFor, provision, signupUser } from './provision.js';
 
 // Accounts, trial caps and account state (docs/SAAS_PLAN.md §5, §7). Replaces plans.test.ts.
 
@@ -202,10 +202,14 @@ describe('account with several institutes', () => {
   });
 });
 
-describe('account claimed by phone', () => {
-  it('an account the platform admin created is claimed when that phone creates an institute', async () => {
+describe('account claimed by email', () => {
+  it('an account the platform admin created is claimed when that email creates an institute', async () => {
     const [created] = await ownerDb('accounts')
-      .insert({ name: 'Kamal Institute', owner_phone: '94770000003', price_book: 'standard' })
+      .insert({
+        name: 'Kamal Institute',
+        owner_email: emailFor('0770000003'),
+        price_book: 'standard',
+      })
       .returning('id');
     const kamal = (await signup('0770000003')).cookie;
     const res = await createInstitute('kamal', kamal);

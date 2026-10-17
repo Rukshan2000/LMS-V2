@@ -48,7 +48,6 @@ export function AccountsList() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [unverified, setUnverified] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,11 +55,8 @@ export function AccountsList() {
     if (q.trim()) params.set('q', q.trim());
     if (filter !== 'all') params.set('state', filter);
     const timer = setTimeout(() => {
-      api<{ accounts: Row[]; unverifiedUsers: number }>(`/admin/accounts?${params}`)
-        .then((r) => {
-          setRows(r.accounts);
-          setUnverified(r.unverifiedUsers);
-        })
+      api<{ accounts: Row[] }>(`/admin/accounts?${params}`)
+        .then((r) => setRows(r.accounts))
         .catch((err) => setError(errorMessage(t, err)));
     }, 250);
     return () => clearTimeout(timer);
@@ -76,9 +72,6 @@ export function AccountsList() {
         </Link>
       </div>
       <FormError message={error} />
-      {unverified > 0 && (
-        <p className="text-sm text-ink-subtle">{fmt(a.unverified, { count: unverified })}</p>
-      )}
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-w-60 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3">
           <Search aria-hidden className="size-4 text-ink-subtle" />

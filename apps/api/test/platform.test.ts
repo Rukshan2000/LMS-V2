@@ -209,7 +209,6 @@ describe('accounts', () => {
     expect((await call('GET', '/accounts?q=nimal')).json().accounts).toHaveLength(1);
     expect((await call('GET', '/accounts?q=0770000001')).json().accounts).toHaveLength(1);
     expect((await call('GET', '/accounts?q=@test.lk')).json().accounts).toHaveLength(1);
-    expect(res.json().unverifiedUsers).toBe(0);
     expect((await call('GET', '/accounts?q=nobody')).json().accounts).toEqual([]);
   });
 
@@ -285,10 +284,14 @@ describe('accounts', () => {
     expect((await call('POST', `/accounts/${id}/invite`)).json().code).toBe('already_claimed');
   });
 
-  it('an unclaimed account made before email login gets an owner email, then can be claimed', async () => {
+  it('the owner email of an unclaimed account can be corrected, then it is claimed with it', async () => {
     const [old] = await ownerDb('accounts')
-      .insert({ name: 'Old', owner_phone: '94715555555', price_book: 'standard' })
+      .insert({ name: 'Old', owner_email: 'typo@exmaple.com', price_book: 'standard' })
       .returning('id');
+    // Every unclaimed account needs an owner email, or nobody could ever claim it.
+    await expect(
+      ownerDb('accounts').insert({ name: 'X', owner_phone: '94715555555', price_book: 'standard' }),
+    ).rejects.toThrow(/accounts_unclaimed_owner_email/);
     const patch = (body: object) => call('PATCH', `/accounts/${old.id}`, body);
     expect((await patch({ ownerEmail: '94770000001@test.lk' })).json().code).toBe('account_exists');
     expect((await patch({ ownerEmail: 'Old@Example.com' })).statusCode).toBe(204);

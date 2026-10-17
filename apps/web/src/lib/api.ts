@@ -3,9 +3,9 @@ import type { Dictionary } from '@/i18n/dictionaries/en';
 export type Role = 'owner' | 'admin' | 'teacher' | 'receptionist' | 'student' | 'parent';
 export interface User {
   id: string;
-  /** Login email. Null only for users from before email login (they are asked to add one). */
-  email: string | null;
-  emailVerified: boolean;
+  /** Login email (always verified). */
+  email: string;
+  /** Contact only (WhatsApp). */
   phone: string | null;
   fullName: string;
 }
