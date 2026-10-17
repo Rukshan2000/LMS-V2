@@ -62,6 +62,7 @@ const patchAccountBody = z
     name: z.string().trim().min(1).max(200),
     notes: z.string().trim().max(5000).nullable(),
     priceBook: z.string().min(1).max(32),
+    ownerEmail: emailSchema,
   })
   .partial();
 const overrideParams = idParams.extend({ key: z.string().max(64) });

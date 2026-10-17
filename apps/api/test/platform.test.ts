@@ -285,6 +285,24 @@ describe('accounts', () => {
     expect((await call('POST', `/accounts/${id}/invite`)).json().code).toBe('already_claimed');
   });
 
+  it('an unclaimed account made before email login gets an owner email, then can be claimed', async () => {
+    const [old] = await ownerDb('accounts')
+      .insert({ name: 'Old', owner_phone: '94715555555', price_book: 'standard' })
+      .returning('id');
+    const patch = (body: object) => call('PATCH', `/accounts/${old.id}`, body);
+    expect((await patch({ ownerEmail: '94770000001@test.lk' })).json().code).toBe('account_exists');
+    expect((await patch({ ownerEmail: 'Old@Example.com' })).statusCode).toBe(204);
+    expect((await call('GET', `/accounts/${old.id}`)).json().account.ownerEmail).toBe(
+      'old@example.com',
+    );
+    const user = await signup('0716666666', 'old@example.com');
+    expect(
+      (await call('POST', '/api/v1/tenants', { name: 'Old', slug: 'old-one' }, user.cookie))
+        .statusCode,
+    ).toBe(201);
+    expect((await patch({ ownerEmail: 'x@example.com' })).json().code).toBe('already_claimed');
+  });
+
   it('every mutation writes exactly one audit row, with actor, before, after and IP', async () => {
     await ownerDb('accounts').where({ id: accountId }).update({ trial_ends_at: null });
     await usage('teacher', `${lastMonth}-01`, 1);

@@ -835,6 +835,8 @@ async function lockAccount(trx: Knex.Transaction, accountId: string) {
       'trial_ends_at',
       'suspended_at',
       'suspended_reason',
+      'owner_email',
+      'owner_user_id',
     );
   if (!account) throw accountNotFound();
   return account;
@@ -925,18 +927,41 @@ export async function countUnverifiedUsers(db: Knex) {
 export async function updateAccount(
   db: Knex,
   accountId: string,
-  patch: { name?: string; notes?: string | null; priceBook?: string },
+  patch: { name?: string; notes?: string | null; priceBook?: string; ownerEmail?: string },
   actor: Actor,
 ) {
   await db.transaction(async (trx) => {
     const account = await lockAccount(trx, accountId);
     if (patch.priceBook !== undefined) await assertPriceBook(trx, patch.priceBook);
-    const before = { name: account.name, notes: account.notes, priceBook: account.price_book };
+    // Owner email: only before the owner signs up (also how accounts made before email login,
+    // with a phone only, get an email they can be claimed with).
+    if (patch.ownerEmail !== undefined && patch.ownerEmail !== account.owner_email) {
+      if (account.owner_user_id) {
+        throw new HttpError(409, 'already_claimed', 'The owner has already signed up');
+      }
+      await lock(trx, `account-email:${patch.ownerEmail}`);
+      const taken = await trx('accounts')
+        .whereRaw('lower(owner_email) = ?', [patch.ownerEmail])
+        .whereNot({ id: accountId })
+        .first('id');
+      if (taken) {
+        throw new HttpError(409, 'account_exists', 'This email already has an account', {
+          accountId: taken.id,
+        });
+      }
+    }
+    const before = {
+      name: account.name,
+      notes: account.notes,
+      priceBook: account.price_book,
+      ownerEmail: account.owner_email,
+    };
     const after = { ...before, ...patch };
     await trx('accounts').where({ id: accountId }).update({
       name: after.name,
       notes: after.notes,
       price_book: after.priceBook,
+      owner_email: after.ownerEmail,
       updated_at: trx.fn.now(),
     });
     await audit(trx, actor, accountId, 'account.update', before, after);

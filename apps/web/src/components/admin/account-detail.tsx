@@ -219,7 +219,12 @@ export function AccountDetail() {
 
                 <Section title={d.name}>
                   <AccountForm
-                    key={JSON.stringify([account.name, account.notes, account.priceBook])}
+                    key={JSON.stringify([
+                      account.name,
+                      account.notes,
+                      account.priceBook,
+                      account.ownerEmail,
+                    ])}
                     account={account}
                     books={books}
                     onSubmit={(patch) => run(`/accounts/${id}`, 'PATCH', patch)}
@@ -544,12 +549,21 @@ function AccountForm({
     name: account.name,
     notes: account.notes ?? '',
     priceBook: account.priceBook,
+    ownerEmail: account.ownerEmail ?? '',
   });
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ name: form.name, notes: form.notes.trim() || null, priceBook: form.priceBook });
+        onSubmit({
+          name: form.name,
+          notes: form.notes.trim() || null,
+          priceBook: form.priceBook,
+          // Only before the owner signs up: the email the account is claimed with.
+          ...(!account.claimed && form.ownerEmail.trim() !== (account.ownerEmail ?? '')
+            ? { ownerEmail: form.ownerEmail }
+            : {}),
+        });
       }}
       className="max-w-lg space-y-3"
     >
@@ -560,6 +574,15 @@ function AccountForm({
         value={form.name}
         onChange={(e) => setForm({ ...form, name: e.target.value })}
       />
+      {!account.claimed && (
+        <Field
+          label={d.ownerEmail}
+          type="email"
+          maxLength={254}
+          value={form.ownerEmail}
+          onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
+        />
+      )}
       <label className="block text-sm font-medium text-ink-muted">
         {d.priceBook}
         <select

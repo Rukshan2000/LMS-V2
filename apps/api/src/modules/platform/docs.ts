@@ -724,15 +724,26 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
         endpoint: {
           method: 'PATCH',
           path: `${ADMIN}/accounts/:id`,
-          summary: 'Change name, notes or price book. Send only what changes.',
+          summary: 'Change name, notes, price book or owner email. Send only what changes.',
           params: [accountId],
           body: [
             { name: 'name', type: 'string', description: '1–200 characters' },
             { name: 'notes', type: 'string | null', description: 'Up to 5000 characters' },
             { name: 'priceBook', type: 'string', description: 'Price book key' },
+            {
+              name: 'ownerEmail',
+              type: 'string',
+              description:
+                'Only while unclaimed: the email the owner signs up and claims the account with',
+            },
           ],
           response: '204',
-          errors: ['404 not_found', '400 unknown_price_book'],
+          errors: [
+            '404 not_found',
+            '400 unknown_price_book',
+            '409 already_claimed',
+            '409 account_exists',
+          ],
         },
       },
       {
