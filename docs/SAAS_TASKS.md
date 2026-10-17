@@ -4,7 +4,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 30/32 · Phase 4: 18/19 · Phase 5: 0/8
+**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 30/32 · Phase 4: 19/20 · Phase 5: 6/8
 
 **Rules for every phase**
 
@@ -21,7 +21,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 - [x] Answer the decisions in SAAS_PLAN §14 and write the answers into §14 (11 decisions, 2026-10-17)
 - [x] Update default values in SAAS_PLAN §5.3 (seeded values, admin-editable; trial caps 100 students / 5 teachers / 1 institute)
 - [x] Write `docs/adr/009-per-head-pricing.md` (supersedes ADR 008 flat pricing); mark ADR 008 "Superseded by 009"
-- [ ] Check prices with at least 2 pilot teachers before publishing them (SAAS_PLAN §13, first risk). **Owner's task; doesn't block Phase 1–3**, must be done before Phase 4 shows prices to customers
+- [ ] Check prices with at least 2 pilot teachers before publishing them (SAAS_PLAN §13, first risk). **Owner's task; doesn't block Phase 1–3**, must be done before Phase 4 shows prices to customers. Phase 4 is built, so this now blocks the Phase 4 release
 - [x] Decide the bank account and support WhatsApp number shown on the Billing page: entered later in the console Settings page (task added to Phase 3 release)
 - [x] Decide who is super admin: only the platform owner, granted by SQL in the Phase 3 release; console grants wait for 2FA
 
@@ -57,7 +57,7 @@ Goal: accounts exist, the student cap runs through `billing`, existing institute
 
 ### Web
 - [x] `lib/entitlements.ts` types; `DashboardShell` stores `entitlements` in `TenantDataContext`
-- [x] Settings plan card reads `entitlements`: state badge (trial days left / active / payment due / overdue / suspended), student bar when capped; old flat-plan text replaced in `si`, `ta`, `en`
+- [x] Settings plan card reads `entitlements`: state badge (trial days left / active / payment due / overdue / suspended), student bar when capped; old flat-plan text replaced in `si`, `ta`, `en` (card replaced by the Billing page in Phase 4)
 
 ### Tests and release
 - [x] Port `apps/api/test/plans.test.ts` to accounts (set caps through price book/overrides instead of `tenants.plan`)
@@ -151,12 +151,12 @@ Goal: everything in the old SQL runbook is done from `/admin`, audited. SAAS_PLA
 
 Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN §5.2, §7.3, §6.4.
 
-**Status:** built and committed to `main` 2026-10-17; not yet released to production (release after Phases 1–3). No migration. Open points decided in SAAS_PLAN §7.7; differences from the plan are marked *(Changed during Phase 4)* in SAAS_PLAN §5.2, §7.3, §7.6, §9 and §11.
+**Status:** built and committed to `main` 2026-10-17 (`cb6a6d3` API, `8c2e6c2` web and docs) and pushed; not yet released to production (release after Phases 1–3). No migration, so `016_drop_tenant_plan` keeps its number. Open points decided in SAAS_PLAN §7.7; differences from the plan are marked *(Changed during Phase 4)* in SAAS_PLAN §5.2, §7.3, §7.6, §9 and §11.
 
 ### API
-- [x] `plugins/entitlements.ts`: `config: { feature }` gate after `loadTenant`; typed `FastifyContextConfig`; `req.entitlements()` memoised per request
+- [x] `plugins/entitlements.ts`: `config: { feature }` gate after `loadTenant` (added per route through `onRoute`, after the route's own preHandlers); typed `FastifyContextConfig`; `req.entitlements()` memoised per request
 - [x] Same plugin: suspended account + non-GET → `403 account_suspended` for everything under `/tenants/:tenantId`
-- [x] Restricted state: `assertCanAddHead` → `403 account_restricted { amountDue, invoiceNumber }`; fee routes unaffected (done in Phase 1 for students; teacher/parent call sites come with the caps below)
+- [x] Restricted state: `assertCanAddHead` → `403 account_restricted { amountDue, invoiceNumber }`; fee routes unaffected (students in Phase 1; staff and parent call sites in Phase 4)
 - [x] Feature gates: reports (`reports/routes.ts`), student import, slips (desk + family upload), live link set (`classes/routes.ts`), portal invites
 - [x] Portal hides `liveUrl` when `feature.live_links` is off (`portal/routes.ts`)
 - [x] Caps: teacher/admin/receptionist on staff invite create + accept; parent on portal invite accept (`staff/routes.ts`)
@@ -176,19 +176,22 @@ Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN �
 - [x] Tests: overdue → restricted after grace blocks only new heads; fee collection and invoice generation still work when restricted
 - [x] Tests: suspended → GET works, POST/PUT/PATCH/DELETE return 403; family users blocked only when suspended
 - [x] Tests: staff invite and accept refused at the teacher cap; parent accept refused at the parent cap
-- [ ] Release Phase 4; sign up a new test account on production and see the trial banner and Billing page
+- [x] Tests added: 49 integration tests (`entitlements.test.ts`), 2 web nav tests; suite: 215 API + 19 web + 11 db passing; `migrate check` passes
+- [ ] Release Phase 4; sign up a new test account on production and see the trial banner and Billing page. Before it: the Phase 0 price check, and bank details + support WhatsApp entered in the console Settings (Phase 3 release); without them the Billing page has no WhatsApp button
 
 ---
 
 ## Phase 5: Contract and harden
 
-- [ ] Migration `016_drop_tenant_plan` (was 015 before Phase 3): drop `tenants.plan`, `tenants.plan_expires_at` and their constraints (only after Phase 1 has been live for at least one release)
-- [ ] Load check: 300 seeded accounts → console accounts list under 1 s, invoice generation for a month under 10 s
-- [ ] Console "Recount" action: rewrite today's `tenant_usage_daily` rows from live counts for one account (SAAS_PLAN §13)
-- [ ] Update [UI_UX.md](UI_UX.md): Billing page, banners, locks, admin console
-- [ ] Update [RELEASE_V1.md](RELEASE_V1.md) and the landing page pricing text
-- [ ] Mark `docs/runbooks/plans.md` replaced; link the console runbook from [runbooks/deploy.md](runbooks/deploy.md)
-- [ ] Update [TASKS.md](../TASKS.md) and this file's progress line
+**Status:** built on `main` 2026-10-17 and pushed, except migration 016, which is written and checked on the branch `saas-phase5-drop-tenant-plan` and held there until Phase 1 has been live for one release. Not released.
+
+- [~] Migration `016_drop_tenant_plan` (was 015 before Phase 3): drop `tenants.plan`, `tenants.plan_expires_at` and their constraints (only after Phase 1 has been live for at least one release). Written on branch `saas-phase5-drop-tenant-plan` (up → down → up passes on the test DB; no code reads the columns). Merge it into `main` in the release after Phase 1 has been live
+- [x] Load check: 300 seeded accounts → console accounts list under 1 s, invoice generation for a month under 10 s. `LOAD_CHECK=1 npx vitest run test/load.test.ts` (in `apps/api`; skipped in `npm test`). Local result: list 267 ms, 300 invoices 340 ms (300 accounts, ~24,000 usage rows); production adds network latency per query, so re-run there if the list feels slow
+- [x] Console "Recount" action: rewrite today's `tenant_usage_daily` rows from live counts for one account (SAAS_PLAN §13). `POST /admin/accounts/:id/recount` + **Recount today** on the account page; uses the triggers' `meter_tenant()`, so today's peak never goes down; audited (`account.recount`)
+- [x] Update [UI_UX.md](UI_UX.md): Billing page, banners, locks, admin console
+- [x] Update [RELEASE_V1.md](RELEASE_V1.md) and the landing page pricing text (no prices on the landing page: they are data and not yet checked with pilots; it says 30 days free, then a monthly fee per active student, teacher and parent)
+- [x] Mark `docs/runbooks/plans.md` replaced; link the console runbook from [runbooks/deploy.md](runbooks/deploy.md) (plans.md was already rewritten for the console in Phase 3, so it is the console runbook now; deploy.md links it and billing.md)
+- [x] Update [TASKS.md](../TASKS.md) and this file's progress line
 - [ ] Release Phase 5
 
 ---

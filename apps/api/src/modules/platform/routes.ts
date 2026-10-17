@@ -17,6 +17,7 @@ import {
   listPriceBooks,
   previewInvoices,
   recordPayment,
+  recountUsage,
   setOverride,
   suspendAccount,
   unsuspendAccount,
@@ -116,6 +117,9 @@ export default async function platformRoutes(
     const { days } = z.object({ days: z.number().int().min(1).max(365) }).parse(req.body);
     return extendTrial(app.db, id, days, actor(req));
   });
+  app.post('/accounts/:id/recount', mutation, async (req) =>
+    recountUsage(app.db, idParams.parse(req.params).id, actor(req)),
+  );
   app.post('/accounts/:id/suspend', mutation, async (req, reply) => {
     const { id } = idParams.parse(req.params);
     await suspendAccount(app.db, id, reason.parse(req.body).reason, actor(req));

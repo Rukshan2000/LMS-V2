@@ -1,6 +1,6 @@
 # Tuition LMS: UI and UX (current state)
 
-**As of:** 2026-10-17, production commit `e7a87d8` + UI upgrade (blue/white pastel tokens, icons, motion) (v1.0 slices 1–9 live at https://lms.kwingsmedia.com)
+**As of:** 2026-10-17, production commit `e7a87d8` + UI upgrade (blue/white pastel tokens, icons, motion) (v1.0 slices 1–9 live at https://lms.kwingsmedia.com). Billing, banners, locks and the platform console (SaaS Phases 3–4, [SAAS_PLAN.md](SAAS_PLAN.md)) are on `main`, not yet released.
 **Code:** `apps/web/src` (Next.js 16 App Router, React 19, Tailwind CSS 4)
 **Purpose:** a record of how the product looks and behaves today, for anyone designing or building the next screens. It describes what exists, not what is planned; gaps are listed in [§11](#11-known-gaps-and-inconsistencies).
 
@@ -45,14 +45,16 @@ One person can hold several roles; the menu shows the union of their roles (dupl
 
 | Role | Typical person | Menu items |
 |---|---|---|
-| **Owner** | Teacher running their own class, or institute owner | Overview, Scan, Students, Classes, Attendance, Fees, Bank slips, Timetable, Reports, Settings |
+| **Owner** | Teacher running their own class, or institute owner | Overview, Scan, Students, Classes, Attendance, Fees, Bank slips, Timetable, Reports, Billing, Settings |
 | **Admin** | Manager | Same as owner (cannot remove the owner) |
 | **Receptionist** | Front desk | Overview, Scan, Students, Classes, Attendance, Fees, Bank slips, Timetable |
 | **Teacher** | Teacher at an institute | Overview, Classes, Attendance, Timetable (sees only their own classes and students) |
 | **Parent** | Guardian invited by WhatsApp link | Overview only (the portal) |
 | **Student** | Student invited with their own mobile | Overview only (the portal) |
 
-Source of truth: `apps/web/src/lib/nav.ts` (menu) and role checks in the API. Items the role cannot use are not shown. Unbuilt items would show greyed out with a "Soon" tag; there are none left in v1.
+Source of truth: `apps/web/src/lib/nav.ts` (menu) and role checks in the API. Items the role cannot use are not shown. Unbuilt items would show greyed out with a "Soon" tag; there are none left in v1. Items whose plan feature is off for the account (Bank slips, Reports) stay in the menu with a small lock icon; the page shows the `<Locked>` card.
+
+**Platform admins** (`users.is_platform_admin`) also get a **Console** link in the header, to `/{lang}/admin` (§8.13). It grants no institute powers.
 
 ---
 
@@ -87,7 +89,12 @@ Every page lives under a language prefix. A request without one (e.g. `/login`) 
   /payments/{paymentId}                      Printable receipt
   /slips                                     Bank slip review
   /reports                                   Reports and CSV downloads
-  /settings                                  Staff, invites, plan
+  /billing                                   Billing (owner/admin): estimate, invoices, how to pay
+  /settings                                  Staff, invites, link to Billing
+
+/{lang}/admin                                Platform console: accounts (platform admins only)
+  /accounts/new · /accounts/{id}             New account · account detail
+  /invoices · /price-books · /settings · /audit
 ```
 
 `{lang}` is `si`, `ta` or `en`. `{tenantId}` is the institute id; switching institute changes only this part.
@@ -117,6 +124,8 @@ All `/t/{tenantId}` pages share one shell (`components/dashboard-shell.tsx`).
 - **Loading**: until the session and institute are loaded the whole area shows "Loading…".
 - **Not logged in / not a member**: 401 goes to Login; an institute the user does not belong to goes to `/app`.
 - **Printing**: header and sidebar are hidden (`print:hidden`) so receipts and cards print alone.
+- **Account banner** (`components/account-banner.tsx`): one line above every page's content when the account is not `active`. Blue with a clock for the trial ("Free trial: 30 days left."), amber for overdue (invoice number, amount, due date), red for restricted ("New students, teachers and parents cannot be added… Everything else works.") and suspended ("you can view everything but not make changes"). Owners and admins get a **View billing** link. Parents and students see it only when suspended, with their own text ("You can view, but cannot upload slips right now").
+- **Lock icons**: a plan-locked item gets a lock after its label (on the rail, over the icon's corner); the Overview cards show the same lock.
 
 Pages outside the shell (landing, login, signup, join, onboarding, privacy) are a single centred column with the language switcher under or beside the form.
 
@@ -194,6 +203,8 @@ Shared primitives live in `components/ui.tsx` (client) and `components/styles.ts
 | `Spinner` | Animated icon + "Loading…", `role="status"`. |
 | `LanguageSwitcher` | Native select inside a bordered pill with a language icon. |
 | Data table (reports) | Card, soft header row, hover rows, numbers right-aligned in mono, scrolls inside its box on phones. |
+| `AccountBanner` | §4. Trial / overdue / restricted / suspended line in the shell. |
+| `Locked` | `<Locked feature="reports">…</Locked>`: renders its children when the plan includes the feature, otherwise a centred card with a lock, the feature's name and "This is not included in your plan. Contact us to turn it on." Used on Reports, Bank slips, Student import and the student page's portal invite. |
 
 ---
 
@@ -322,7 +333,7 @@ Built for speed with a USB scanner or a phone camera.
 
 - **Staff**: list (name, mobile · role, "(you)"), Remove for others (not the owner).
 - **Invite staff**: name, mobile, role → pending invites list with **Send on WhatsApp**, Copy link, Revoke, expiry date.
-- **Plan**: "Plan: Free", "4 of 50 active students" with a progress bar (red when full), paid-until or ended date, and how to upgrade (prices; pay by bank transfer and send the slip on WhatsApp).
+- **Billing**: a link card to the Billing page (§8.12), which replaced the old Plan card.
 
 ### 8.11 Parent / student portal
 
@@ -352,6 +363,43 @@ Kasun Perera  1001
 - **Join live class** (green) appears only from 30 minutes before the class until it ends, and only if that month is paid; otherwise "(pay this month's fee to join)" in red or "(link opens 30 min before class)" in grey.
 - Cancelled classes are struck through with "(cancelled)".
 - No children linked yet: a short message asking the institute for a new link.
+- Without the live links feature, classes show no link and no "online" tag. Without the slips feature, or while the institute's account is suspended, the **Send the slip** button is hidden; pending slips are still listed.
+
+### 8.12 Billing (owner/admin)
+
+```
+Billing  [Overdue]
+┌ Free trial: 12 days left. Nothing is billed for trial days. ┐   (trial only)
+│ Active students   40 / 100    Teachers   2 / 5              │   bars for capped limits
+│ Institutes         1 / 1                                     │   (amber number when full)
+└─────────────────────────────────────────────────────────────┘
+┌ This month so far (2026-10) ────────────────────────────────┐
+│ An estimate: you pay for the highest number of each …       │
+│ Item          Highest   Price (LKR)   Amount (LKR)          │
+│ Students          120        100.00      12,000.00          │
+│ Teachers            3      2,000.00       6,000.00          │
+│ Total                                    18,000.00          │
+│ Prices per month: Students LKR 100.00 · Teachers …          │
+└─────────────────────────────────────────────────────────────┘
+┌ Invoices ───────────────────────────────────────────────────┐
+│ No.             Month    Amount    Due         Status       │
+│ S-2026-09-0007  2026-09  2,350.00  2026-10-08  [Unpaid]     │
+│ [Send slip on WhatsApp  S-2026-09-0007 · LKR 2,350.00]      │   one per unpaid invoice,
+└─────────────────────────────────────────────────────────────┘   below the table
+┌ How to pay ─────────────────────────────────────────────────┐
+│ Bank details (free text from the console, shown as written) │
+│ Pay by bank transfer, reference = invoice number …          │
+│ Support WhatsApp: +94…                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- The estimate uses the same calculation as the invoice (`computeInvoice` with the month so far).
+- The WhatsApp button opens a message to the support number with the invoice number, the amount still due and the institute name. Without a support number in the console, there is no button; without bank details, "Bank details will be shown here soon".
+- The button sits under the table, full width on phones, so it never scrolls out of view with the table.
+
+### 8.13 Platform console (platform admins)
+
+A separate shell at `/{lang}/admin` with a "Platform admin" bar and its own menu: **Accounts** (search, filters for trial ending / overdue / restricted / suspended, heads now, estimate, amount due, WhatsApp reminder), **New account** (with a WhatsApp sign-up message), **account detail** (state, values with overrides highlighted, overrides editor, extend trial, suspend/unsuspend, heads per day with **Recount today**, institutes, invoices with record payment and void, payments, history), **Invoices** (month picker, check totals, generate, CSV), **Price books** (books × keys grid), **Settings** (trial, grace and due days, trial caps, bank details, support WhatsApp) and **Audit log**. It shows counts and money only, never student records. Runbooks: [plans.md](runbooks/plans.md), [billing.md](runbooks/billing.md).
 
 ---
 
@@ -413,7 +461,6 @@ Settings → Invite staff (name, mobile, role) → Send on WhatsApp → staff op
 | Dark mode | None; light only. | Not planned for v1. |
 | Portal | One long page; no notifications (web push deferred). | Keep single page; add push for slip approved/rejected and class changes. |
 | Password reset | No "Forgot password" link (email reset not built yet). | Add with Gmail SMTP (v1 scope). |
-| Upgrade | Plan card says "send us the slip on WhatsApp" without a number. | Add the support WhatsApp number. |
 | Language review | Sinhala and Tamil text written without native-speaker review. | Review with pilot users. |
 
 ---

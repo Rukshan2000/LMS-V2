@@ -40,6 +40,12 @@ Rules:
 - Keep migrations compatible with the code that is still running (expand → migrate → contract).
 - Manual run on the server: `cd /var/www/tuition-lms && set -a && . ./migrate.env && set +a && docker compose run --rm --no-deps -e MIGRATION_DATABASE_URL api node dist/migrate.js status`
 
+Contract migrations (dropping columns) wait until the code that no longer reads them has been live for at least one release, so a rollback still works. Example: `016_drop_tenant_plan` is kept on the branch `saas-phase5-drop-tenant-plan` until SaaS Phase 1 has been live one release (SAAS_TASKS Phase 5).
+
+## Platform console and billing
+
+Customer accounts, prices, trials, monthly invoices, payments and suspension are run from the platform console at `/admin`, not by SQL. Runbooks: [billing.md](billing.md) (first platform admin, monthly invoices, payments, what customers see) and [plans.md](plans.md) (price books, overrides, features, caps, trials, suspension).
+
 ## Changing deploy.sh or docker-compose.yml
 
 They are root-owned on the server on purpose. After changing them in git:

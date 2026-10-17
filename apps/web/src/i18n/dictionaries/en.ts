@@ -4,9 +4,9 @@ const en = {
   confirm: 'Confirm',
   landing: {
     headline: 'Run your tuition class without the paperwork',
-    sub: 'Attendance, fees and parent messages in one place. Free for up to 50 students.',
+    sub: 'Attendance, fees and parent messages in one place. Free for 30 days, then a monthly fee for each active student, teacher and parent.',
     login: 'Log in',
-    signup: 'Create free account',
+    signup: 'Start free trial',
   },
   auth: {
     acceptPrivacy: 'I have read and agree to the',
@@ -506,6 +506,9 @@ const en = {
         'Hello {name}, your Tuition LMS account "{account}" is ready. Sign up with this mobile number and create your institute here: {url}',
     },
     detail: {
+      recount: 'Recount today',
+      recountHint:
+        'Rewrites today’s head counts from the live data, if they look wrong. Never lowers today’s peak.',
       back: 'Accounts',
       trialEnds: 'Trial ends',
       createdAt: 'Created',

@@ -10,7 +10,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Next up:** Beta with 3–5 teachers + v1.0 release checklist ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md)). All v1.0 slices are built. Pilot 1 can start now.
 
-**SaaS billing work:** accounts, per-head billing, trials and super admin are tracked separately in [docs/SAAS_TASKS.md](docs/SAAS_TASKS.md) (plan: [docs/SAAS_PLAN.md](docs/SAAS_PLAN.md), pricing: [ADR 009](docs/adr/009-per-head-pricing.md)). Phase 0 decided; Phase 1 (accounts + billing engine) built on `main`, not yet released.
+**SaaS billing work:** accounts, per-head billing, trials and super admin are tracked separately in [docs/SAAS_TASKS.md](docs/SAAS_TASKS.md) (plan: [docs/SAAS_PLAN.md](docs/SAAS_PLAN.md), pricing: [ADR 009](docs/adr/009-per-head-pricing.md)). Phases 1–5 built on `main` (accounts and billing engine, metering and invoices, platform console, customer Billing page with trial, restrictions and feature gates, then hardening), none released yet. Migration 016 (drop the old plan columns) waits on a branch until Phase 1 has been live one release.
 
 ---
 
@@ -221,7 +221,7 @@ No staging server yet: test locally, then release. Add staging when pilot users 
   - CSV for Excel: payments (range), unpaid fees (with guardian phones), students (guardians + classes); UTF-8 BOM so Sinhala/Tamil open correctly; cells starting with = + - @ are prefixed so Excel never runs them as formulas
   - Tests: 3 API + CSV writer; checked in browser (si)
   - Released to production (commit 59b316e)
-- [x] 9. Plans: free cap 50, manual plan activation
+- [x] 9. Plans: free cap 50, manual plan activation (**replaced** by per-head billing, SaaS Phases 1–4: trial caps, price books and the platform console; `lib/plans.ts` deleted, `docs/runbooks/plans.md` rewritten for the console)
   - Migration 011: `tenants.plan` limited to free/teacher/institute, `plan_expires_at` (paid plans must have one); expired paid plan = Free limits, no data deleted
   - Limits (`apps/api/src/lib/plans.ts`): Free 50, Teacher 400 (**guess — confirm in pilot**), Institute no limit; counts active students only
   - Enforced on add student, CSV import (whole file refused), re-activating a student; per-tenant lock so two desks cannot both take the last place

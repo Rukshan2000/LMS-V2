@@ -1,6 +1,6 @@
 'use client';
 
-import { Ban, CalendarPlus, CircleCheck, Trash2 } from 'lucide-react';
+import { Ban, CalendarPlus, CircleCheck, RefreshCw, Trash2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -216,6 +216,12 @@ export function AccountDetail() {
           {fmt(d.estimate, { total: fmtMoney(data.month.estimate.total) })} ·{' '}
           <HeadCounts counts={data.month.headsNow} />
         </p>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <ConfirmButton icon={RefreshCw} onConfirm={() => run(`/accounts/${id}/recount`, 'POST')}>
+            {d.recount}
+          </ConfirmButton>
+          <span className="text-ink-subtle">{d.recountHint}</span>
+        </div>
         <ul className="space-y-1 text-xs">
           {data.month.days.map((day) => (
             <li key={day.day} className="flex items-center gap-2">

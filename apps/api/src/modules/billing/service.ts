@@ -1,5 +1,6 @@
 // Billing service: the only code that reads accounts, price books, overrides and subscription
 // invoices (docs/SAAS_PLAN.md §4 rule 3). Other modules use the functions exported by index.ts.
+import { forEachTenant } from '@lms/db';
 import type { Knex } from 'knex';
 import { HttpError } from '../../lib/http-error.js';
 import { fromCents, toCents } from '../../lib/money.js';
@@ -971,6 +972,36 @@ export async function extendTrial(
       { trialEndsAt, days, overridesMoved: moved },
     );
     return { trialEndsAt };
+  });
+}
+
+/**
+ * Rewrite today's tenant_usage_daily rows from live counts, for every institute of the account
+ * (SAAS_PLAN §13: a path the triggers missed). Uses the triggers' own meter_tenant(), so the day's
+ * peak never goes down: count_max = GREATEST(count_max, now), count_last = now.
+ */
+export async function recountUsage(db: Knex, accountId: string, actor: Actor, now = new Date()) {
+  return db.transaction(async (trx) => {
+    await lockAccount(trx, accountId);
+    const today = colomboToday(now);
+    const ids = await accountTenantIds(trx, accountId);
+    const before = dailyTotals(await usageRows(trx, accountId, today, today), [today]);
+    await forEachTenant(trx, ids, (id) => trx.raw('SELECT meter_tenant(?)', [id]));
+    const after = dailyTotals(await usageRows(trx, accountId, today, today), [today]);
+    const day = (t: Record<Head, number[]>) =>
+      Object.fromEntries(HEADS.map((h) => [h, t[h][0]!])) as Record<Head, number>;
+    await audit(
+      trx,
+      actor,
+      accountId,
+      'account.recount',
+      { day: today, ...day(before) },
+      {
+        day: today,
+        ...day(after),
+      },
+    );
+    return { day: today, counts: day(after) };
   });
 }
 

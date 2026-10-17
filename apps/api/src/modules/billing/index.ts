@@ -24,6 +24,7 @@ export {
   listInvoices,
   listPriceBooks,
   previewInvoices,
+  recountUsage,
   setOverride,
   suspendAccount,
   unsuspendAccount,

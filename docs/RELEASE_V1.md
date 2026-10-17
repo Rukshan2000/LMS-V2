@@ -50,7 +50,7 @@ Result:      "Kasun scored 78/100 in Term Test 2. Class rank: 12/140."
 | Messages | Click-to-WhatsApp for attendance, receipts, reminders and approvals. Web push + in-app notices |
 | Portals | Student/parent: timetable, attendance, fees, upload slip, live links |
 | Reports | Daily collection, monthly collection, attendance by batch, CSV export |
-| Plans | Free up to 50 students. Paid plans enabled manually by you (bank transfer) |
+| Plans | ~~Free up to 50 students; paid plans enabled manually~~ (shipped in v1.0, ADR 008). **Replaced by per-head billing** (ADR 009, [SAAS_PLAN.md](SAAS_PLAN.md)): 30-day free trial, then a monthly invoice per active student, teacher and parent; prices, caps and features set by the platform admin in the console; customers pay by bank transfer and send the slip on WhatsApp from the Billing page |
 | Ops | Staging + production, daily backups, restore tested, structured server logs (pino) kept 14 days. Uptime check moves to v2 |
 
 ### Cut to v1.1 (no blockers, just time)
@@ -146,7 +146,7 @@ Start the **business registration in parallel** now. It takes weeks and unlocks 
 - [x] Duplicate scan, duplicate slip and double approve are all safe (API tests: simultaneous scans/payments/verifies, slip hash + reference flags)
 - [ ] Every WhatsApp link opens with the correct parent number and message, in Sinhala and English
 - [x] Tenant isolation tests pass: API, files, slip images (RLS tests + `slips.test.ts` cross-institute)
-- [x] Free plan blocks the 51st student without deleting data (`plans.test.ts`)
+- [x] Free plan blocks the 51st student without deleting data (`plans.test.ts`; since SaaS Phase 1 the trial cap does this, `billing.test.ts`)
 - [ ] Backup restored on staging, steps documented
 - [x] Privacy notice + parent consent at signup (`/privacy`, required checkbox, `users.privacy_accepted_at`)
 - [ ] 3 pilot teachers used it for a full month of billing

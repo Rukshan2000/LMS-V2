@@ -27,6 +27,7 @@ const ROUTES: [string, string][] = [
   ['PUT', `/accounts/${ID}/overrides/price.student`],
   ['DELETE', `/accounts/${ID}/overrides/price.student`],
   ['POST', `/accounts/${ID}/trial`],
+  ['POST', `/accounts/${ID}/recount`],
   ['POST', `/accounts/${ID}/suspend`],
   ['POST', `/accounts/${ID}/unsuspend`],
   ['GET', '/invoices'],
@@ -246,6 +247,27 @@ describe('accounts', () => {
     );
   });
 
+  it('recount rewrites today from live counts and never lowers the peak', async () => {
+    const today = colomboToday();
+    await call('POST', `/api/v1/tenants/${tenantId}/students`, { fullName: 'Amal' }, owner);
+    // A path the triggers missed: today's student row is lost, the teacher row says 4 at peak.
+    await ownerDb('tenant_usage_daily').where({ tenant_id: tenantId, head: 'student' }).del();
+    await usage('teacher', today, 4);
+    const res = await call('POST', `/accounts/${accountId}/recount`);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ day: today, counts: { student: 1, teacher: 4 } });
+    const rows = await ownerDb('tenant_usage_daily')
+      .where({ tenant_id: tenantId })
+      .whereRaw('day = ?', [today])
+      .select('head', 'count_max as max', 'count_last as last');
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { head: 'student', max: 1, last: 1 },
+        { head: 'teacher', max: 4, last: 0 },
+      ]),
+    );
+  });
+
   it('suspending makes the account read-only for the customer', async () => {
     const suspend = await call('POST', `/accounts/${accountId}/suspend`, { reason: 'Unpaid' });
     expect(suspend.statusCode).toBe(204);
@@ -396,6 +418,7 @@ describe('audit', () => {
       ],
       ['override.clear', () => call('DELETE', `/accounts/${accountId}/overrides/included.student`)],
       ['account.trial', () => call('POST', `/accounts/${accountId}/trial`, { days: 3 })],
+      ['account.recount', () => call('POST', `/accounts/${accountId}/recount`)],
       ['account.suspend', () => call('POST', `/accounts/${accountId}/suspend`, { reason: 'x' })],
       ['account.unsuspend', () => call('POST', `/accounts/${accountId}/unsuspend`)],
       [
