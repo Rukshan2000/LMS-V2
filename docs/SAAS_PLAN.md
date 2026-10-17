@@ -233,7 +233,7 @@ due + 7 days unpaid            ── restricted: no new students/teachers/paren
 admin (optional)               ── suspend: read-only
 ```
 
-Generating invoices is idempotent (`UNIQUE (account_id, period)`), so clicking twice does nothing. When the worker from ADR 001 exists, a scheduled run calls the same function ([§12](#12-how-to-extend-it-later)).
+Generating invoices is idempotent (one live invoice per account and month: a unique index on `(account_id, period)` that leaves out void invoices), so clicking twice does nothing. A voided month can be generated again. *(Changed during Phase 3, migration 015; was `UNIQUE (account_id, period)`.)* When the worker from ADR 001 exists, a scheduled run calls the same function ([§12](#12-how-to-extend-it-later)).
 
 ### 6.2 Invoice calculation (pure, unit-tested)
 
@@ -288,7 +288,7 @@ The Billing page (owner and admin roles) shows this month **so far**:
 - last month's invoice and its status;
 - how to pay (bank details, reference = invoice number, WhatsApp button to send the slip).
 
-It uses the same `computeInvoice` function, with "month so far" as input, so the estimate and the bill can't disagree.
+It uses the same `computeInvoice` function, with "month so far" as input, so the estimate and the bill can't disagree. *(Phase 3: `computeInvoice` takes an optional `lastDay`; days after it are not counted. The console's accounts list and account page use it for the estimate; the per-day head totals come from the same `dailyTotals` helper.)*
 
 ---
 
@@ -357,7 +357,7 @@ export async function forEachTenant<T>(trx, tenantIds, userId, fn: (tenantId) =>
 ### 7.5 Concurrency
 
 - One advisory lock per account and head (`cap:<head>:<accountId>`) in the write transaction.
-- Invoice generation locks per account (`invoice:<accountId>`) and relies on `UNIQUE (account_id, period)`.
+- Invoice generation locks per account (`invoice:<accountId>`) and relies on the unique index on live invoices `(account_id, period) WHERE status <> 'void'` *(changed during Phase 3)*.
 - Payments use `client_ref UNIQUE`, as fee payments already do.
 
 ### 7.6 API contract
@@ -447,7 +447,7 @@ subscription_invoices (
   due_date date NOT NULL,
   status varchar(8) NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid','void')),
   generated_by uuid REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (account_id, period)
+  UNIQUE (account_id, period) WHERE status <> 'void'   -- partial index, migration 015 (Phase 3)
 )
 
 subscription_payments (
@@ -474,7 +474,7 @@ users    + is_platform_admin boolean NOT NULL DEFAULT false
 Notes:
 
 - `price_books.values` and override values are validated by Zod against the code catalogue on write. The resolver treats a missing key as its safe default (price 0, feature off, cap 0 for caps that are set), so keys can be added in either order.
-- An invoice is `paid` when its payments sum to its total. Part payments are allowed; a payment above the amount due is refused. Only an open invoice without payments can be voided, and a voided month cannot be regenerated (`UNIQUE (account_id, period)`) until credit notes exist. *(Phase 2.)*
+- An invoice is `paid` when its payments sum to its total. Part payments are allowed; a payment above the amount due is refused. Only an open invoice without payments can be voided. *(Phase 2.)* A voided month can be generated again: the void invoice stays as a record and the new one gets the next number of that period, with prices as they are at regeneration. *(Changed during Phase 3: Phase 2 blocked this with `UNIQUE (account_id, period)`, which left the console no way to correct a wrong bill. Migration 015 replaces it with a partial unique index that ignores void invoices.)*
 - `platform_audit` and `subscription_invoices` lines are append-only: the app role gets no `UPDATE`/`DELETE` on audit, and voiding an invoice is a status change plus an audit row.
 - The trigger function is `SECURITY INVOKER` and only writes `tenant_usage_daily`, so it needs no extra privilege.
 
@@ -484,7 +484,8 @@ Notes:
 |---|---|---|---|
 | 013 | `accounts_and_billing` | All tables above; seed the `standard` price book and settings; `tenants.account_id`; `users.is_platform_admin`; backfill accounts; `SET NOT NULL`; audit grants | Yes |
 | 014 | `usage_metering` | Trigger function + triggers; backfill today's counts into `tenant_usage_daily` | Yes: only adds a side effect on writes |
-| 015 | `drop_tenant_plan` | Drop `tenants.plan`, `plan_expires_at` and constraints | Only after phase 1 has been live ≥ 1 release |
+| 015 | `invoice_regenerate_after_void` | Replace `UNIQUE (account_id, period)` on `subscription_invoices` with a unique index on live (not void) invoices *(added during Phase 3)* | Yes: only relaxes a constraint. `down()` fails if a voided month was regenerated |
+| 016 | `drop_tenant_plan` | Drop `tenants.plan`, `plan_expires_at` and constraints *(was 015 until Phase 3)* | Only after phase 1 has been live ≥ 1 release |
 
 **Backfill rules (013):**
 
@@ -492,7 +493,7 @@ Notes:
 2. One account per owner user; an owner of several institutes gets one account holding all of them.
 3. **Existing customers** start on `standard` with `trial_ends_at` = the later of their current `plan_expires_at` and *migration date + 30 days*. Nobody is billed for time they already paid for, and everyone gets at least a month's notice ([§14 decision 6](#14-decisions-made-2026-10-17)).
 4. A tenant with no active owner (not expected) gets its own account with `owner_user_id = null`, and the migration logs it.
-5. `down()` drops everything added. `tenants.plan` is untouched until 015, so rollback is lossless. CI `migrate check` covers it.
+5. `down()` drops everything added. `tenants.plan` is untouched until 016, so rollback is lossless. CI `migrate check` covers it.
 
 ---
 
@@ -523,7 +524,7 @@ apps/api/src/
   lib/plans.ts                   DELETED in phase 1
 packages/db/
   src/context.ts                 + forEachTenant
-  migrations/013_accounts_and_billing.ts, 014_usage_metering.ts, 015_drop_tenant_plan.ts
+  migrations/013_accounts_and_billing.ts, 014_usage_metering.ts, 015_invoice_regenerate_after_void.ts, 016_drop_tenant_plan.ts
 ```
 
 Dependency rule: feature modules import only `modules/billing/index.ts`. `platform` calls `billing/service.ts` for every change, so the console, a future PayHere webhook and a future scheduled job all share one code path and one audit trail.
@@ -556,7 +557,7 @@ apps/web/src/
 |---|---|
 | Who | `users.is_platform_admin`. The first admin is set by SQL on the server (runbook). Adding more admins in the console waits for 2FA ([§14](#14-decisions-made-2026-10-17)). |
 | Hiding | Every `/api/v1/admin/*` route returns **404** for non-admins. |
-| Sessions | Admin routes need a session younger than 12 h. Stricter rate limit on mutations. |
+| Sessions | Admin routes need a session younger than 12 h (`auth_sessions.created_at`, which already existed). Stricter rate limit on mutations (30 per minute per IP; reads unlimited). *(Phase 3: a platform admin with an older login gets `401 reauth_required` instead of 404, so the console can send them to log in again; everyone else still gets 404, and the 404 check runs before the rate limit, so non-admins never see a 429.)* |
 | Data access | Accounts, institutes (names only), owner phone, counts, prices and money. Never students, guardians, attendance or fee records. |
 | Audit | Every mutation writes `platform_audit` with before/after, in the same transaction. |
 
@@ -565,7 +566,7 @@ apps/web/src/
 | Method + path | Does |
 |---|---|
 | `GET /accounts?q=&state=` | List: name, owner, state, heads this month, estimated bill, amount due |
-| `POST /accounts` | Create for `{ name, ownerName, ownerPhone, priceBook, trialDays }` → WhatsApp sign-up message link |
+| `POST /accounts` | Create for `{ name, ownerPhone, priceBook, trialDays }`; refuses a phone that already has an account (`409 account_exists`). No trial caps: the admin picks the book and sets caps as overrides. *(Changed during Phase 3: `ownerName` is not sent or stored. accounts has no owner name column, and the name is needed only in the WhatsApp sign-up message, which the console builds in the browser. After sign-up the owner's `users.full_name` is shown.)* |
 | `GET /accounts/:id` | Detail: state, values (book + overrides), usage chart, institutes, invoices, payments, audit |
 | `PATCH /accounts/:id` | Name, notes, price book |
 | `PUT /accounts/:id/overrides/:key` · `DELETE` | Customer price/cap/feature `{ value, expiresAt?, note }` |
@@ -574,10 +575,11 @@ apps/web/src/
 | `POST /invoices/generate` | `{ period }` → generate for every account (idempotent); returns counts |
 | `GET /invoices?period=&status=` | All subscription invoices |
 | `POST /invoices/:id/payments` | `{ amount, reference, clientRef }` |
-| `POST /invoices/:id/void` | `{ reason }` (then regenerate if needed) |
-| `GET /price-books` · `PUT /price-books/:key` · `POST /price-books` | Edit or add books (validated; shows affected accounts) |
-| `GET /settings` · `PUT /settings/:key` | Trial days, grace days, due days, bank details, support WhatsApp |
-| `GET /audit?accountId=&actor=` | Audit log |
+| `POST /invoices/:id/void` | `{ reason }`, then regenerate the month if needed (migration 015) |
+| `GET /invoices/preview?period=` | Totals per account that Generate would create, without creating anything *(added during Phase 3, for "shows totals first")* |
+| `GET /price-books` · `PUT /price-books/:key` · `POST /price-books` | Edit or add books (validated; shows affected accounts). `GET` also returns the catalogue `keys`, so the console keeps no copy of the list. `PUT` replaces the book's values *(Phase 3)* |
+| `GET /settings` · `PUT /settings/:key` | Trial days, grace days, due days, trial caps, bank details (text), support WhatsApp (`94…`); each key has its own schema, an unknown key is 404 |
+| `GET /audit?accountId=&actor=` | Audit log, newest 200 rows *(Phase 3: no paging yet; the account page shows that account's newest 100)* |
 
 ### 10.3 Account claiming
 
@@ -594,7 +596,7 @@ This is the same phone-match trust as staff invites, with no new token type.
 
 | Screen | Content |
 |---|---|
-| Accounts | Table with filters: *Trial ending in 7 days*, *Overdue*, *Restricted*, *Suspended*. Row: heads now, estimate, due. WhatsApp reminder button (owner's language). |
+| Accounts | Table with filters: *Trial ending in 7 days*, *Overdue*, *Restricted*, *Suspended*. Row: heads now, estimate, due. WhatsApp reminder button. *(Changed during Phase 3: the message is in the console's language, because users have no stored language yet.)* |
 | Account detail | State and dates; values with overrides highlighted; heads per day (simple bar list); institutes; invoices with **Record payment**; **Extend trial**, **Suspend**; overrides editor; audit history |
 | New account | Name, owner name and phone, price book, trial days |
 | Invoices | Month picker, **Generate for month**, list with status, totals, export CSV |
@@ -674,7 +676,7 @@ Each phase is its own release to `production` and must pass format, lint, typech
 
 ### Phase 5: Contract and harden
 
-- Migration 015 (drop old plan columns).
+- Migration 016 (drop old plan columns; was 015 before Phase 3).
 - Update [UI_UX.md](UI_UX.md), [RELEASE_V1.md](RELEASE_V1.md) and the landing page.
 - Load check: 300 seeded accounts, console list under 1 s, invoice generation under 10 s.
 

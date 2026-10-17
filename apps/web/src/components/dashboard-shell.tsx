@@ -15,6 +15,7 @@ import {
   Receipt,
   ScanLine,
   Settings,
+  ShieldCheck,
   Users,
   Wallet,
   X,
@@ -247,6 +248,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             )}
             <div className="ml-auto flex items-center gap-3">
               <LanguageSwitcher className="max-sm:hidden" />
+              {data?.me.isPlatformAdmin && (
+                <Link
+                  href={`/${lang}/admin`}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary-soft"
+                >
+                  <ShieldCheck aria-hidden className="size-4" />
+                  <span className="max-sm:sr-only">{t.admin.console}</span>
+                </Link>
+              )}
               {data && (
                 <span className="hidden items-center gap-2 text-sm text-ink-muted sm:flex">
                   <span className="flex size-7 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-hover">

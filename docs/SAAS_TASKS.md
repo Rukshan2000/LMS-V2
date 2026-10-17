@@ -4,7 +4,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 1/29 · Phase 4: 2/19 · Phase 5: 0/8
+**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 18/19 · Phase 3: 30/32 · Phase 4: 2/19 · Phase 5: 0/8
 
 **Rules for every phase**
 
@@ -105,38 +105,43 @@ Goal: head counts are recorded automatically and monthly invoices can be generat
 
 Goal: everything in the old SQL runbook is done from `/admin`, audited. SAAS_PLAN §10.
 
+**Status:** built and committed to `main` 2026-10-17; not yet released to production (release after Phases 1 and 2). Differences from the plan are marked *(Changed during Phase 3)* in SAAS_PLAN §6.1, §6.4, §7.5, §8.1, §8.2, §10.1, §10.2 and §10.4.
+
 ### API
-- [ ] `plugins/platform-admin.ts`: `requirePlatformAdmin` (404 for non-admins), session younger than 12 h, stricter rate limit on mutations
-- [ ] `modules/platform/routes.ts` registered at `/api/v1/admin` in `app.ts`
-- [ ] `GET /accounts` (search, state filter, heads now, estimate, amount due) reading `tenant_usage_daily` per institute (`forEachTenant`); add a monthly rollup table if the list gets slow
-- [ ] `POST /accounts` (create for owner phone, price book, trial days) + WhatsApp sign-up message link
-- [ ] `GET /accounts/:id` (state, values with overrides, daily usage, institutes by name, invoices, payments, audit)
-- [ ] `PATCH /accounts/:id` (name, notes, price book)
-- [ ] `PUT / DELETE /accounts/:id/overrides/:key` (validated against the catalogue; note required; optional expiry)
-- [ ] `POST /accounts/:id/trial`, `/suspend`, `/unsuspend`
-- [ ] `POST /invoices/generate`, `GET /invoices`, `POST /invoices/:id/payments`, `POST /invoices/:id/void`
-- [ ] `GET / PUT / POST /price-books` (validated; response includes number of affected accounts)
-- [ ] `GET / PUT /settings`
-- [ ] `GET /audit`
-- [ ] Every mutation goes through `billing/service.ts` and writes one audit row (actor, account, before, after, IP)
-- [ ] `/auth/me` returns `isPlatformAdmin`
+- [x] `plugins/platform-admin.ts`: `requirePlatformAdmin` (404 for non-admins), session younger than 12 h, stricter rate limit on mutations
+- [x] `modules/platform/routes.ts` registered at `/api/v1/admin` in `app.ts`
+- [x] `GET /accounts` (search, state filter, heads now, estimate, amount due) reading `tenant_usage_daily` per institute (`forEachTenant`); add a monthly rollup table if the list gets slow
+- [x] `POST /accounts` (create for owner phone, price book, trial days) + WhatsApp sign-up message link
+- [x] `GET /accounts/:id` (state, values with overrides, daily usage, institutes by name, invoices, payments, audit)
+- [x] `PATCH /accounts/:id` (name, notes, price book)
+- [x] `PUT / DELETE /accounts/:id/overrides/:key` (validated against the catalogue; note required; optional expiry)
+- [x] `POST /accounts/:id/trial`, `/suspend`, `/unsuspend`
+- [x] `POST /invoices/generate`, `GET /invoices`, `POST /invoices/:id/payments`, `POST /invoices/:id/void`
+- [x] `GET / PUT / POST /price-books` (validated; response includes number of affected accounts)
+- [x] `GET / PUT /settings`
+- [x] `GET /audit`
+- [x] Every mutation goes through `billing/service.ts` and writes one audit row (actor, account, before, after, IP)
+- [x] `/auth/me` returns `isPlatformAdmin`
 - [x] Account claiming: unclaimed account with matching `owner_phone` is claimed on first `POST /tenants` (SAAS_PLAN §10.3) (done in Phase 1, tested in `billing.test.ts`)
 
 ### Web (`app/[lang]/admin/**`, `components/admin/**`)
-- [ ] Admin layout + shell (separate menu, "Platform admin" bar); non-admins redirected to `/app`
-- [ ] Accounts list with filters (trial ending in 7 days, overdue, restricted, suspended) + WhatsApp reminder button
-- [ ] New account form
-- [ ] Account detail: state, values (overrides highlighted), heads per day, institutes, invoices with Record payment, Extend trial, Suspend/Unsuspend, overrides editor, audit history
-- [ ] Invoices page: month picker, Generate for month (shows totals first), list, CSV export
-- [ ] Price books editor (books × keys grid, "affects N accounts" confirmation)
-- [ ] Settings page and Audit page
-- [ ] Header link to the console for platform admins
-- [ ] Admin strings in `si`, `ta`, `en`
+- [x] Admin layout + shell (separate menu, "Platform admin" bar); non-admins redirected to `/app`
+- [x] Accounts list with filters (trial ending in 7 days, overdue, restricted, suspended) + WhatsApp reminder button
+- [x] New account form
+- [x] Account detail: state, values (overrides highlighted), heads per day, institutes, invoices with Record payment, Extend trial, Suspend/Unsuspend, overrides editor, audit history
+- [x] Invoices page: month picker, Generate for month (shows totals first), list, CSV export
+- [x] Price books editor (books × keys grid, "affects N accounts" confirmation)
+- [x] Settings page and Audit page
+- [x] Header link to the console for platform admins
+- [x] Admin strings in `si`, `ta`, `en`
 
 ### Tests, docs and release
-- [ ] `apps/api/test/platform.test.ts`: non-admin gets 404 on every admin route; each mutation writes exactly one audit row; override changes the next invoice but not past ones; price book edit rejects unknown keys; claiming by phone
-- [ ] Remove the temporary billing script from Phase 2
-- [ ] Rewrite `docs/runbooks/plans.md` and `billing.md` for the console; keep SQL only for granting the first admin
+- [x] `apps/api/test/platform.test.ts`: non-admin gets 404 on every admin route; each mutation writes exactly one audit row; override changes the next invoice but not past ones; price book edit rejects unknown keys; claiming by phone; admin login older than 12 h refused; mutation rate limit
+- [x] Migration `015_invoice_regenerate_after_void`: a voided month can be generated again (partial unique index on live invoices); `drop_tenant_plan` moves to 016
+- [x] `computeInvoice(..., lastDay?)` for the month-so-far estimate; unit test
+- [x] Tests added: 15 platform integration tests (`platform.test.ts`), 1 invoice unit test; suite: 166 API + 17 web + 11 db passing; `migrate check` passes
+- [x] Remove the temporary billing script from Phase 2
+- [x] Rewrite `docs/runbooks/plans.md` and `billing.md` for the console; keep SQL only for granting the first admin
 - [ ] Release Phase 3; grant your own user platform admin on production and generate a test invoice for a test account
 - [ ] In the console Settings page, enter the bank details and support WhatsApp number before generating the first real invoice
 
@@ -175,7 +180,7 @@ Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN �
 
 ## Phase 5: Contract and harden
 
-- [ ] Migration `015_drop_tenant_plan`: drop `tenants.plan`, `tenants.plan_expires_at` and their constraints (only after Phase 1 has been live for at least one release)
+- [ ] Migration `016_drop_tenant_plan` (was 015 before Phase 3): drop `tenants.plan`, `tenants.plan_expires_at` and their constraints (only after Phase 1 has been live for at least one release)
 - [ ] Load check: 300 seeded accounts → console accounts list under 1 s, invoice generation for a month under 10 s
 - [ ] Console "Recount" action: rewrite today's `tenant_usage_daily` rows from live counts for one account (SAAS_PLAN §13)
 - [ ] Update [UI_UX.md](UI_UX.md): Billing page, banners, locks, admin console

@@ -1,43 +1,46 @@
-# Runbook: activate or extend a paid plan
+# Runbook: prices, discounts, trials and suspension
 
-v1 has no payment gateway. A teacher pays by bank transfer, sends the slip, and you switch the plan on by hand.
+Everything here is done in the **platform console** at `/admin` (SAAS_PLAN §10), and every change is audited (**Audit log**). The old flat plans (`tenants.plan`, ADR 008) no longer apply; billing is per head (ADR 009). Getting console access is in [billing.md](billing.md#one-time-setup-the-first-platform-admin). Monthly invoices and payments are in [billing.md](billing.md) too.
 
-| Plan | Price (ADR 008) | Active students |
-|------|-----------------|-----------------|
-| free | 0 | 50 |
-| teacher | LKR 2,900 / month | 400 |
-| institute | LKR 9,900 / month | no limit |
+## A new customer you signed up yourself
 
-Limits live in `apps/api/src/lib/plans.ts`. When a paid plan expires the institute is back on Free limits: nothing is deleted, but new or re-activated students are refused while they are over 50.
+**Accounts → New account**: account name, owner name and mobile, price book, free trial days → **Create account** → **Send sign-up message on WhatsApp**.
 
-## Activate / extend
+When the owner signs up **with that mobile** and creates an institute, it joins this account (claiming by phone, SAAS_PLAN §10.3). Until then the list shows "Not signed up yet". A mobile that already has an account is refused. Accounts created here get no trial caps; set caps as overrides if you want them.
 
-1. Check the transfer arrived in the bank account.
-2. Find the institute (the slug is in their link, e.g. `nimal-maths`):
+Customers who sign up on their own get an account automatically: the default price book, `trial_days` free and the trial caps from Settings.
 
-```bash
-ssh root@164.68.97.187
-sudo -u postgres psql -d tuition_lms -c "SELECT id, slug, name, plan, plan_expires_at FROM tenants WHERE slug = 'nimal-maths'"
-```
+## Change prices for everyone: price books
 
-3. Set the plan. Extending adds to the current expiry if it is still in the future, so paying early loses nothing:
+**Price books**: books × keys grid. Prices are LKR per head per month (`price.*`), free heads per month (`included.*`), `minimum.monthly`, caps (`cap.*`, blank = no limit) and features (`feature.*`).
 
-```bash
-sudo -u postgres psql -d tuition_lms -c "
-  UPDATE tenants
-     SET plan = 'teacher',
-         plan_expires_at = GREATEST(COALESCE(plan_expires_at, now()), now()) + interval '1 month',
-         status = 'active', updated_at = now()
-   WHERE slug = 'nimal-maths'
-  RETURNING slug, plan, plan_expires_at"
-```
+- **Save** shows how many accounts use the book; click again to save.
+- Changes apply from the **next** invoice. Past invoices never change.
+- **New price book** starts as a copy of the default one (e.g. `ngo`, `pilot`). Move an account to it on the account page (**Price book**).
+- Unknown keys and bad values (negative, more than 2 decimals) are refused.
 
-Use `interval '12 months'` for a yearly payment and `plan = 'institute'` for the bigger plan.
+## Change one customer: overrides
 
-4. Tell the teacher on WhatsApp; Settings → Plan shows the new plan and expiry immediately.
+Account page → **Set override**: key, value, optional expiry date, and a note saying why (required). The override wins over the price book until it expires. Rows with an override are highlighted in **Prices, caps and features**; **Remove** goes back to the book.
 
-## Back to Free
+Examples:
 
-```bash
-sudo -u postgres psql -d tuition_lms -c "UPDATE tenants SET plan = 'free', plan_expires_at = NULL WHERE slug = 'nimal-maths'"
-```
+| Need | Key | Value |
+|---|---|---|
+| Students at LKR 80 until March | `price.student` | `80`, expires 31 March |
+| First 20 students free | `included.student` | `20` |
+| Allow a 4th institute | `cap.institutes` | `4` |
+| No student cap | `cap.students` | blank |
+| Switch the parent app off | `feature.portal` | Off |
+
+## Trials
+
+Account page → **Extend trial** → days. A running trial is extended from its end date and its trial caps move with it; an ended trial restarts from today (without caps). Trial days are never billed.
+
+The default trial length and caps for new sign-ups are on **Settings**.
+
+## Suspend (read-only)
+
+Only for accounts that don't pay after reminders. Account page → reason → **Suspend** → click again. The customer sees the account as suspended and can't add students, teachers, parents or institutes. The full read-only block (every change refused) comes with Phase 4. **Unsuspend** lifts it at once.
+
+An unpaid account is already `restricted` automatically (no new heads, fee collection still works); suspension is the manual step after that.
