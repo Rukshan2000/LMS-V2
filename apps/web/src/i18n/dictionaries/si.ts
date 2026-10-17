@@ -173,7 +173,6 @@ const si: Dictionary = {
     title: 'කාලසටහන',
     prevWeek: 'පෙර',
     nextWeek: 'ඊළඟ',
-    thisWeek: 'මෙම සතිය',
     noClasses: 'මෙම සතියේ පන්ති නැත.',
     cancelled: 'අවලංගුයි',
     cancel: 'පන්තිය අවලංගු කරන්න',
@@ -183,6 +182,10 @@ const si: Dictionary = {
     save: 'සුරකින්න',
     close: 'වසන්න',
     extra: 'අමතර පන්තිය',
+    today: 'අද',
+    week: 'සතිය',
+    month: 'මාසය',
+    list: 'ලැයිස්තුව',
   },
   staff: {
     title: 'සැකසුම්',

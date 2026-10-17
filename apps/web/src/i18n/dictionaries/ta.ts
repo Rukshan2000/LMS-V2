@@ -174,7 +174,6 @@ const ta: Dictionary = {
     title: 'கால அட்டவணை',
     prevWeek: 'முந்தைய',
     nextWeek: 'அடுத்த',
-    thisWeek: 'இந்த வாரம்',
     noClasses: 'இந்த வாரம் வகுப்புகள் இல்லை.',
     cancelled: 'ரத்து செய்யப்பட்டது',
     cancel: 'வகுப்பை ரத்து செய்',
@@ -184,6 +183,10 @@ const ta: Dictionary = {
     save: 'சேமி',
     close: 'மூடு',
     extra: 'கூடுதல் வகுப்பு',
+    today: 'இன்று',
+    week: 'வாரம்',
+    month: 'மாதம்',
+    list: 'பட்டியல்',
   },
   staff: {
     title: 'அமைப்புகள்',

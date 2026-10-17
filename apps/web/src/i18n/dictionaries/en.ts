@@ -169,7 +169,6 @@ const en = {
     title: 'Timetable',
     prevWeek: 'Previous',
     nextWeek: 'Next',
-    thisWeek: 'This week',
     noClasses: 'No classes this week.',
     cancelled: 'Cancelled',
     cancel: 'Cancel class',
@@ -179,6 +178,10 @@ const en = {
     save: 'Save',
     close: 'Close',
     extra: 'Extra class',
+    today: 'Today',
+    week: 'Week',
+    month: 'Month',
+    list: 'List',
   },
   staff: {
     title: 'Settings',

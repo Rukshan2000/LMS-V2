@@ -1,0 +1,59 @@
+/* FullCalendar (timetable) in the app's tokens. */
+.timetable {
+  --fc-border-color: var(--color-line);
+  --fc-page-bg-color: var(--color-surface);
+  --fc-neutral-bg-color: var(--color-surface-soft);
+  --fc-today-bg-color: color-mix(in srgb, var(--color-primary-soft) 45%, transparent);
+  --fc-now-indicator-color: var(--color-danger-solid);
+  --fc-event-bg-color: var(--color-primary-soft);
+  --fc-event-border-color: var(--color-primary);
+  --fc-event-text-color: var(--color-primary-hover);
+  --fc-list-event-hover-bg-color: var(--color-surface-soft);
+  font-size: 0.875rem;
+}
+.timetable .fc-scrollgrid {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.timetable .fc-col-header-cell {
+  padding: 0.5rem 0;
+  background: var(--color-surface-soft);
+}
+.timetable .fc-timegrid-slot {
+  height: 2.25rem;
+}
+.timetable .fc-timegrid-slot-label,
+.timetable .fc-list-event-time {
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+.timetable .fc-event {
+  cursor: pointer;
+  transition: filter 150ms;
+}
+.timetable .fc-v-event {
+  border-width: 0 0 0 3px;
+  border-radius: 0.375rem;
+  padding: 1px 4px;
+}
+/* FullCalendar darkens a focused event; the selected ring below marks it instead. */
+.timetable .fc-event:focus::after {
+  display: none;
+}
+.timetable .fc-event:hover {
+  filter: brightness(0.97);
+}
+.timetable .fc-event.is-extra {
+  --fc-event-bg-color: var(--color-late-soft);
+  --fc-event-border-color: var(--color-late-solid);
+  --fc-event-text-color: var(--color-late);
+}
+.timetable .fc-event.is-cancelled {
+  --fc-event-bg-color: var(--color-neutral-soft);
+  --fc-event-border-color: var(--color-line-strong);
+  --fc-event-text-color: var(--color-ink-subtle);
+  text-decoration: line-through;
+}
+.timetable .fc-event.is-selected {
+  box-shadow: 0 0 0 2px var(--color-primary-ring);
+}
