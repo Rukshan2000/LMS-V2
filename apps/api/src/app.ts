@@ -8,6 +8,7 @@ import feeRoutes from './modules/fees/routes.js';
 import identityRoutes from './modules/identity/routes.js';
 import platformRoutes from './modules/platform/routes.js';
 import portalRoutes from './modules/portal/routes.js';
+import quizRoutes from './modules/quizzes/routes.js';
 import reportRoutes from './modules/reports/routes.js';
 import slipRoutes from './modules/slips/routes.js';
 import { inviteRoutes, staffRoutes } from './modules/staff/routes.js';
@@ -62,6 +63,7 @@ export async function buildApp({
   await app.register(attendanceRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(feeRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(portalRoutes, { prefix: '/api/v1/tenants/:tenantId' });
+  await app.register(quizRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(slipRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(billingRoutes, { prefix: '/api/v1/tenants/:tenantId' });
   await app.register(reportRoutes, { prefix: '/api/v1/tenants/:tenantId/reports' });
