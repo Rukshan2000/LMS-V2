@@ -10,7 +10,7 @@ Based on [BUILD_GUIDE.md](BUILD_GUIDE.md). Mark `[x]` when done.
 
 **Next up:** Beta with 3–5 teachers + v1.0 release checklist ([docs/RELEASE_V1.md §7](docs/RELEASE_V1.md)). All v1.0 slices are built. Pilot 1 can start now.
 
-**SaaS billing work:** accounts, per-head billing, trials and super admin are tracked separately in [docs/SAAS_TASKS.md](docs/SAAS_TASKS.md) (plan: [docs/SAAS_PLAN.md](docs/SAAS_PLAN.md)).
+**SaaS billing work:** accounts, per-head billing, trials and super admin are tracked separately in [docs/SAAS_TASKS.md](docs/SAAS_TASKS.md) (plan: [docs/SAAS_PLAN.md](docs/SAAS_PLAN.md), pricing: [ADR 009](docs/adr/009-per-head-pricing.md)). Phase 0 decided; Phase 1 (accounts + billing engine) built on `main`, not yet released.
 
 ---
 
@@ -145,6 +145,18 @@ Web: `apps/web/src` — routes under `app/[lang]` (`si` default, `ta`, `en`), da
 - [x] Full flow checked in a real browser, desktop + phone width: signup → create institute → dashboard → language switch → mobile menu → logout → wrong-login error (Tamil)
 - [x] Step 4 released to production (pipeline deploy, smoke check incl. `/si/login`)
 - [ ] **You:** sign up on https://lms.kwingsmedia.com on your phone + laptop and create an institute (Claude does not create accounts on production)
+
+### UI/UX upgrade ([docs/UI_UX_UPGRADE_PLAN.md](docs/UI_UX_UPGRADE_PLAN.md))
+- [x] Blue/white pastel design tokens in `globals.css` (colours, radii, shadows, animations); no raw palette classes left
+- [x] Icons (`lucide-react`, tree-shaken) for menu, statuses, buttons, empty states
+- [x] Shared UI: `btn`/`Button` variants, `Badge`, `ConfirmButton` (every removal is two-step), `Skeleton`, `EmptyState`, toasts, `BackLink`, `Brand`
+- [x] Smooth transitions (page fade, pop-in, mobile menu slide), `prefers-reduced-motion` respected, print stays plain
+- [x] Shell stays visible while loading; sticky header; animated mobile menu (Escape closes)
+- [x] Pages use the full width; two-column layouts on wide screens (student, class, scan, portal, timetable)
+- [x] Collapsible desktop sidebar (icon rail, remembered per browser)
+- [x] Released to production (2026-10-17: `9b449b0`, `1eddccb`)
+- [ ] Check every screen at phone width on a real phone (browser used for checks could not go below ~1200px)
+- [ ] Focus trap inside the open mobile menu
 
 ## Step 5: Feature slices
 Each slice is complete only when it has: migration + RLS → repo → service → route → tests → UI → released via `production` branch.

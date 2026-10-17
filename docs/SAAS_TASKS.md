@@ -4,7 +4,7 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 **Legend:** `[x]` completed · `[ ]` not completed · `[~]` in progress
 
-**Progress:** Phase 0: 5/6 · Phase 1: 22/23 · Phase 2: 0/18 · Phase 3: 0/29 · Phase 4: 1/19 · Phase 5: 0/8
+**Progress:** Phase 0: 5/6 · Phase 1: 23/24 · Phase 2: 0/18 · Phase 3: 1/29 · Phase 4: 2/19 · Phase 5: 0/8
 
 **Rules for every phase**
 
@@ -31,6 +31,8 @@ Based on [SAAS_PLAN.md](SAAS_PLAN.md) (§ numbers below point there). Mark `[x]`
 
 Goal: accounts exist, the student cap runs through `billing`, existing institutes behave exactly as before. SAAS_PLAN §8, §7.1–7.5.
 
+**Status:** built and committed to `main` 2026-10-17 (`7d31f24`); not yet released to production.
+
 ### Database
 - [x] Migration `013_accounts_and_billing`: tables `price_books`, `platform_settings`, `accounts`, `account_overrides`, `subscription_invoices`, `subscription_payments`, `platform_audit` (SAAS_PLAN §8.1)
 - [x] 013: `tenants.account_id` (nullable + index), `users.is_platform_admin` (default false)
@@ -38,7 +40,7 @@ Goal: accounts exist, the student cap runs through `billing`, existing institute
 - [x] 013: backfill (per-tenant `app.tenant_id` to read owners under forced RLS; one account per owner; existing customers get `trial_ends_at = max(plan_expires_at, now + 30 days)`; tenants without owner logged), then `SET NOT NULL` on `tenants.account_id`
 - [x] 013: grants: app role `INSERT, SELECT` only on `platform_audit`; `down()` drops everything added
 - [x] Rehearse 013 locally with an owner role that is **not** `BYPASSRLS` (copy of local dev data: 3 owners found, all claimed) and with seeded edge cases on the test DB (owner of 2 institutes → 1 account, paid plan keeps its paid date, institute without owner → unclaimed account + warning)
-- [x] `forEachTenant(trx, tenantIds, userId, fn)` in `packages/db/src/context.ts`, exported from `packages/db/src/index.ts`
+- [x] `forEachTenant(trx, tenantIds, fn)` in `packages/db/src/context.ts` (keeps the caller's user context), exported from `packages/db/src/index.ts`
 - [x] Test: `forEachTenant` restores the original context after success and after a thrown error (`packages/db/test/`)
 
 ### Billing module (API)
@@ -46,20 +48,21 @@ Goal: accounts exist, the student cap runs through `billing`, existing institute
 - [x] `modules/billing/resolve.ts`: pure `resolveAccountState(account, openInvoices, settings, now)` and `resolveValues(priceBook, overrides, now)`
 - [x] Unit tests `test/billing-resolve.test.ts`: every row of SAAS_PLAN §5.2, first-match order, override precedence, expired override ignored, missing key = safe default
 - [x] `modules/billing/usage.ts`: live counts per head for one tenant + across an account (`forEachTenant`)
-- [x] `modules/billing/service.ts`: `getEntitlements`, `assertFeature`, `assertCanAddHead` (advisory lock `cap:<head>:<accountId>`), `findOrClaimOrCreateAccount`
+- [x] `modules/billing/service.ts`: `getEntitlements`, `assertFeature`, `assertCanAddHead` (advisory lock `cap:<cap>:<accountId>`), `accountForNewInstitute` (find, claim by phone, or create with trial)
 - [x] `modules/billing/index.ts`: public surface only
 - [x] Students: replace `assertStudentCapacity` in `students/routes.ts` (create, restore) and `students/import.ts` with `assertCanAddHead('student')`
 - [x] Delete `apps/api/src/lib/plans.ts`
-- [x] `POST /tenants` (`tenancy/routes.ts`): attach the new institute to `findOrClaimOrCreateAccount(user)`; check `cap.institutes`
+- [x] `POST /tenants` (`tenancy/routes.ts`): attach the new institute to `accountForNewInstitute(user)`; check `cap.institutes`
 - [x] `GET /tenants/:tenantId` returns `entitlements` (SAAS_PLAN §7.6); old `usage` field removed (only the plan card used it)
 
 ### Web
 - [x] `lib/entitlements.ts` types; `DashboardShell` stores `entitlements` in `TenantDataContext`
-- [x] Settings plan card reads `entitlements` (same look as today)
+- [x] Settings plan card reads `entitlements`: state badge (trial days left / active / payment due / overdue / suspended), student bar when capped; old flat-plan text replaced in `si`, `ta`, `en`
 
 ### Tests and release
 - [x] Port `apps/api/test/plans.test.ts` to accounts (set caps through price book/overrides instead of `tenants.plan`)
 - [x] Tests: account-wide cap across two institutes of one account; two desks adding the last allowed student at once → one succeeds
+- [x] Tests added: 12 resolver unit tests (`billing-resolve.test.ts`), 15 billing integration tests (`billing.test.ts`), 3 db tests (`forEachTenant` ×2, append-only audit); suite: 125 API + 17 web + 11 db passing; `migrate check` passes
 - [ ] Release Phase 1 to production; check one existing institute's Settings page and student add still work
 
 ---
@@ -113,7 +116,7 @@ Goal: everything in the old SQL runbook is done from `/admin`, audited. SAAS_PLA
 - [ ] `GET /audit`
 - [ ] Every mutation goes through `billing/service.ts` and writes one audit row (actor, account, before, after, IP)
 - [ ] `/auth/me` returns `isPlatformAdmin`
-- [ ] Account claiming: unclaimed account with matching `owner_phone` is claimed on first `POST /tenants` (SAAS_PLAN §10.3)
+- [x] Account claiming: unclaimed account with matching `owner_phone` is claimed on first `POST /tenants` (SAAS_PLAN §10.3) (done in Phase 1, tested in `billing.test.ts`)
 
 ### Web (`app/[lang]/admin/**`, `components/admin/**`)
 - [ ] Admin layout + shell (separate menu, "Platform admin" bar); non-admins redirected to `/app`
@@ -142,7 +145,7 @@ Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN �
 ### API
 - [ ] `plugins/entitlements.ts`: `config: { feature }` gate after `loadTenant`; typed `FastifyContextConfig`; `req.entitlements()` memoised per request
 - [ ] Same plugin: suspended account + non-GET → `403 account_suspended` for everything under `/tenants/:tenantId`
-- [ ] Restricted state: `assertCanAddHead` → `403 account_restricted { amountDue, invoiceNumber }`; fee routes unaffected
+- [x] Restricted state: `assertCanAddHead` → `403 account_restricted { amountDue, invoiceNumber }`; fee routes unaffected (done in Phase 1 for students; teacher/parent call sites come with the caps below)
 - [ ] Feature gates: reports (`reports/routes.ts`), student import, slips (desk + family upload), live link set (`classes/routes.ts`), portal invites
 - [ ] Portal hides `liveUrl` when `feature.live_links` is off (`portal/routes.ts`)
 - [ ] Caps: teacher/admin/receptionist on staff invite create + accept; parent on portal invite accept (`staff/routes.ts`)
@@ -154,7 +157,7 @@ Goal: customers see their trial, bill and locks; rules are enforced. SAAS_PLAN �
 - [ ] "Billing" menu item for owner and admin (`lib/nav.ts`); Settings plan card replaced by a link to Billing
 - [ ] `account-banner.tsx` in the shell: trial (days left), overdue (amount, due date), restricted, suspended
 - [ ] `lib/nav.ts` `feature?` key; lock icon on locked menu items; `<Locked>` card on gated pages
-- [ ] Error messages for `plan_limit` (per key), `feature_locked`, `account_restricted`, `account_suspended` in `si`, `ta`, `en`
+- [~] Error messages for `plan_limit` (per key), `feature_locked`, `account_restricted`, `account_suspended` in `si`, `ta`, `en` (all four added in Phase 1; `plan_limit` is still one generic text, per-key text pending)
 - [ ] Check in the browser at phone and desktop width in all three languages
 
 ### Tests and release
