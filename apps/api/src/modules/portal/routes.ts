@@ -1,13 +1,11 @@
-import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { emailSchema } from '../../lib/email.js';
 import { HttpError, notFound } from '../../lib/http-error.js';
 import { fromCents, toCents } from '../../lib/money.js';
-import { normalizePhone } from '../../lib/phone.js';
 import { addDays, colomboToday, TIME_ZONE } from '../../lib/time.js';
 import { ensureSessions } from '../classes/schedule.js';
-
-const INVITE_DAYS = 14;
+import { mailInvite, newInviteToken } from '../staff/routes.js';
 const LINK_EARLY_MINUTES = 30;
 const uuid = z.uuid();
 
@@ -17,49 +15,50 @@ export default async function portalRoutes(app: FastifyInstance) {
   const desk = app.requireRole('owner', 'admin', 'receptionist');
   const family = app.requireRole('student', 'parent');
 
-  // Portal invite for a student (their own mobile) or a guardian (parent). The phone must be
-  // the student's or one of their guardians', so a link can only go to a known number.
+  // Portal invite for a student (their own email) or a guardian (parent). The email must be
+  // the student's or one of their guardians', so a link can only go to a known address.
   app.post(
     '/students/:studentId/portal-invite',
     { preHandler: desk, config: { feature: 'portal' } },
     async (req, reply) => {
       const { studentId } = req.params as { studentId: string };
       if (!uuid.safeParse(studentId).success) throw notFound();
-      const phone = normalizePhone(z.object({ phone: z.string().max(20) }).parse(req.body).phone);
-      const token = randomBytes(32).toString('base64url');
+      const { email } = z.object({ email: emailSchema }).parse(req.body);
+      const { token, tokenHash, expiresAt } = newInviteToken();
       const tenantId = req.tenant!.id;
       const invite = await req.withTenant(async (trx) => {
         const student = await trx('students')
           .where({ id: studentId, status: 'active' })
-          .first('full_name', 'phone');
+          .first('full_name', 'email');
         if (!student) throw notFound();
         const guardian = await trx('student_guardians as sg')
           .join('guardians as g', 'g.id', 'sg.guardian_id')
-          .where({ 'sg.student_id': studentId, 'g.phone': phone })
+          .where({ 'sg.student_id': studentId, 'g.email': email })
           .first('g.full_name');
         const target =
-          student.phone === phone
+          student.email === email
             ? { role: 'student', fullName: student.full_name }
             : guardian && { role: 'parent', fullName: guardian.full_name };
         if (!target) {
-          throw new HttpError(400, 'unknown_phone', 'Use the student’s or a guardian’s mobile');
+          throw new HttpError(400, 'unknown_email', 'Use the student’s or a guardian’s email');
         }
         await trx('tenant_invites')
-          .where({ phone, student_id: studentId, status: 'pending' })
+          .where({ email, student_id: studentId, status: 'pending' })
           .update({ status: 'revoked', updated_at: trx.fn.now() });
         await trx('tenant_invites').insert({
           tenant_id: tenantId,
           full_name: target.fullName,
-          phone,
+          email,
           role: target.role,
           student_id: studentId,
-          token_hash: createHash('sha256').update(token).digest('hex'),
-          expires_at: new Date(Date.now() + INVITE_DAYS * 24 * 3600 * 1000),
+          token_hash: tokenHash,
+          expires_at: expiresAt,
           invited_by_membership_id: req.tenant!.membershipId,
         });
-        return { ...target, phone, studentName: student.full_name };
+        return { ...target, email, studentName: student.full_name };
       });
-      return reply.status(201).send({ invite, code: `${tenantId}.${token}` });
+      const emailSent = await mailInvite(app, tenantId, token, invite);
+      return reply.status(201).send({ invite, code: `${tenantId}.${token}`, emailSent });
     },
   );
 

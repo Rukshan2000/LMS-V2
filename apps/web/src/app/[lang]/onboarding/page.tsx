@@ -5,7 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Building2 } from 'lucide-react';
 import { Brand, Button, Card, Field, FormError } from '@/components/ui';
 import { useI18n } from '@/i18n/provider';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, type Me } from '@/lib/api';
 
 const slugify = (name: string) =>
   name
@@ -24,9 +24,15 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api('/auth/me').catch((err) => {
-      if (err instanceof ApiError && err.status === 401) router.replace(`/${lang}/login`);
-    });
+    api<Me>('/auth/me')
+      // Only for a user's first institute; owners cannot add more themselves.
+      .then(({ user, tenants }) => {
+        if (!user.emailVerified) router.replace(`/${lang}/account/email`);
+        else if (tenants.length > 0) router.replace(`/${lang}/app`);
+      })
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) router.replace(`/${lang}/login`);
+      });
   }, [lang, router]);
 
   async function onSubmit(e: FormEvent) {

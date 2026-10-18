@@ -11,7 +11,9 @@ import { btn, Button, Card, FormError, Spinner } from './ui';
 
 interface Invite {
   fullName: string;
-  phone: string;
+  /** Who may accept. Invites from before email login have only a phone. */
+  email: string | null;
+  phone: string | null;
   role: Role;
   tenantId: string;
   tenantName: string;
@@ -91,16 +93,20 @@ export function JoinInvite() {
           <AuthForm
             key={mode}
             mode={mode}
-            phone={displayPhone(invite.phone)}
+            email={invite.email ?? undefined}
             fullName={invite.fullName}
             onDone={loadMe}
             onSwitch={() => setMode((m) => (m === 'signup' ? 'login' : 'signup'))}
           />
         </>
+      ) : invite.email ? (
+        !me.user.emailVerified || me.user.email !== invite.email
       ) : me.user.phone !== invite.phone ? (
         <Card>
           <p className="text-ink-muted">
-            {fmt(j.wrongPhone, { phone: displayPhone(invite.phone) })}
+            {invite.email
+              ? fmt(j.wrongEmail, { email: invite.email })
+              : fmt(j.wrongPhone, { phone: displayPhone(invite.phone ?? '') })}
           </p>
           <button type="button" onClick={logout} className={`mt-4 text-sm ${btn('link', 'none')}`}>
             <LogOut aria-hidden className="size-4" />

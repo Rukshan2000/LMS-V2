@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision, signupUser } from './provision.js';
 import { parseCsv } from '../src/lib/csv.js';
 import { colomboToday } from '../src/lib/time.js';
 
@@ -16,11 +17,8 @@ let kid1: string, kid2: string, batchId: string;
 const thisMonth = colomboToday().slice(0, 7);
 
 async function signup(phone: string) {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  await provision(ownerDb, phone);
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   return {
     cookie: `sid=${res.cookies.find((c) => c.name === 'sid')!.value}`,
     id: res.json().user.id,

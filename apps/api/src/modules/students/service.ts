@@ -1,5 +1,6 @@
 import type { Knex } from 'knex';
 import { z } from 'zod';
+import { emailSchema } from '../../lib/email.js';
 import { parsePhone } from '../../lib/phone.js';
 
 export const RELATIONSHIPS = ['mother', 'father', 'guardian'] as const;
@@ -12,6 +13,10 @@ const phone = z
     if (!p) ctx.addIssue({ code: 'custom', message: 'invalid_phone' });
     return p ?? '';
   });
+const optionalEmail = z
+  .union([emailSchema, z.literal('')])
+  .nullish()
+  .transform((v) => v || null);
 const optionalText = (max: number) =>
   z
     .string()
@@ -23,6 +28,8 @@ const optionalText = (max: number) =>
 export const guardianInput = z.object({
   fullName: z.string().trim().min(1).max(200),
   phone,
+  // For portal invites by email.
+  email: optionalEmail,
   relationship: z.enum(RELATIONSHIPS).default('guardian'),
 });
 
@@ -32,6 +39,7 @@ export const studentInput = z.object({
     .union([phone, z.literal('')])
     .nullish()
     .transform((v) => v || null),
+  email: optionalEmail,
   school: optionalText(200),
   grade: optionalText(50),
   notes: optionalText(2000),
@@ -98,9 +106,13 @@ export async function setGuardians(
   await trx('student_guardians').where({ student_id: studentId }).delete();
   for (const g of guardians) {
     const [row] = await trx('guardians')
-      .insert({ tenant_id: tenantId, full_name: g.fullName, phone: g.phone })
+      .insert({ tenant_id: tenantId, full_name: g.fullName, phone: g.phone, email: g.email })
       .onConflict(['tenant_id', 'phone'])
-      .merge({ updated_at: trx.fn.now() })
+      // A sibling's form without the email must not erase it.
+      .merge({
+        email: trx.raw('COALESCE(EXCLUDED.email, guardians.email)'),
+        updated_at: trx.fn.now(),
+      })
       .returning('id');
     await trx('student_guardians')
       .insert({
@@ -122,6 +134,7 @@ export async function createStudent(trx: Knex.Transaction, tenantId: string, inp
       student_number: String(number),
       full_name: input.fullName,
       phone: input.phone,
+      email: input.email,
       school: input.school,
       grade: input.grade,
       notes: input.notes,
@@ -139,6 +152,7 @@ export async function getStudent(trx: Knex.Transaction, id: string) {
       'student_number as studentNumber',
       'full_name as fullName',
       'phone',
+      'email',
       'school',
       'grade',
       'status',
@@ -150,7 +164,7 @@ export async function getStudent(trx: Knex.Transaction, id: string) {
     .join('guardians as g', 'g.id', 'sg.guardian_id')
     .where('sg.student_id', id)
     .orderBy('g.full_name')
-    .select('g.id', 'g.full_name as fullName', 'g.phone', 'sg.relationship');
+    .select('g.id', 'g.full_name as fullName', 'g.phone', 'g.email', 'sg.relationship');
   const classes = await trx('enrollments as e')
     .join('batches as b', 'b.id', 'e.batch_id')
     .join('subjects as su', 'su.id', 'b.subject_id')

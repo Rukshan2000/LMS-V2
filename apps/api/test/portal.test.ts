@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { emailFor, provision, signupUser } from './provision.js';
 import { colomboToday } from '../src/lib/time.js';
 
 let app: FastifyInstance;
@@ -14,11 +15,8 @@ let api: string;
 let kid1: string, kid2: string, other: string;
 
 async function signup(phone: string) {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  await provision(ownerDb, phone);
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return `sid=${sid.value}`;
 }
@@ -34,14 +32,24 @@ async function student(fullName: string, phone: string | null, guardianPhone: st
   const res = await call('POST', '/students', {
     fullName,
     phone,
-    guardians: [{ fullName: 'Kamala', phone: guardianPhone, relationship: 'mother' }],
+    email: phone && emailFor(phone),
+    guardians: [
+      {
+        fullName: 'Kamala',
+        phone: guardianPhone,
+        email: emailFor(guardianPhone),
+        relationship: 'mother',
+      },
+    ],
     force: true,
   });
   expect(res.statusCode).toBe(201);
   return res.json().student.id as string;
 }
 async function invite(studentId: string, phone: string) {
-  const res = await call('POST', `/students/${studentId}/portal-invite`, { phone });
+  const res = await call('POST', `/students/${studentId}/portal-invite`, {
+    email: emailFor(phone),
+  });
   expect(res.statusCode).toBe(201);
   return res.json().code as string;
 }
@@ -94,7 +102,7 @@ describe('portal', () => {
     });
   });
 
-  it('a student invite uses the student’s own mobile', async () => {
+  it('a student invite uses the student’s own email', async () => {
     const amal = await signup('0711111111');
     await accept(await invite(kid1, '0711111111'), amal);
     const me = (await call('GET', '', undefined, amal)).json();
@@ -102,13 +110,15 @@ describe('portal', () => {
     expect((await call('GET', '/portal', undefined, amal)).json().children).toHaveLength(1);
   });
 
-  it('only the student’s or a guardian’s phone can be invited', async () => {
-    const res = await call('POST', `/students/${kid1}/portal-invite`, { phone: '0733333333' });
+  it('only the student’s or a guardian’s email can be invited', async () => {
+    const res = await call('POST', `/students/${kid1}/portal-invite`, {
+      email: emailFor('0733333333'),
+    });
     expect(res.statusCode).toBe(400);
-    expect(res.json().code).toBe('unknown_phone');
+    expect(res.json().code).toBe('unknown_email');
   });
 
-  it('a forwarded link is useless to another phone', async () => {
+  it('a forwarded link is useless to another email', async () => {
     const code = await invite(other, '0733333333');
     const stranger = await signup('0744444444');
     expect((await accept(code, stranger)).statusCode).toBe(403);
@@ -134,7 +144,7 @@ describe('portal', () => {
     await accept(await invite(kid1, '0722222222'), mother);
     const res = await call('POST', '/invites', {
       fullName: 'Kamala',
-      phone: '0722222222',
+      email: emailFor('0722222222'),
       role: 'teacher',
     });
     expect(res.statusCode).toBe(201);

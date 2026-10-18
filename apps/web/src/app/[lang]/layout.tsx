@@ -29,7 +29,9 @@ export default async function RootLayout({ children, params }: LayoutProps<'/[la
       lang={lang}
       className={`${latin.variable} ${sinhala.variable} ${tamil.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">
+      {/* Browser extensions (e.g. ColorZilla's cz-shortcut-listen) add attributes to <body>
+          before React loads; this ignores attribute differences on this element only. */}
+      <body className="flex min-h-full flex-col font-sans" suppressHydrationWarning>
         <I18nProvider lang={lang} dict={dict}>
           {children}
         </I18nProvider>

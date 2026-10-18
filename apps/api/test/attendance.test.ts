@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { provision, signupUser } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -14,11 +15,8 @@ let api: string;
 const minutes = (n: number) => new Date(Date.now() + n * 60_000).toISOString();
 
 async function signup(phone: string) {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName: `User ${phone}` },
-  });
+  await provision(ownerDb, phone);
+  const res = await signupUser(app, { phone, fullName: `User ${phone}` });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }

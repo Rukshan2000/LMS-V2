@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import type { Knex } from 'knex';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { hashPassword } from '../src/modules/identity/service.js';
+import { emailFor, provision, sentMail, signupUser } from './provision.js';
 
 let app: FastifyInstance;
 let appDb: Knex;
@@ -11,11 +13,8 @@ let owner: string;
 let tenantId: string;
 
 async function signup(phone: string, fullName = `User ${phone}`) {
-  const res = await app.inject({
-    method: 'POST',
-    url: '/api/v1/auth/signup',
-    payload: { phone, password: 'correct-horse', acceptPrivacy: true, fullName },
-  });
+  await provision(ownerDb, phone);
+  const res = await signupUser(app, { phone, fullName });
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return `sid=${sid.value}`;
 }
@@ -31,11 +30,11 @@ const req = (method: string, url: string, cookie?: string, payload?: unknown) =>
 async function invite(role = 'teacher', phone = '0712345678') {
   const res = await req('POST', `/api/v1/tenants/${tenantId}/invites`, owner, {
     fullName: 'Sunil Teacher',
-    phone,
+    email: emailFor(phone),
     role,
   });
   expect(res.statusCode).toBe(201);
-  return res.json() as { code: string; invite: { id: string } };
+  return res.json() as { code: string; invite: { id: string }; emailSent: boolean };
 }
 
 beforeAll(async () => {
@@ -58,13 +57,18 @@ beforeEach(async () => {
 });
 
 describe('staff invites', () => {
-  it('invitee sees the invite, signs up with that phone, accepts and gets the role', async () => {
-    const { code } = await invite('teacher');
+  it('invitee gets the link by email, signs up with that email, accepts and gets the role', async () => {
+    const { code, emailSent } = await invite('teacher');
+    expect(emailSent).toBe(true);
+    const mail = sentMail(app).at(-1)!;
+    expect(mail.to).toBe('94712345678@test.lk');
+    expect(mail.subject).toBe('Invitation to Nimal Maths');
+    expect(mail.text).toContain(`/join/${code}`);
     const view = await req('GET', `/api/v1/invites/${code}`);
     expect(view.json().invite).toMatchObject({
       tenantName: 'Nimal Maths',
       role: 'teacher',
-      phone: '94712345678',
+      email: '94712345678@test.lk',
     });
 
     const teacher = await signup('071 234 5678');
@@ -78,12 +82,71 @@ describe('staff invites', () => {
     expect((await req('POST', `/api/v1/invites/${code}/accept`, teacher)).statusCode).toBe(404);
   });
 
-  it('a forwarded link cannot be used by a different phone number', async () => {
+  it('a forwarded link cannot be used by a different email', async () => {
     const { code } = await invite();
     const stranger = await signup('0779999999');
     const res = await req('POST', `/api/v1/invites/${code}/accept`, stranger);
     expect(res.statusCode).toBe(403);
-    expect(res.json().code).toBe('wrong_phone');
+    expect(res.json().code).toBe('wrong_email');
+  });
+
+  it('an email invite needs that email verified; old phone invites still match by phone', async () => {
+    const { code } = await invite();
+    // A user from before email login: phone only, then claims the invited email unverified.
+    const [legacy] = await ownerDb('users')
+      .insert({
+        phone: '94712345678',
+        email: '94712345678@test.lk',
+        full_name: 'Old',
+        password_hash: await hashPassword('correct-horse'),
+      })
+      .returning('id');
+    const login = await req('POST', '/api/v1/auth/login', undefined, {
+      identifier: '0712345678',
+      password: 'correct-horse',
+    });
+    expect(login.statusCode).toBe(200);
+    expect(login.json().user).toMatchObject({ id: legacy.id, emailVerified: false });
+    const cookie = `sid=${login.cookies.find((c) => c.name === 'sid')!.value}`;
+    expect((await req('POST', `/api/v1/invites/${code}/accept`, cookie)).json().code).toBe(
+      'wrong_email',
+    );
+
+    // An invite made before the change (phone, no email) is still accepted by phone.
+    await ownerDb('tenant_invites').update({ email: null, phone: '94712345678' });
+    expect((await req('POST', `/api/v1/invites/${code}/accept`, cookie)).statusCode).toBe(200);
+  });
+
+  it('resend mails a new link and the old one stops working', async () => {
+    const first = await invite();
+    const res = await req(
+      'POST',
+      `/api/v1/tenants/${tenantId}/invites/${first.invite.id}/resend`,
+      owner,
+    );
+    expect(res.json().emailSent).toBe(true);
+    expect(sentMail(app).at(-1)!.text).toContain(`/join/${res.json().code}`);
+    expect((await req('GET', `/api/v1/invites/${first.code}`)).statusCode).toBe(404);
+    expect((await req('GET', `/api/v1/invites/${res.json().code}`)).statusCode).toBe(200);
+  });
+
+  it('a failed email still creates the invite, so the link can be copied', async () => {
+    const original = app.mailer.send;
+    app.mailer.send = async () => {
+      throw new Error('smtp down');
+    };
+    try {
+      const res = await req('POST', `/api/v1/tenants/${tenantId}/invites`, owner, {
+        fullName: 'X',
+        email: 'x@test.lk',
+        role: 'teacher',
+      });
+      expect(res.statusCode).toBe(201);
+      expect(res.json().emailSent).toBe(false);
+      expect((await req('GET', `/api/v1/invites/${res.json().code}`)).statusCode).toBe(200);
+    } finally {
+      app.mailer.send = original;
+    }
   });
 
   it('accepting requires login', async () => {
@@ -103,12 +166,12 @@ describe('staff invites', () => {
 
     const { code: c2 } = await invite('receptionist', '0723334444');
     await ownerDb('tenant_invites')
-      .where({ phone: '94723334444' })
+      .where({ email: emailFor('0723334444') })
       .update({ expires_at: new Date(Date.now() - 1000) });
     expect((await req('GET', `/api/v1/invites/${c2}`)).statusCode).toBe(404);
   });
 
-  it('re-inviting the same phone replaces the old link', async () => {
+  it('re-inviting the same email replaces the old link', async () => {
     const first = await invite();
     const second = await invite('receptionist');
     expect((await req('GET', `/api/v1/invites/${first.code}`)).statusCode).toBe(404);
@@ -125,13 +188,13 @@ describe('staff invites', () => {
     await req('POST', `/api/v1/invites/${code}/accept`, teacher);
     const again = await req('POST', `/api/v1/tenants/${tenantId}/invites`, owner, {
       fullName: 'X',
-      phone: '0712345678',
+      email: emailFor('0712345678'),
       role: 'admin',
     });
     expect(again.json().code).toBe('already_member');
     const asOwner = await req('POST', `/api/v1/tenants/${tenantId}/invites`, owner, {
       fullName: 'X',
-      phone: '0711111111',
+      email: emailFor('0711111111'),
       role: 'owner',
     });
     expect(asOwner.statusCode).toBe(400);
@@ -143,7 +206,7 @@ describe('staff invites', () => {
     await req('POST', `/api/v1/invites/${code}/accept`, r);
     const res = await req('POST', `/api/v1/tenants/${tenantId}/invites`, r, {
       fullName: 'X',
-      phone: '0711111111',
+      email: emailFor('0711111111'),
       role: 'teacher',
     });
     expect(res.statusCode).toBe(403);

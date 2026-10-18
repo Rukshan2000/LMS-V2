@@ -14,6 +14,7 @@ export {
   voidInvoice,
   // Platform console (modules/platform). Every mutation writes one platform_audit row.
   clearOverride,
+  countUnverifiedUsers,
   createAccount,
   createPriceBook,
   extendTrial,
@@ -27,6 +28,7 @@ export {
   recountUsage,
   setOverride,
   suspendAccount,
+  unclaimedOwnerEmail,
   unsuspendAccount,
   updateAccount,
   updatePriceBook,

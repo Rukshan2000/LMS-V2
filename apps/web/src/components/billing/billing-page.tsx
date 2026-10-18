@@ -9,7 +9,7 @@ import { cents, fmtMoney, fromCents } from '@/lib/money';
 import { waLink } from '@/lib/whatsapp';
 import { HEADS, StateBadge, Table, Td } from '../admin/shared';
 import { useTenantData } from '../dashboard-shell';
-import { Badge, card, FormError, Skeleton, btn } from '../ui';
+import { Badge, card, FormError, Skeleton, Tabs, btn } from '../ui';
 
 const CAPS: Cap[] = ['students', 'teachers', 'parents', 'institutes'];
 const dueOf = (i: Billing['invoices'][number]) =>
@@ -31,7 +31,6 @@ export function BillingPage() {
 
   const caps = CAPS.filter((c) => e.caps[c].limit !== null);
   const section = `${card} space-y-3 p-4 text-sm`;
-  const heading = 'flex flex-wrap items-center gap-2 text-base font-medium';
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -76,136 +75,147 @@ export function BillingPage() {
 
       {!data && !error && <Skeleton />}
       {data && (
-        <>
-          <section className={section}>
-            <h2 className={heading}>
-              <CreditCard aria-hidden className="size-5 text-primary" />
-              {fmt(b.thisMonth, { month: data.thisMonth.period })}
-            </h2>
-            <p className="text-ink-subtle">{b.thisMonthHint}</p>
-            {data.thisMonth.lines.length === 0 ? (
-              <p>{e.state === 'trial' ? b.nothingTrial : b.nothing}</p>
-            ) : (
-              <Table head={[b.item, b.peak, b.unitPrice, b.amount]}>
-                {data.thisMonth.lines.map((l) =>
-                  l.type === 'head' ? (
-                    <tr key={l.head}>
-                      <Td>
-                        {t.admin.heads[l.head]}
-                        {l.included > 0 && (
-                          <span className="block text-ink-subtle">
-                            {fmt(b.included, { count: l.included })}
-                          </span>
-                        )}
-                      </Td>
-                      <Td num>{l.peak}</Td>
-                      <Td num>{fmtMoney(l.unitPrice)}</Td>
-                      <Td num>{fmtMoney(l.amount)}</Td>
-                    </tr>
+        <Tabs
+          items={[
+            {
+              id: 'month',
+              icon: CreditCard,
+              label: fmt(b.thisMonth, { month: data.thisMonth.period }),
+              content: (
+                <section className={section}>
+                  <p className="text-ink-subtle">{b.thisMonthHint}</p>
+                  {data.thisMonth.lines.length === 0 ? (
+                    <p>{e.state === 'trial' ? b.nothingTrial : b.nothing}</p>
                   ) : (
-                    <tr key="minimum">
-                      <Td>{fmt(b.minimum, { amount: fmtMoney(l.minimum) })}</Td>
-                      <Td num>{''}</Td>
-                      <Td num>{''}</Td>
-                      <Td num>{fmtMoney(l.amount)}</Td>
-                    </tr>
-                  ),
-                )}
-                <tr className="font-medium">
-                  <Td>{b.total}</Td>
-                  <Td num>{''}</Td>
-                  <Td num>{''}</Td>
-                  <Td num>{fmtMoney(data.thisMonth.total)}</Td>
-                </tr>
-              </Table>
-            )}
-            <p className="text-ink-subtle">
-              {b.prices}{' '}
-              {HEADS.filter((h) => cents(data.prices[h]) > 0)
-                .map((h) => `${t.admin.heads[h]} LKR ${fmtMoney(data.prices[h])}`)
-                .join(' · ')}
-            </p>
-          </section>
-
-          <section className={section}>
-            <h2 className={heading}>
-              <ReceiptText aria-hidden className="size-5 text-primary" />
-              {b.invoices}
-            </h2>
-            {data.invoices.length === 0 ? (
-              <p className="text-ink-subtle">{b.noInvoices}</p>
-            ) : (
-              <Table head={[b.number, b.month, b.amount, b.due, b.status]}>
-                {data.invoices.map((i) => (
-                  <tr key={i.id}>
-                    <Td>
-                      <span className="font-mono whitespace-nowrap">{i.number}</span>
-                    </Td>
-                    <Td>{i.period}</Td>
-                    <Td num>
-                      {fmtMoney(i.total)}
-                      {i.status === 'open' && cents(i.paid) > 0 && (
-                        <span className="block text-ink-subtle">
-                          {fmt(b.left, { amount: fmtMoney(dueOf(i)) })}
-                        </span>
+                    <Table head={[b.item, b.peak, b.unitPrice, b.amount]}>
+                      {data.thisMonth.lines.map((l) =>
+                        l.type === 'head' ? (
+                          <tr key={l.head}>
+                            <Td>
+                              {t.admin.heads[l.head]}
+                              {l.included > 0 && (
+                                <span className="block text-ink-subtle">
+                                  {fmt(b.included, { count: l.included })}
+                                </span>
+                              )}
+                            </Td>
+                            <Td num>{l.peak}</Td>
+                            <Td num>{fmtMoney(l.unitPrice)}</Td>
+                            <Td num>{fmtMoney(l.amount)}</Td>
+                          </tr>
+                        ) : (
+                          <tr key="minimum">
+                            <Td>{fmt(b.minimum, { amount: fmtMoney(l.minimum) })}</Td>
+                            <Td num>{''}</Td>
+                            <Td num>{''}</Td>
+                            <Td num>{fmtMoney(l.amount)}</Td>
+                          </tr>
+                        ),
                       )}
-                    </Td>
-                    <Td>
-                      <span className="whitespace-nowrap">{i.dueDate}</span>
-                    </Td>
-                    <Td>
-                      <Badge tone={i.status === 'paid' ? 'success' : 'warning'}>
-                        {b.statuses[i.status]}
-                      </Badge>
-                    </Td>
-                  </tr>
-                ))}
-              </Table>
-            )}
-            {/* Outside the table, so the button never scrolls off a phone screen. */}
-            {data.payTo.whatsapp &&
-              data.invoices
-                .filter((i) => i.status === 'open')
-                .map((i) => (
-                  <a
-                    key={i.id}
-                    href={waLink(
-                      data.payTo.whatsapp!,
-                      fmt(b.slipMessage, {
-                        number: i.number,
-                        amount: fmtMoney(dueOf(i)),
-                        institute: tenant.name,
-                      }),
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`${btn('whatsapp')} w-full sm:w-auto`}
-                  >
-                    <MessageCircle aria-hidden className="size-4" />
-                    {b.sendSlip}
-                    <span className="font-mono">
-                      {i.number} · LKR {fmtMoney(dueOf(i))}
-                    </span>
-                  </a>
-                ))}
-          </section>
-
-          <section className={section}>
-            <h2 className={heading}>
-              <Landmark aria-hidden className="size-5 text-primary" />
-              {b.howToPay}
-            </h2>
-            {data.payTo.bankDetails ? (
-              <p className="rounded-lg bg-surface-soft p-3 font-mono whitespace-pre-line">
-                {data.payTo.bankDetails}
-              </p>
-            ) : (
-              <p className="text-ink-subtle">{b.noBankDetails}</p>
-            )}
-            <p>{b.reference}</p>
-            {data.payTo.whatsapp && <p>{fmt(b.whatsapp, { phone: `+${data.payTo.whatsapp}` })}</p>}
-          </section>
-        </>
+                      <tr className="font-medium">
+                        <Td>{b.total}</Td>
+                        <Td num>{''}</Td>
+                        <Td num>{''}</Td>
+                        <Td num>{fmtMoney(data.thisMonth.total)}</Td>
+                      </tr>
+                    </Table>
+                  )}
+                  <p className="text-ink-subtle">
+                    {b.prices}{' '}
+                    {HEADS.filter((h) => cents(data.prices[h]) > 0)
+                      .map((h) => `${t.admin.heads[h]} LKR ${fmtMoney(data.prices[h])}`)
+                      .join(' · ')}
+                  </p>
+                </section>
+              ),
+            },
+            {
+              id: 'invoices',
+              icon: ReceiptText,
+              label: b.invoices,
+              content: (
+                <section className={section}>
+                  {data.invoices.length === 0 ? (
+                    <p className="text-ink-subtle">{b.noInvoices}</p>
+                  ) : (
+                    <Table head={[b.number, b.month, b.amount, b.due, b.status]}>
+                      {data.invoices.map((i) => (
+                        <tr key={i.id}>
+                          <Td>
+                            <span className="font-mono whitespace-nowrap">{i.number}</span>
+                          </Td>
+                          <Td>{i.period}</Td>
+                          <Td num>
+                            {fmtMoney(i.total)}
+                            {i.status === 'open' && cents(i.paid) > 0 && (
+                              <span className="block text-ink-subtle">
+                                {fmt(b.left, { amount: fmtMoney(dueOf(i)) })}
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            <span className="whitespace-nowrap">{i.dueDate}</span>
+                          </Td>
+                          <Td>
+                            <Badge tone={i.status === 'paid' ? 'success' : 'warning'}>
+                              {b.statuses[i.status]}
+                            </Badge>
+                          </Td>
+                        </tr>
+                      ))}
+                    </Table>
+                  )}
+                  {/* Outside the table, so the button never scrolls off a phone screen. */}
+                  {data.payTo.whatsapp &&
+                    data.invoices
+                      .filter((i) => i.status === 'open')
+                      .map((i) => (
+                        <a
+                          key={i.id}
+                          href={waLink(
+                            data.payTo.whatsapp!,
+                            fmt(b.slipMessage, {
+                              number: i.number,
+                              amount: fmtMoney(dueOf(i)),
+                              institute: tenant.name,
+                            }),
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`${btn('whatsapp')} w-full sm:w-auto`}
+                        >
+                          <MessageCircle aria-hidden className="size-4" />
+                          {b.sendSlip}
+                          <span className="font-mono">
+                            {i.number} · LKR {fmtMoney(dueOf(i))}
+                          </span>
+                        </a>
+                      ))}
+                </section>
+              ),
+            },
+            {
+              id: 'pay',
+              icon: Landmark,
+              label: b.howToPay,
+              content: (
+                <section className={section}>
+                  {data.payTo.bankDetails ? (
+                    <p className="rounded-lg bg-surface-soft p-3 font-mono whitespace-pre-line">
+                      {data.payTo.bankDetails}
+                    </p>
+                  ) : (
+                    <p className="text-ink-subtle">{b.noBankDetails}</p>
+                  )}
+                  <p>{b.reference}</p>
+                  {data.payTo.whatsapp && (
+                    <p>{fmt(b.whatsapp, { phone: `+${data.payTo.whatsapp}` })}</p>
+                  )}
+                </section>
+              ),
+            },
+          ]}
+        />
       )}
     </div>
   );

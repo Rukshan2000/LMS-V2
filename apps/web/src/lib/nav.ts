@@ -29,6 +29,8 @@ export const NAV: NavItem[] = [
   { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist'] },
   { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'], feature: 'bank_slips' },
   { key: 'timetable', path: '/timetable', roles: [...STAFF, 'receptionist', 'teacher'] },
+  // Students and parents find quizzes on their overview (portal).
+  { key: 'quizzes', path: '/quizzes', roles: [...STAFF, 'teacher'], feature: 'quizzes' },
   { key: 'reports', path: '/reports', roles: STAFF, feature: 'reports' },
   { key: 'billing', path: '/billing', roles: STAFF },
   { key: 'settings', path: '/settings', roles: STAFF },

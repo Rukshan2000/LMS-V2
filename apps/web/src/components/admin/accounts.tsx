@@ -48,6 +48,7 @@ export function AccountsList() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all');
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [unverified, setUnverified] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,8 +56,11 @@ export function AccountsList() {
     if (q.trim()) params.set('q', q.trim());
     if (filter !== 'all') params.set('state', filter);
     const timer = setTimeout(() => {
-      api<{ accounts: Row[] }>(`/admin/accounts?${params}`)
-        .then((r) => setRows(r.accounts))
+      api<{ accounts: Row[]; unverifiedUsers: number }>(`/admin/accounts?${params}`)
+        .then((r) => {
+          setRows(r.accounts);
+          setUnverified(r.unverifiedUsers);
+        })
         .catch((err) => setError(errorMessage(t, err)));
     }, 250);
     return () => clearTimeout(timer);
@@ -72,6 +76,9 @@ export function AccountsList() {
         </Link>
       </div>
       <FormError message={error} />
+      {unverified > 0 && (
+        <p className="text-sm text-ink-subtle">{fmt(a.unverified, { count: unverified })}</p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex min-w-60 flex-1 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3">
           <Search aria-hidden className="size-4 text-ink-subtle" />
@@ -120,7 +127,7 @@ export function AccountsList() {
                 <Td>
                   {r.ownerName ?? <span className="text-ink-subtle">{a.unclaimed}</span>}
                   <span className="block text-xs text-ink-subtle">
-                    {displayPhone(r.ownerPhone)}
+                    {r.ownerEmail ?? displayPhone(r.ownerPhone)}
                   </span>
                 </Td>
                 <Td>
@@ -137,7 +144,7 @@ export function AccountsList() {
                 <Td num>{fmtMoney(r.estimate)}</Td>
                 <Td num>{Number(r.amountDue) > 0 ? fmtMoney(r.amountDue) : '–'}</Td>
                 <Td>
-                  {text && (
+                  {text && r.ownerPhone && (
                     <a
                       href={waLink(r.ownerPhone, text)}
                       target="_blank"
@@ -165,13 +172,17 @@ export function NewAccount() {
   const [form, setForm] = useState({
     name: '',
     ownerName: '',
+    ownerEmail: '',
     ownerPhone: '',
     priceBook: '',
     trialDays: '30',
   });
-  const [created, setCreated] = useState<{ id: string; message: string; phone: string } | null>(
-    null,
-  );
+  const [created, setCreated] = useState<{
+    id: string;
+    message: string;
+    phone: string | null;
+    emailSent: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -197,10 +208,14 @@ export function NewAccount() {
     setError(null);
     try {
       // ownerName is not sent: it only goes into the WhatsApp message (SAAS_PLAN §10.2).
-      const res = await api<{ account: { id: string; ownerPhone: string } }>('/admin/accounts', {
+      const res = await api<{
+        account: { id: string; ownerEmail: string; ownerPhone: string | null };
+        emailSent: boolean;
+      }>('/admin/accounts', {
         method: 'POST',
         body: {
           name: form.name,
+          ownerEmail: form.ownerEmail,
           ownerPhone: form.ownerPhone,
           priceBook: form.priceBook,
           trialDays: Number(form.trialDays),
@@ -209,10 +224,12 @@ export function NewAccount() {
       setCreated({
         id: res.account.id,
         phone: res.account.ownerPhone,
+        emailSent: res.emailSent,
         message: fmt(n.message, {
           name: form.ownerName || form.name,
           account: form.name,
-          url: `${window.location.origin}/${lang}/signup`,
+          email: res.account.ownerEmail,
+          url: `${window.location.origin}/${lang}/signup?email=${encodeURIComponent(res.account.ownerEmail)}`,
         }),
       });
     } catch (err) {
@@ -229,7 +246,11 @@ export function NewAccount() {
       <h1 className="text-2xl font-semibold">{n.title}</h1>
       {created ? (
         <div className="space-y-3">
-          <FormSuccess>{n.created}</FormSuccess>
+          {created.emailSent ? (
+            <FormSuccess>{n.created}</FormSuccess>
+          ) : (
+            <FormError message={n.createdNoEmail} />
+          )}
           <a
             href={waLink(created.phone, created.message)}
             target="_blank"
@@ -258,8 +279,15 @@ export function NewAccount() {
             onChange={set('ownerName')}
           />
           <Field
-            label={n.ownerPhone}
+            label={n.ownerEmail}
             required
+            type="email"
+            maxLength={254}
+            value={form.ownerEmail}
+            onChange={set('ownerEmail')}
+          />
+          <Field
+            label={n.ownerPhone}
             type="tel"
             inputMode="tel"
             value={form.ownerPhone}

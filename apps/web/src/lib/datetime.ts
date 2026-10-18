@@ -37,3 +37,8 @@ export const mondayOf = (date: string) =>
 
 /** Sri Lanka local date + time → ISO string with offset, for the API. */
 export const toIso = (date: string, time: string) => `${date}T${time}:00+05:30`;
+
+/** ISO timestamp → "YYYY-MM-DDTHH:MM" in Sri Lanka time, for <input type="datetime-local">. */
+export const toLocalInput = (iso: string) => `${colomboDate(iso)}T${colomboTime(iso)}`;
+/** <input type="datetime-local"> value (Sri Lanka time) → ISO string for the API. */
+export const fromLocalInput = (value: string) => toIso(value.slice(0, 10), value.slice(11, 16));

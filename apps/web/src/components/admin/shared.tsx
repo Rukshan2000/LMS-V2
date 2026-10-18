@@ -13,7 +13,8 @@ export type Head = (typeof HEADS)[number];
 export interface AccountSummary {
   id: string;
   name: string;
-  ownerPhone: string;
+  ownerEmail: string | null;
+  ownerPhone: string | null;
   ownerName: string | null;
   claimed: boolean;
   priceBook: string;
@@ -30,7 +31,8 @@ export interface Invoice {
   id: string;
   accountId: string;
   accountName?: string;
-  ownerPhone?: string;
+  ownerEmail?: string | null;
+  ownerPhone?: string | null;
   number: string;
   period: string;
   total: string;

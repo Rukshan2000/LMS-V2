@@ -1,6 +1,19 @@
 'use client';
 
-import { Ban, CalendarPlus, CircleCheck, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  Ban,
+  Building2,
+  CalendarPlus,
+  ChartColumn,
+  CircleCheck,
+  History,
+  Mail,
+  ReceiptText,
+  RefreshCw,
+  Settings2,
+  SlidersHorizontal,
+  Trash2,
+} from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
@@ -8,7 +21,17 @@ import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
 import { cents, fmtMoney, fromCents } from '@/lib/money';
 import { displayPhone } from '../students/types';
-import { BackLink, Badge, Button, card, ConfirmButton, Field, FormError, useToast } from '../ui';
+import {
+  BackLink,
+  Badge,
+  Button,
+  card,
+  ConfirmButton,
+  Field,
+  FormError,
+  Tabs,
+  useToast,
+} from '../ui';
 import {
   HEADS,
   HeadCounts,
@@ -103,6 +126,19 @@ export function AccountDetail() {
     }
   }
 
+  async function resendInvite() {
+    setError(null);
+    try {
+      const { emailSent } = await api<{ emailSent: boolean }>(`/admin/accounts/${id}/invite`, {
+        method: 'POST',
+      });
+      if (emailSent) toast(d.resent);
+      else setError(t.errors.mail_unavailable);
+    } catch (err) {
+      fail(err);
+    }
+  }
+
   if (!data) return <FormError message={error} />;
   const { account } = data;
   const maxDay = Math.max(1, ...data.month.days.map((x) => x.student));
@@ -117,8 +153,19 @@ export function AccountDetail() {
       <FormError message={error} />
 
       <section className={`${card} grid gap-4 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4`}>
-        <Info label={d.ownerPhone}>
-          {account.ownerName ?? t.admin.accounts.unclaimed} · {displayPhone(account.ownerPhone)}
+        <Info label={d.ownerEmail}>
+          {account.ownerName ?? t.admin.accounts.unclaimed} · {account.ownerEmail ?? '–'}
+          {account.ownerPhone && ` · ${displayPhone(account.ownerPhone)}`}
+          {!account.claimed && account.ownerEmail && (
+            <button
+              type="button"
+              onClick={resendInvite}
+              className="mt-1 flex items-center gap-1 font-medium text-primary hover:text-primary-hover"
+            >
+              <Mail aria-hidden className="size-4" />
+              {d.resend}
+            </button>
+          )}
         </Info>
         <Info label={d.priceBook}>{account.priceBook}</Info>
         <Info label={d.trialEnds}>
@@ -137,149 +184,209 @@ export function AccountDetail() {
         )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title={d.extendTrial}>
-          <TrialForm onSubmit={(days) => run(`/accounts/${id}/trial`, 'POST', { days })} />
-        </Section>
-        <Section title={account.suspendedAt ? d.unsuspend : d.suspend}>
-          {account.suspendedAt ? (
-            <ConfirmButton
-              icon={CircleCheck}
-              onConfirm={() => run(`/accounts/${id}/unsuspend`, 'POST')}
-            >
-              {d.unsuspend}
-            </ConfirmButton>
-          ) : (
-            <ReasonForm
-              label={d.reason}
-              action={d.suspend}
-              icon={Ban}
-              onSubmit={(reason) => run(`/accounts/${id}/suspend`, 'POST', { reason })}
-            />
-          )}
-        </Section>
-      </div>
+      <Tabs
+        items={[
+          {
+            id: 'manage',
+            icon: Settings2,
+            label: d.manage,
+            content: (
+              <>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <Section title={d.extendTrial}>
+                    <TrialForm
+                      onSubmit={(days) => run(`/accounts/${id}/trial`, 'POST', { days })}
+                    />
+                  </Section>
+                  <Section title={account.suspendedAt ? d.unsuspend : d.suspend}>
+                    {account.suspendedAt ? (
+                      <ConfirmButton
+                        icon={CircleCheck}
+                        onConfirm={() => run(`/accounts/${id}/unsuspend`, 'POST')}
+                      >
+                        {d.unsuspend}
+                      </ConfirmButton>
+                    ) : (
+                      <ReasonForm
+                        label={d.reason}
+                        action={d.suspend}
+                        icon={Ban}
+                        onSubmit={(reason) => run(`/accounts/${id}/suspend`, 'POST', { reason })}
+                      />
+                    )}
+                  </Section>
+                </div>
 
-      <Section title={d.name}>
-        <AccountForm
-          key={JSON.stringify([account.name, account.notes, account.priceBook])}
-          account={account}
-          books={books}
-          onSubmit={(patch) => run(`/accounts/${id}`, 'PATCH', patch)}
-        />
-      </Section>
-
-      <Section title={d.values}>
-        <Table head={[d.key, `${d.bookValue} (${data.book.key})`, d.overrideValue, '']}>
-          {keys.map((key) => {
-            const o = data.overrides.find((x) => x.key === key);
-            return (
-              <tr key={key} className={o ? 'bg-warning-soft/60' : undefined}>
-                <Td>
-                  <code>{key}</code>
-                </Td>
-                <Td>{key in data.book.values ? showValue(data.book.values[key], d) : '–'}</Td>
-                <Td>
-                  {o && (
-                    <>
-                      <span className="font-medium">{showValue(o.value, d)}</span>
-                      <span className="block text-xs text-ink-subtle">
-                        {o.note}
-                        {o.expiresAt && ` · ${fmt(d.until, { date: colomboDate(o.expiresAt) })}`}
-                      </span>
-                    </>
-                  )}
-                </Td>
-                <Td>
-                  {o && (
-                    <ConfirmButton
-                      icon={Trash2}
-                      onConfirm={() => run(`/accounts/${id}/overrides/${key}`, 'DELETE')}
+                <Section title={d.name}>
+                  <AccountForm
+                    key={JSON.stringify([
+                      account.name,
+                      account.notes,
+                      account.priceBook,
+                      account.ownerEmail,
+                    ])}
+                    account={account}
+                    books={books}
+                    onSubmit={(patch) => run(`/accounts/${id}`, 'PATCH', patch)}
+                  />
+                </Section>
+              </>
+            ),
+          },
+          {
+            id: 'values',
+            icon: SlidersHorizontal,
+            label: d.values,
+            content: (
+              <section className={`${card} space-y-3 p-4`}>
+                <Table head={[d.key, `${d.bookValue} (${data.book.key})`, d.overrideValue, '']}>
+                  {keys.map((key) => {
+                    const o = data.overrides.find((x) => x.key === key);
+                    return (
+                      <tr key={key} className={o ? 'bg-warning-soft/60' : undefined}>
+                        <Td>
+                          <code>{key}</code>
+                        </Td>
+                        <Td>
+                          {key in data.book.values ? showValue(data.book.values[key], d) : '–'}
+                        </Td>
+                        <Td>
+                          {o && (
+                            <>
+                              <span className="font-medium">{showValue(o.value, d)}</span>
+                              <span className="block text-xs text-ink-subtle">
+                                {o.note}
+                                {o.expiresAt &&
+                                  ` · ${fmt(d.until, { date: colomboDate(o.expiresAt) })}`}
+                              </span>
+                            </>
+                          )}
+                        </Td>
+                        <Td>
+                          {o && (
+                            <ConfirmButton
+                              icon={Trash2}
+                              onConfirm={() => run(`/accounts/${id}/overrides/${key}`, 'DELETE')}
+                            >
+                              {d.remove}
+                            </ConfirmButton>
+                          )}
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </Table>
+                <h3 className="pt-2 text-sm font-medium">{d.setOverride}</h3>
+                <OverrideForm
+                  keys={keys}
+                  onSubmit={(key, body) => run(`/accounts/${id}/overrides/${key}`, 'PUT', body)}
+                />
+              </section>
+            ),
+          },
+          {
+            id: 'usage',
+            icon: ChartColumn,
+            label: d.usage,
+            content: (
+              <section className={`${card} space-y-3 p-4`}>
+                <p className="text-sm">
+                  {fmt(d.estimate, { total: fmtMoney(data.month.estimate.total) })} ·{' '}
+                  <HeadCounts counts={data.month.headsNow} />
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <ConfirmButton
+                    icon={RefreshCw}
+                    onConfirm={() => run(`/accounts/${id}/recount`, 'POST')}
+                  >
+                    {d.recount}
+                  </ConfirmButton>
+                  <span className="text-ink-subtle">{d.recountHint}</span>
+                </div>
+                <ul className="space-y-1 text-xs">
+                  {data.month.days.map((day) => (
+                    <li key={day.day} className="flex items-center gap-2">
+                      <span className="w-20 shrink-0 font-mono text-ink-subtle">{day.day}</span>
+                      <span
+                        className="h-2 rounded-full bg-primary"
+                        style={{ width: `${(day.student * 40) / maxDay}%` }}
+                      />
+                      <HeadCounts
+                        counts={
+                          Object.fromEntries(HEADS.map((h) => [h, day[h]])) as Record<Head, number>
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ),
+          },
+          {
+            id: 'institutes',
+            icon: Building2,
+            label: d.institutes,
+            content: (
+              <section className={`${card} space-y-3 p-4`}>
+                <ul className="divide-y divide-line text-sm">
+                  {data.institutes.map((i) => (
+                    <li key={i.id} className="flex justify-between py-1.5">
+                      <span>{i.name}</span>
+                      <span className="text-ink-subtle">{i.slug}</span>
+                    </li>
+                  ))}
+                  {!data.institutes.length && <li className="text-ink-subtle">{d.none}</li>}
+                </ul>
+              </section>
+            ),
+          },
+          {
+            id: 'invoices',
+            icon: ReceiptText,
+            label: d.invoices,
+            content: (
+              <section className={`${card} space-y-3 p-4`}>
+                {data.invoices.length ? (
+                  <ul className="divide-y divide-line text-sm">
+                    {data.invoices.map((inv) => (
+                      <InvoiceRow key={inv.id} invoice={inv} run={run} />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-subtle">{d.noInvoices}</p>
+                )}
+                {data.payments.length > 0 && (
+                  <>
+                    <h3 className="pt-2 text-sm font-medium">{d.payments}</h3>
+                    <Table
+                      head={[t.admin.invoices.number, d.amount, d.reference, t.admin.audit.when]}
                     >
-                      {d.remove}
-                    </ConfirmButton>
-                  )}
-                </Td>
-              </tr>
-            );
-          })}
-        </Table>
-        <h3 className="pt-2 text-sm font-medium">{d.setOverride}</h3>
-        <OverrideForm
-          keys={keys}
-          onSubmit={(key, body) => run(`/accounts/${id}/overrides/${key}`, 'PUT', body)}
-        />
-      </Section>
-
-      <Section title={d.usage}>
-        <p className="text-sm">
-          {fmt(d.estimate, { total: fmtMoney(data.month.estimate.total) })} ·{' '}
-          <HeadCounts counts={data.month.headsNow} />
-        </p>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <ConfirmButton icon={RefreshCw} onConfirm={() => run(`/accounts/${id}/recount`, 'POST')}>
-            {d.recount}
-          </ConfirmButton>
-          <span className="text-ink-subtle">{d.recountHint}</span>
-        </div>
-        <ul className="space-y-1 text-xs">
-          {data.month.days.map((day) => (
-            <li key={day.day} className="flex items-center gap-2">
-              <span className="w-20 shrink-0 font-mono text-ink-subtle">{day.day}</span>
-              <span
-                className="h-2 rounded-full bg-primary"
-                style={{ width: `${(day.student * 40) / maxDay}%` }}
-              />
-              <HeadCounts
-                counts={Object.fromEntries(HEADS.map((h) => [h, day[h]])) as Record<Head, number>}
-              />
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      <Section title={d.institutes}>
-        <ul className="divide-y divide-line text-sm">
-          {data.institutes.map((i) => (
-            <li key={i.id} className="flex justify-between py-1.5">
-              <span>{i.name}</span>
-              <span className="text-ink-subtle">{i.slug}</span>
-            </li>
-          ))}
-          {!data.institutes.length && <li className="text-ink-subtle">{d.none}</li>}
-        </ul>
-      </Section>
-
-      <Section title={d.invoices}>
-        {data.invoices.length ? (
-          <ul className="divide-y divide-line text-sm">
-            {data.invoices.map((inv) => (
-              <InvoiceRow key={inv.id} invoice={inv} run={run} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-ink-subtle">{d.noInvoices}</p>
-        )}
-        {data.payments.length > 0 && (
-          <>
-            <h3 className="pt-2 text-sm font-medium">{d.payments}</h3>
-            <Table head={[t.admin.invoices.number, d.amount, d.reference, t.admin.audit.when]}>
-              {data.payments.map((p) => (
-                <tr key={p.id}>
-                  <Td>{p.number}</Td>
-                  <Td num>{fmtMoney(p.amount)}</Td>
-                  <Td>{p.reference}</Td>
-                  <Td>{colomboDate(p.receivedAt)}</Td>
-                </tr>
-              ))}
-            </Table>
-          </>
-        )}
-      </Section>
-
-      <Section title={d.history}>
-        <AuditRows events={data.audit} showAccount={false} />
-      </Section>
+                      {data.payments.map((p) => (
+                        <tr key={p.id}>
+                          <Td>{p.number}</Td>
+                          <Td num>{fmtMoney(p.amount)}</Td>
+                          <Td>{p.reference}</Td>
+                          <Td>{colomboDate(p.receivedAt)}</Td>
+                        </tr>
+                      ))}
+                    </Table>
+                  </>
+                )}
+              </section>
+            ),
+          },
+          {
+            id: 'history',
+            icon: History,
+            label: d.history,
+            content: (
+              <section className={`${card} space-y-3 p-4`}>
+                <AuditRows events={data.audit} showAccount={false} />
+              </section>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -442,12 +549,21 @@ function AccountForm({
     name: account.name,
     notes: account.notes ?? '',
     priceBook: account.priceBook,
+    ownerEmail: account.ownerEmail ?? '',
   });
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ name: form.name, notes: form.notes.trim() || null, priceBook: form.priceBook });
+        onSubmit({
+          name: form.name,
+          notes: form.notes.trim() || null,
+          priceBook: form.priceBook,
+          // Only before the owner signs up: the email the account is claimed with.
+          ...(!account.claimed && form.ownerEmail.trim() !== (account.ownerEmail ?? '')
+            ? { ownerEmail: form.ownerEmail }
+            : {}),
+        });
       }}
       className="max-w-lg space-y-3"
     >
@@ -458,6 +574,15 @@ function AccountForm({
         value={form.name}
         onChange={(e) => setForm({ ...form, name: e.target.value })}
       />
+      {!account.claimed && (
+        <Field
+          label={d.ownerEmail}
+          type="email"
+          maxLength={254}
+          value={form.ownerEmail}
+          onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
+        />
+      )}
       <label className="block text-sm font-medium text-ink-muted">
         {d.priceBook}
         <select

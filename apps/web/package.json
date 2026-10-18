@@ -11,6 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fullcalendar/core": "6.1.21",
+    "@fullcalendar/daygrid": "6.1.21",
+    "@fullcalendar/list": "6.1.21",
+    "@fullcalendar/react": "6.1.21",
+    "@fullcalendar/timegrid": "6.1.21",
     "lucide-react": "^1.58.0",
     "next": "16.4.2",
     "qrcode": "^1.5.4",

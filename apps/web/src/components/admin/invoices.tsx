@@ -83,6 +83,7 @@ export function InvoicesPage() {
     const head = [
       'number',
       'account',
+      'owner_email',
       'owner_phone',
       'period',
       'total',
@@ -94,6 +95,7 @@ export function InvoicesPage() {
       [
         i.number,
         i.accountName ?? '',
+        i.ownerEmail ?? '',
         i.ownerPhone ?? '',
         i.period,
         i.total,

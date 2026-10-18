@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CircleCheck,
   ClipboardCheck,
+  ListChecks,
   UsersRound,
   Video,
   Wallet,
@@ -16,6 +17,8 @@ import { api, errorMessage, fmt } from '@/lib/api';
 import { colomboDate, fmtDay, fmtTime } from '@/lib/datetime';
 import { cents, fmtMoney, fromCents } from '@/lib/money';
 import { useTenantData } from './dashboard-shell';
+import { PortalQuizzes } from './quizzes/portal-quizzes';
+import type { PortalQuiz } from './quizzes/types';
 import { SlipUpload } from './slip-upload';
 import { Badge, btn, card, EmptyState, FormError, Skeleton } from './ui';
 
@@ -83,13 +86,19 @@ export function Portal() {
   // No uploads without the slips feature, or while the account is suspended (read-only).
   const canUpload = entitlements.features.bank_slips && entitlements.writable;
   const [children, setChildren] = useState<Child[] | null>(null);
+  const [quizzes, setQuizzes] = useState<PortalQuiz[]>([]);
+  const withQuizzes = entitlements.features.quizzes;
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api<{ children: Child[] }>(`/tenants/${tenantId}/portal`)
       .then((r) => setChildren(r.children))
       .catch((err) => setError(errorMessage(t, err)));
-  }, [tenantId, t]);
+    if (withQuizzes)
+      api<{ quizzes: PortalQuiz[] }>(`/tenants/${tenantId}/portal/quizzes`)
+        .then((r) => setQuizzes(r.quizzes))
+        .catch(() => {});
+  }, [tenantId, t, withQuizzes]);
   useEffect(load, [load]);
 
   if (error) return <FormError message={error} />;
@@ -220,6 +229,12 @@ export function Portal() {
                 </p>
               )}
             </Section>
+
+            {withQuizzes && (
+              <Section title={t.quizzes.title} icon={ListChecks}>
+                <PortalQuizzes quizzes={quizzes.filter((x) => x.studentId === c.id)} />
+              </Section>
+            )}
 
             <Section title={p.attendance} icon={ClipboardCheck}>
               {c.attendance.length === 0 ? (

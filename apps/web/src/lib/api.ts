@@ -3,7 +3,10 @@ import type { Dictionary } from '@/i18n/dictionaries/en';
 export type Role = 'owner' | 'admin' | 'teacher' | 'receptionist' | 'student' | 'parent';
 export interface User {
   id: string;
-  phone: string;
+  /** Login email. Null only for users from before email login (they are asked to add one). */
+  email: string | null;
+  emailVerified: boolean;
+  phone: string | null;
   fullName: string;
 }
 export interface TenantSummary {

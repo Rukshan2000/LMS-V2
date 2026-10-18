@@ -1,13 +1,13 @@
 'use client';
 
-import { Banknote, ChevronRight, ClipboardCheck, Download, Wallet } from 'lucide-react';
+import { Banknote, CalendarDays, ClipboardCheck, Download, Wallet } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { colomboDate } from '@/lib/datetime';
 import { fmtMoney } from '@/lib/money';
-import { btn, card, FormError } from './ui';
+import { btn, card, FormError, Tabs } from './ui';
 
 interface Summary {
   months: { period: string; invoices: number; billed: string; paid: string; outstanding: string }[];
@@ -111,101 +111,103 @@ export function Reports() {
       </div>
       <FormError message={error} />
 
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 font-medium">
-          <Wallet aria-hidden className="size-5 text-primary" />
-          {r.feesByMonth}
-        </h2>
-        <Table head={[f.month, r.invoices, f.billed, f.collected, f.outstanding]}>
-          {data?.months.map((m) => (
-            <tr key={m.period}>
-              <td className="px-3 py-2">{monthName(m.period)}</td>
-              <Num>{m.invoices}</Num>
-              <Num>{fmtMoney(m.billed)}</Num>
-              <Num>{fmtMoney(m.paid)}</Num>
-              <Num>{fmtMoney(m.outstanding)}</Num>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 font-medium">
-          <Banknote aria-hidden className="size-5 text-primary" />
-          {r.received}
-        </h2>
-        <Table head={[f.month, f.method, f.payments, f.amount]}>
-          {data?.received.map((m) => (
-            <tr key={m.month + m.method}>
-              <td className="px-3 py-2">{monthName(m.month)}</td>
-              <td className="px-3 py-2 text-right">{f[m.method as 'cash']}</td>
-              <Num>{m.payments}</Num>
-              <Num>{fmtMoney(m.amount)}</Num>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
-      <details className="group space-y-2">
-        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 rounded-lg font-medium transition-colors hover:text-primary [&::-webkit-details-marker]:hidden">
-          <ChevronRight
-            aria-hidden
-            className="size-5 text-primary transition-transform duration-200 group-open:rotate-90"
-          />
-          {r.daily}
-        </summary>
-        <Table head={[f.date, f.payments, f.amount]}>
-          {data?.daily.map((d) => (
-            <tr key={d.day}>
-              <td className="px-3 py-2">{d.day}</td>
-              <Num>{d.payments}</Num>
-              <Num>{fmtMoney(d.amount)}</Num>
-            </tr>
-          ))}
-        </Table>
-      </details>
-
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 font-medium">
-          <ClipboardCheck aria-hidden className="size-5 text-primary" />
-          {r.attendance}
-        </h2>
-        <Table
-          head={[
-            r.class,
-            r.sessions,
-            r.enrolled,
-            t.attendance.present,
-            t.attendance.late,
-            t.attendance.absent,
-            r.rate,
-          ]}
-        >
-          {data?.attendance.map((a) => (
-            <tr key={a.batchId}>
-              <td className="px-3 py-2">{a.name}</td>
-              <Num>{a.sessions}</Num>
-              <Num>{a.enrolled}</Num>
-              <Num>{a.present}</Num>
-              <Num>{a.late}</Num>
-              <Num>{a.absent}</Num>
-              <Num>{pct(a.present + a.late, a.sessions * a.enrolled)}</Num>
-            </tr>
-          ))}
-        </Table>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 font-medium">
-          <Download aria-hidden className="size-5 text-primary" />
-          {r.exports}
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {csv('payments', true)}
-          {csv('unpaid')}
-          {csv('students')}
-        </div>
-      </section>
+      <Tabs
+        items={[
+          {
+            id: 'fees',
+            icon: Wallet,
+            label: r.feesByMonth,
+            content: (
+              <Table head={[f.month, r.invoices, f.billed, f.collected, f.outstanding]}>
+                {data?.months.map((m) => (
+                  <tr key={m.period}>
+                    <td className="px-3 py-2">{monthName(m.period)}</td>
+                    <Num>{m.invoices}</Num>
+                    <Num>{fmtMoney(m.billed)}</Num>
+                    <Num>{fmtMoney(m.paid)}</Num>
+                    <Num>{fmtMoney(m.outstanding)}</Num>
+                  </tr>
+                ))}
+              </Table>
+            ),
+          },
+          {
+            id: 'received',
+            icon: Banknote,
+            label: r.received,
+            content: (
+              <Table head={[f.month, f.method, f.payments, f.amount]}>
+                {data?.received.map((m) => (
+                  <tr key={m.month + m.method}>
+                    <td className="px-3 py-2">{monthName(m.month)}</td>
+                    <td className="px-3 py-2 text-right">{f[m.method as 'cash']}</td>
+                    <Num>{m.payments}</Num>
+                    <Num>{fmtMoney(m.amount)}</Num>
+                  </tr>
+                ))}
+              </Table>
+            ),
+          },
+          {
+            id: 'daily',
+            icon: CalendarDays,
+            label: r.daily,
+            content: (
+              <Table head={[f.date, f.payments, f.amount]}>
+                {data?.daily.map((d) => (
+                  <tr key={d.day}>
+                    <td className="px-3 py-2">{d.day}</td>
+                    <Num>{d.payments}</Num>
+                    <Num>{fmtMoney(d.amount)}</Num>
+                  </tr>
+                ))}
+              </Table>
+            ),
+          },
+          {
+            id: 'attendance',
+            icon: ClipboardCheck,
+            label: r.attendance,
+            content: (
+              <Table
+                head={[
+                  r.class,
+                  r.sessions,
+                  r.enrolled,
+                  t.attendance.present,
+                  t.attendance.late,
+                  t.attendance.absent,
+                  r.rate,
+                ]}
+              >
+                {data?.attendance.map((a) => (
+                  <tr key={a.batchId}>
+                    <td className="px-3 py-2">{a.name}</td>
+                    <Num>{a.sessions}</Num>
+                    <Num>{a.enrolled}</Num>
+                    <Num>{a.present}</Num>
+                    <Num>{a.late}</Num>
+                    <Num>{a.absent}</Num>
+                    <Num>{pct(a.present + a.late, a.sessions * a.enrolled)}</Num>
+                  </tr>
+                ))}
+              </Table>
+            ),
+          },
+          {
+            id: 'exports',
+            icon: Download,
+            label: r.exports,
+            content: (
+              <div className="flex flex-wrap gap-2">
+                {csv('payments', true)}
+                {csv('unpaid')}
+                {csv('students')}
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

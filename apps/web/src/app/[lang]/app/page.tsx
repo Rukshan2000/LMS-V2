@@ -14,7 +14,9 @@ export default function AppEntry() {
 
   useEffect(() => {
     api<Me>('/auth/me')
-      .then(({ tenants }) => {
+      .then(({ user, tenants }) => {
+        // Users from before email login add one first (EMAIL_AUTH_PLAN §9).
+        if (!user.emailVerified) return router.replace(`/${lang}/account/email`);
         if (tenants.length === 0) return router.replace(`/${lang}/onboarding`);
         let last: string | null = null;
         try {

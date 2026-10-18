@@ -224,14 +224,53 @@ export async function getEntitlements(
 }
 
 /**
+ * Inserts an account, with the `trial_caps` overrides expiring with the trial when it has one.
+ * Accounts are only created from the platform console (and tests).
+ */
+export async function openAccount(
+  trx: Knex.Transaction,
+  input: {
+    name: string;
+    ownerEmail?: string | null;
+    ownerPhone?: string | null;
+    priceBook: string;
+    trialEndsAt: Date | null;
+    createdBy?: string;
+  },
+) {
+  const [account] = await trx('accounts')
+    .insert({
+      name: input.name,
+      owner_email: input.ownerEmail ?? null,
+      owner_phone: input.ownerPhone ?? null,
+      price_book: input.priceBook,
+      trial_ends_at: input.trialEndsAt,
+      created_by: input.createdBy,
+    })
+    .returning(['id', 'name', 'owner_email', 'owner_phone', 'price_book', 'trial_ends_at']);
+  const caps = input.trialEndsAt ? Object.entries((await loadSettings(trx)).trialCaps) : [];
+  if (caps.length) {
+    await trx('account_overrides').insert(
+      caps.map(([key, value]) => ({
+        account_id: account.id,
+        key,
+        value: JSON.stringify(value),
+        expires_at: input.trialEndsAt,
+        note: 'Trial caps',
+      })),
+    );
+  }
+  return account;
+}
+
+/**
  * The account a new institute belongs to: the one this user owns, else an unclaimed account the
- * platform admin created for this phone, else a new self-service account with a trial (trial caps
- * are overrides that expire with it). Then checks the institutes cap.
+ * platform admin created for this phone. No account → refused: new customers are set up in the
+ * platform console only. Then checks the institutes cap.
  */
 export async function accountForNewInstitute(
   trx: Knex.Transaction,
-  user: { id: string; phone: string },
-  name: string,
+  user: { id: string; email: string | null; emailVerified: boolean; phone: string | null },
 ): Promise<string> {
   await lock(trx, `account-owner:${user.id}`);
   let account: AccountRow | undefined = await trx('accounts')
@@ -243,7 +282,15 @@ export async function accountForNewInstitute(
         'id',
         trx('accounts')
           .whereNull('owner_user_id')
-          .where({ owner_phone: user.phone })
+          // By verified email; accounts made before email login (no owner_email) by phone.
+          .where((w) => {
+            if (user.emailVerified) w.whereRaw('lower(owner_email) = ?', [user.email]);
+            if (user.phone)
+              w.orWhere((o) => o.whereNull('owner_email').where({ owner_phone: user.phone }));
+          })
+          .modify((q) => {
+            if (!user.emailVerified && !user.phone) q.whereRaw('false');
+          })
           .orderBy('created_at')
           .limit(1)
           .select('id'),
@@ -252,32 +299,9 @@ export async function accountForNewInstitute(
       .returning(['id', 'price_book', 'trial_ends_at', 'suspended_at']);
   }
   if (!account) {
-    const settings = await loadSettings(trx);
-    const book = await trx('price_books').where({ is_default: true }).first('key');
-    const trialEndsAt = new Date(Date.now() + settings.trialDays * 86400_000);
-    [account] = await trx('accounts')
-      .insert({
-        name,
-        owner_user_id: user.id,
-        owner_phone: user.phone,
-        price_book: book.key,
-        trial_ends_at: trialEndsAt,
-      })
-      .returning(['id', 'price_book', 'trial_ends_at', 'suspended_at']);
-    const caps = Object.entries(settings.trialCaps);
-    if (caps.length) {
-      await trx('account_overrides').insert(
-        caps.map(([key, value]) => ({
-          account_id: account!.id,
-          key,
-          value: JSON.stringify(value),
-          expires_at: trialEndsAt,
-          note: 'Trial caps',
-        })),
-      );
-    }
+    throw new HttpError(403, 'no_account', 'Contact us to set up your institute');
   }
-  const ctx = await accountContext(trx, account!);
+  const ctx = await accountContext(trx, account);
   assertCanAddHeads(ctx);
   await assertCap(trx, ctx, 'institutes', 1, async () =>
     Number(
@@ -572,6 +596,7 @@ const accountNotFound = () => new HttpError(404, 'not_found', 'Account not found
 const ACCOUNT_COLUMNS = [
   'a.id',
   'a.name',
+  'a.owner_email',
   'a.owner_phone',
   'a.owner_user_id',
   'u.full_name as owner_name',
@@ -584,7 +609,8 @@ const ACCOUNT_COLUMNS = [
 ];
 type AccountDetailRow = AccountRow & {
   name: string;
-  owner_phone: string;
+  owner_email: string | null;
+  owner_phone: string | null;
   owner_user_id: string | null;
   owner_name: string | null;
   suspended_reason: string | null;
@@ -622,6 +648,7 @@ function summary(row: AccountDetailRow, ctx: AccountContext) {
   return {
     id: row.id,
     name: row.name,
+    ownerEmail: row.owner_email,
     ownerPhone: row.owner_phone,
     ownerName: row.owner_name,
     claimed: row.owner_user_id !== null,
@@ -650,7 +677,7 @@ export async function listAccounts(
       // 0771234567 is stored as 94771234567: match without the leading 0.
       const digits = q.replace(/\D/g, '').replace(/^0/, '');
       query.where((w) => {
-        w.whereILike('a.name', `%${q}%`);
+        w.whereILike('a.name', `%${q}%`).orWhereILike('a.owner_email', `%${q}%`);
         if (digits.length >= 3) w.orWhere('a.owner_phone', 'like', `%${digits}%`);
       });
     }
@@ -808,6 +835,8 @@ async function lockAccount(trx: Knex.Transaction, accountId: string) {
       'trial_ends_at',
       'suspended_at',
       'suspended_reason',
+      'owner_email',
+      'owner_user_id',
     );
   if (!account) throw accountNotFound();
   return account;
@@ -821,67 +850,118 @@ async function assertPriceBook(trx: Knex.Transaction, key: string) {
 
 /**
  * An account created by the platform admin for a customer who has not signed up yet. The
- * customer claims it by creating an institute with this phone (SAAS_PLAN §10.3). No trial caps:
- * the admin picks the price book, and sets caps as overrides if wanted.
+ * customer claims it by creating an institute while logged in with this (verified) email
+ * (SAAS_PLAN §10.3, EMAIL_AUTH_PLAN §3.5). With a trial it gets the trial caps; the admin can
+ * change them as overrides. The phone is contact data only.
  */
 export async function createAccount(
   db: Knex,
-  input: { name: string; ownerPhone: string; priceBook: string; trialDays: number },
+  input: {
+    name: string;
+    ownerEmail: string;
+    ownerPhone?: string | null;
+    priceBook: string;
+    trialDays: number;
+  },
   actor: Actor,
   now = new Date(),
 ) {
   return db.transaction(async (trx) => {
-    await lock(trx, `account-phone:${input.ownerPhone}`);
+    await lock(trx, `account-email:${input.ownerEmail}`);
     await assertPriceBook(trx, input.priceBook);
-    // A second account for the same phone could never be claimed (claiming takes the oldest).
-    const owner = await trx('users').where({ phone: input.ownerPhone }).first('id');
+    // A second account for the same email could never be claimed (claiming takes the oldest).
+    const owner = await trx('users').whereRaw('lower(email) = ?', [input.ownerEmail]).first('id');
     const existing = await trx('accounts')
-      .where({ owner_phone: input.ownerPhone })
+      .whereRaw('lower(owner_email) = ?', [input.ownerEmail])
       .modify((w) => {
         if (owner) w.orWhere({ owner_user_id: owner.id });
       })
       .first('id');
     if (existing) {
-      throw new HttpError(409, 'account_exists', 'This phone already has an account', {
+      throw new HttpError(409, 'account_exists', 'This email already has an account', {
         accountId: existing.id,
       });
     }
     const trialEndsAt =
       input.trialDays > 0 ? new Date(now.getTime() + input.trialDays * 86400_000) : null;
-    const [account] = await trx('accounts')
-      .insert({
-        name: input.name,
-        owner_phone: input.ownerPhone,
-        price_book: input.priceBook,
-        trial_ends_at: trialEndsAt,
-        created_by: actor.userId,
-      })
-      .returning(['id', 'name', 'owner_phone', 'price_book', 'trial_ends_at']);
+    const account = await openAccount(trx, { ...input, trialEndsAt, createdBy: actor.userId });
     await audit(trx, actor, account.id, 'account.create', null, {
       name: account.name,
+      ownerEmail: account.owner_email,
       ownerPhone: account.owner_phone,
       priceBook: account.price_book,
       trialEndsAt: account.trial_ends_at,
     });
-    return { id: account.id as string, ownerPhone: account.owner_phone as string };
+    return {
+      id: account.id as string,
+      name: account.name as string,
+      ownerEmail: account.owner_email as string,
+      ownerPhone: account.owner_phone as string | null,
+    };
   });
+}
+
+/** For "resend invitation": where to send it, or 409 when the owner already signed up. */
+export async function unclaimedOwnerEmail(db: Knex, accountId: string) {
+  const row = await db('accounts')
+    .where({ id: accountId })
+    .first('name', 'owner_email', 'owner_user_id');
+  if (!row) throw accountNotFound();
+  if (row.owner_user_id) {
+    throw new HttpError(409, 'already_claimed', 'The owner has already signed up');
+  }
+  if (!row.owner_email) throw new HttpError(409, 'no_owner_email', 'This account has no email');
+  return { name: row.name as string, email: row.owner_email as string };
+}
+
+/** Users who still log in by phone (EMAIL_AUTH_PLAN §9): when 0, phone login can go. */
+export async function countUnverifiedUsers(db: Knex) {
+  const row = await db('users')
+    .where({ status: 'active' })
+    .where((w) => w.whereNull('email').orWhereNull('email_verified_at'))
+    .count({ n: '*' })
+    .first();
+  return Number(row?.n ?? 0);
 }
 
 export async function updateAccount(
   db: Knex,
   accountId: string,
-  patch: { name?: string; notes?: string | null; priceBook?: string },
+  patch: { name?: string; notes?: string | null; priceBook?: string; ownerEmail?: string },
   actor: Actor,
 ) {
   await db.transaction(async (trx) => {
     const account = await lockAccount(trx, accountId);
     if (patch.priceBook !== undefined) await assertPriceBook(trx, patch.priceBook);
-    const before = { name: account.name, notes: account.notes, priceBook: account.price_book };
+    // Owner email: only before the owner signs up (also how accounts made before email login,
+    // with a phone only, get an email they can be claimed with).
+    if (patch.ownerEmail !== undefined && patch.ownerEmail !== account.owner_email) {
+      if (account.owner_user_id) {
+        throw new HttpError(409, 'already_claimed', 'The owner has already signed up');
+      }
+      await lock(trx, `account-email:${patch.ownerEmail}`);
+      const taken = await trx('accounts')
+        .whereRaw('lower(owner_email) = ?', [patch.ownerEmail])
+        .whereNot({ id: accountId })
+        .first('id');
+      if (taken) {
+        throw new HttpError(409, 'account_exists', 'This email already has an account', {
+          accountId: taken.id,
+        });
+      }
+    }
+    const before = {
+      name: account.name,
+      notes: account.notes,
+      priceBook: account.price_book,
+      ownerEmail: account.owner_email,
+    };
     const after = { ...before, ...patch };
     await trx('accounts').where({ id: accountId }).update({
       name: after.name,
       notes: after.notes,
       price_book: after.priceBook,
+      owner_email: after.ownerEmail,
       updated_at: trx.fn.now(),
     });
     await audit(trx, actor, accountId, 'account.update', before, after);
@@ -1050,7 +1130,12 @@ export async function listInvoices(
       .orderBy('i.number', 'desc')
       // ponytail: newest 500 without a period filter; add paging when there are more.
       .limit(500)
-      .select([...invoiceColumns(trx), 'a.name as accountName', 'a.owner_phone as ownerPhone']),
+      .select([
+        ...invoiceColumns(trx),
+        'a.name as accountName',
+        'a.owner_email as ownerEmail',
+        'a.owner_phone as ownerPhone',
+      ]),
   );
 }
 

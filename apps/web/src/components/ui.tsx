@@ -22,7 +22,9 @@ import {
   useEffect,
   useId,
   useState,
+  useSyncExternalStore,
   type ButtonHTMLAttributes,
+  type KeyboardEvent,
   type InputHTMLAttributes,
   type ReactNode,
 } from 'react';
@@ -274,6 +276,95 @@ export function EmptyState({ icon: Icon, children }: { icon: LucideIcon; childre
         <Icon aria-hidden className="size-6" />
       </span>
       {children}
+    </div>
+  );
+}
+
+export interface TabItem {
+  id: string;
+  label: ReactNode;
+  icon?: LucideIcon;
+  content: ReactNode;
+}
+
+const onHash = (cb: () => void) => {
+  addEventListener('hashchange', cb);
+  return () => removeEventListener('hashchange', cb);
+};
+
+/**
+ * Page sections as underline tabs. The open tab lives in the URL hash (#fees), so reload and
+ * shared links keep it. Inactive panels stay mounted but hidden, so forms keep what was typed.
+ * Pass `false` for a tab the user may not see.
+ */
+export function Tabs({ items }: { items: (TabItem | false | null | undefined)[] }) {
+  const tabs = items.filter((x): x is TabItem => !!x);
+  const base = useId();
+  const hash = useSyncExternalStore(
+    onHash,
+    () => location.hash.slice(1),
+    () => '',
+  );
+  const active = tabs.find((x) => x.id === hash) ?? tabs[0];
+
+  function select(id: string) {
+    // replaceState keeps Next's router state; the event tells every Tabs to re-read the hash.
+    history.replaceState(history.state, '', `#${id}`);
+    dispatchEvent(new HashChangeEvent('hashchange'));
+  }
+  function onKeyDown(e: KeyboardEvent) {
+    const i = tabs.indexOf(active);
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    const tab = tabs[(next + tabs.length) % tabs.length];
+    select(tab.id);
+    document.getElementById(`${base}-tab-${tab.id}`)?.focus();
+  }
+
+  return (
+    <div>
+      <div
+        role="tablist"
+        onKeyDown={onKeyDown}
+        className="-mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0 print:hidden"
+      >
+        {tabs.map(({ id, label, icon: Icon }) => {
+          const on = id === active.id;
+          return (
+            <button
+              key={id}
+              id={`${base}-tab-${id}`}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-controls={`${base}-panel-${id}`}
+              tabIndex={on ? 0 : -1}
+              onClick={() => select(id)}
+              className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
+                on
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ink-muted hover:border-line-strong hover:text-ink'
+              }`}
+            >
+              {Icon && <Icon aria-hidden className="size-4" />}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      {tabs.map(({ id, content }) => (
+        <div
+          key={id}
+          id={`${base}-panel-${id}`}
+          role="tabpanel"
+          aria-labelledby={`${base}-tab-${id}`}
+          hidden={id !== active.id}
+          className="animate-fade-in space-y-6 pt-5"
+        >
+          {content}
+        </div>
+      ))}
     </div>
   );
 }

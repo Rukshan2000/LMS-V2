@@ -22,6 +22,7 @@ export const FEATURES = [
   'reports',
   'student_import',
   'portal',
+  'quizzes',
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
