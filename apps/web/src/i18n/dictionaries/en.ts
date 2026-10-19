@@ -7,6 +7,84 @@ const en = {
     sub: 'Attendance, fees and parent messages in one place. Free for 30 days, then a monthly fee for each active student, teacher and parent.',
     login: 'Log in',
     signup: 'Start free trial',
+    badge: 'Made for Sri Lankan tuition classes',
+    explore: 'See what it does',
+    nav: { features: 'Features', how: 'How it works', pricing: 'Pricing' },
+    mock: {
+      batch: 'Combined Maths · A/L 2027',
+      today: 'Today, 4:00 PM',
+      present: 'Present',
+      collected: 'Collected this month',
+      paid: 'Paid',
+      due: 'Fee due',
+      slip: 'Bank slip waiting',
+      approve: 'Approve',
+    },
+    featuresTitle: 'Everything your class needs, in one app',
+    featuresSub:
+      'Built with teachers who run classes of 30 to 3,000 students: on a phone at the door, on a laptop in the office.',
+    features: [
+      {
+        title: 'QR attendance',
+        body: 'Print class cards and scan them with any phone camera. Fee status shows on every scan.',
+      },
+      {
+        title: 'Fees and receipts',
+        body: 'Monthly, admission and tute fees, free and half cards, cash at the desk and PDF receipts.',
+      },
+      {
+        title: 'Bank slip approval',
+        body: 'Students upload a slip photo, you approve with one tap. Duplicate slips are flagged.',
+      },
+      {
+        title: 'WhatsApp messages',
+        body: 'Receipts, reminders and attendance notes pre-written for you. Tap Send from your own phone.',
+      },
+      {
+        title: 'Timetable',
+        body: 'A weekly calendar of every batch. Cancel or move a session and students see it at once.',
+      },
+      {
+        title: 'Online quizzes',
+        body: 'MCQs are marked automatically; you mark typed answers. Results go straight to students.',
+      },
+      {
+        title: 'Student and parent portal',
+        body: 'Timetable, attendance, fees and live class links, unlocked only for paid months.',
+      },
+      {
+        title: 'Reports',
+        body: 'Daily and monthly collection, attendance by batch and the "not paid this month" list. CSV export.',
+      },
+    ],
+    howTitle: 'Up and running in a day',
+    steps: [
+      {
+        title: 'We open your account',
+        body: 'Tell us about your class and we set up your institute with a 30-day free trial.',
+      },
+      {
+        title: 'Add your classes and students',
+        body: 'Create batches, import students from a CSV and print their QR cards.',
+      },
+      {
+        title: 'Scan, collect, message',
+        body: 'Mark attendance at the door, record fees and send parents a WhatsApp in one tap.',
+      },
+    ],
+    pricingTitle: 'Pay only for who uses it',
+    pricingBody:
+      'Free for 30 days. After that, one monthly invoice for each active student, teacher and parent. No setup fee, no contract.',
+    pricingPoints: [
+      'Pay by bank transfer',
+      'Sinhala, Tamil and English',
+      'Works on any phone',
+      'Your data stays yours',
+    ],
+    ctaTitle: 'Ready to leave the paperwork behind?',
+    ctaBody:
+      'Already have an account? Log in. Got an invitation email? Use it to set up your login.',
+    footer: 'Tuition class management for Sri Lanka.',
   },
   auth: {
     acceptPrivacy: 'I have read and agree to the',
