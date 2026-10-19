@@ -23,7 +23,10 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
       <select
         aria-label={t.dashboard.language}
         value={lang}
-        onChange={(e) => change(e.target.value as Locale)}
+        onChange={(e) => {
+          e.target.blur(); // drop the focus ring once a language is picked
+          change(e.target.value as Locale);
+        }}
         className="border-0 bg-transparent py-1.5 focus:shadow-none"
       >
         {locales.map((l) => (

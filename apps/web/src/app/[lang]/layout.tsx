@@ -1,14 +1,26 @@
 import type { Metadata } from 'next';
-import { Noto_Sans, Noto_Sans_Sinhala, Noto_Sans_Tamil } from 'next/font/google';
+import { Hind_Madurai, Poppins } from 'next/font/google';
+import localFont from 'next/font/local';
 import { notFound } from 'next/navigation';
 import { isLocale, locales } from '@/i18n/config';
 import { getDictionary } from '@/i18n/get-dictionary';
 import { I18nProvider } from '@/i18n/provider';
 import '../globals.css';
 
-const latin = Noto_Sans({ subsets: ['latin'], variable: '--font-latin' });
-const sinhala = Noto_Sans_Sinhala({ subsets: ['sinhala'], variable: '--font-sinhala' });
-const tamil = Noto_Sans_Tamil({ subsets: ['tamil'], variable: '--font-tamil' });
+// Poppins is not a variable font, so list the weights the app uses (normal, medium, semibold, bold).
+const latin = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-latin',
+});
+// UN-Bindumathi (Pushpananda Ekanayaka), the Sinhala font Helakuru uses. One weight only: bold is synthesised.
+const sinhala = localFont({ src: '../../fonts/UN-Bindumathi.ttf', variable: '--font-sinhala' });
+// Same foundry as Poppins (Indian Type Foundry), so Tamil and English match.
+const tamil = Hind_Madurai({
+  subsets: ['tamil'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-tamil',
+});
 
 export const generateStaticParams = () => locales.map((lang) => ({ lang }));
 

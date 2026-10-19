@@ -3,7 +3,6 @@
 import {
   Ban,
   ChevronLeft,
-  GraduationCap,
   CircleAlert,
   CircleCheck,
   CircleDashed,
@@ -14,6 +13,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
+import { Logo } from './logo';
 import Link from 'next/link';
 import {
   createContext,
@@ -38,9 +38,7 @@ export function Brand() {
   const { t } = useI18n();
   return (
     <span className="inline-flex items-center gap-2 font-semibold">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
-        <GraduationCap aria-hidden className="size-5" />
-      </span>
+      <Logo className="size-8 drop-shadow-sm" />
       {t.appName}
     </span>
   );

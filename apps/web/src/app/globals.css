@@ -89,13 +89,13 @@ body {
   color: var(--color-ink);
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-/* Every text input, select and textarea gets the same focus ring, so screens don't repeat it. */
+/* Every text input, select and textarea gets the same focus ring, so screens don't repeat it.
+   The outline lives in the same layer so the field rule below can turn it off (unlayered CSS would always win). */
 @layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
   input:not([type='checkbox'], [type='radio'], [type='file']),
   select,
   textarea {

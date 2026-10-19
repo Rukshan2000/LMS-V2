@@ -7,7 +7,6 @@ import {
   ChartColumn,
   ClipboardCheck,
   CreditCard,
-  GraduationCap,
   LayoutDashboard,
   ListChecks,
   Lock,
@@ -24,6 +23,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { Logo } from './logo';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -235,9 +235,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                 <PanelLeftClose aria-hidden className="size-5" />
               )}
             </button>
-            <span className="hidden size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white md:flex">
-              <GraduationCap aria-hidden className="size-5" />
-            </span>
+            <Logo className="hidden size-8 md:block" />
             {data ? (
               <label className="flex min-w-0 items-center gap-2 rounded-lg border border-line px-2 transition-colors focus-within:border-primary focus-within:ring-3 focus-within:ring-primary-ring hover:border-line-strong">
                 <Building2 aria-hidden className="size-4 shrink-0 text-ink-subtle" />
