@@ -91,6 +91,20 @@ describe('classes and subjects', () => {
     expect(batch.teacherName).toBe('User 0770000002');
   });
 
+  it('a class made without a teacher gets one later, and can be cleared again', async () => {
+    const t = await signup('0770000003');
+    const teacherId = await addMember(t.userId, 'teacher');
+    const batch = await createBatch('Later');
+    expect(batch.teacherName).toBeNull();
+    const set = await call('PATCH', `/batches/${batch.id}`, { teacherMembershipId: teacherId });
+    expect(set.json().batch).toMatchObject({
+      teacherMembershipId: teacherId,
+      teacherName: 'User 0770000003',
+    });
+    const cleared = await call('PATCH', `/batches/${batch.id}`, { teacherMembershipId: null });
+    expect(cleared.json().batch).toMatchObject({ teacherMembershipId: null, teacherName: null });
+  });
+
   it("rejects another tenant's subject or teacher", async () => {
     const other = await signup('0770000009');
     const otherTenant = (

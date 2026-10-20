@@ -13,6 +13,9 @@ const createTenantBody = z.object({
     .regex(/^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/, '3–60 characters: a–z, 0–9 and -'),
 });
 
+// Accent colours an institute can pick. Same list as migration 020 and web globals.css.
+export const THEMES = ['blue', 'teal', 'green', 'purple', 'rose', 'orange'] as const;
+
 export default async function tenancyRoutes(app: FastifyInstance) {
   // Create an institute: tenant + owner membership + first branch, all or nothing.
   app.post('/', { preHandler: app.requireAuth }, async (req, reply) => {
@@ -55,12 +58,22 @@ export default async function tenancyRoutes(app: FastifyInstance) {
       const tenant = await app
         .db('tenants')
         .where({ id: req.tenant!.id })
-        .first('id', 'slug', 'name', 'status');
+        .first('id', 'slug', 'name', 'status', 'theme');
       const { id, roles } = req.tenant!;
       // Head counts only for those who manage the account (saves queries for everyone else).
       const withUsage = roles.some((r) => r === 'owner' || r === 'admin');
       const entitlements = await req.withTenant((trx) => getEntitlements(trx, id, { withUsage }));
       return { tenant, roles, entitlements };
+    });
+
+    scoped.patch('/:tenantId', { preHandler: app.requireRole('owner', 'admin') }, async (req) => {
+      const body = z.object({ theme: z.enum(THEMES) }).parse(req.body);
+      const [tenant] = await app
+        .db('tenants')
+        .where({ id: req.tenant!.id })
+        .update({ theme: body.theme, updated_at: app.db.fn.now() })
+        .returning(['id', 'slug', 'name', 'status', 'theme']);
+      return { tenant };
     });
 
     // Staff list for pickers (e.g. choosing a class teacher).

@@ -51,3 +51,7 @@ export interface Member {
   fullName: string;
   roles: string[];
 }
+
+/** Members who can teach a class. */
+export const teachersOf = (members: Member[]) =>
+  members.filter((m) => m.roles.some((r) => r === 'teacher' || r === 'owner' || r === 'admin'));

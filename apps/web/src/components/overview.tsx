@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { NAV_ICONS, useTenantData } from './dashboard-shell';
 import { useI18n } from '@/i18n/provider';
 import { navForRoles } from '@/lib/nav';
-import { Portal } from './portal';
+import { Portal, useIsFamily } from './portal';
 import { card } from './ui';
 
 export function Overview() {
   const { lang, t } = useI18n();
   const { me, tenant, roles, entitlements } = useTenantData();
-  const family = roles.every((r) => r === 'student' || r === 'parent');
+  const family = useIsFamily();
   const base = `/${lang}/t/${tenant.id}`;
 
   return (

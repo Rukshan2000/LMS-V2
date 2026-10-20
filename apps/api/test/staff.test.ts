@@ -241,3 +241,21 @@ describe('removing staff', () => {
     expect((await req('GET', `/api/v1/tenants/${tenantId}`, teacher)).statusCode).toBe(200);
   });
 });
+
+describe('institute theme', () => {
+  it('owner sets the colour, everyone sees it; others cannot change it; unknown colours refused', async () => {
+    const url = `/api/v1/tenants/${tenantId}`;
+    expect((await req('GET', url, owner)).json().tenant.theme).toBe('blue');
+
+    const set = await req('PATCH', url, owner, { theme: 'teal' });
+    expect(set.statusCode).toBe(200);
+    expect(set.json().tenant.theme).toBe('teal');
+    expect((await req('PATCH', url, owner, { theme: 'neon' })).statusCode).toBe(400);
+
+    const { code } = await invite('teacher');
+    const teacher = await signup('071 234 5678');
+    await req('POST', `/api/v1/invites/${code}/accept`, teacher);
+    expect((await req('GET', url, teacher)).json().tenant.theme).toBe('teal');
+    expect((await req('PATCH', url, teacher, { theme: 'rose' })).statusCode).toBe(403);
+  });
+});

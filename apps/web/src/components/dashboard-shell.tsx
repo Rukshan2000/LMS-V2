@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   CreditCard,
   LayoutDashboard,
+  FileText,
   ListChecks,
   Lock,
   LogOut,
@@ -17,7 +18,6 @@ import {
   Receipt,
   ScanLine,
   Settings,
-  ShieldCheck,
   Users,
   Wallet,
   X,
@@ -26,7 +26,7 @@ import {
 import { Logo } from './logo';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, use, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
 import { api, ApiError, type Me, type Role } from '@/lib/api';
 import type { Entitlements } from '@/lib/entitlements';
@@ -48,6 +48,7 @@ export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
   slips: Receipt,
   timetable: CalendarDays,
   quizzes: ListChecks,
+  tutes: FileText,
   reports: ChartColumn,
   billing: CreditCard,
   settings: Settings,
@@ -55,12 +56,17 @@ export const NAV_ICONS: Record<NavItem['key'], LucideIcon> = {
 
 interface TenantData {
   me: Me;
-  tenant: { id: string; slug: string; name: string; status: string };
+  tenant: { id: string; slug: string; name: string; status: string; theme: string };
   roles: Role[];
   entitlements: Entitlements;
 }
 
-const TenantDataContext = createContext<TenantData | null>(null);
+interface TenantContext extends TenantData {
+  /** Apply a saved change to the institute (e.g. its theme) without reloading. */
+  updateTenant: (patch: Partial<TenantData['tenant']>) => void;
+}
+
+const TenantDataContext = createContext<TenantContext | null>(null);
 
 export function useTenantData() {
   const ctx = use(TenantDataContext);
@@ -78,6 +84,25 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   // Desktop only: icon rail instead of the full menu. Remembered in this browser.
   const [collapsed, setCollapsed] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const context = useMemo(
+    () =>
+      data && {
+        ...data,
+        updateTenant: (patch: Partial<TenantData['tenant']>) =>
+          setData((d) => d && { ...d, tenant: { ...d.tenant, ...patch } }),
+      },
+    [data],
+  );
+
+  // The institute's colour, on <html> so the page background and toasts follow it too.
+  const theme = data?.tenant.theme;
+  useEffect(() => {
+    if (!theme) return;
+    document.documentElement.dataset.theme = theme;
+    return () => {
+      delete document.documentElement.dataset.theme;
+    };
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +226,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <TenantDataContext value={data}>
+    <TenantDataContext value={context}>
       <ToastProvider>
         <div className="flex min-h-full flex-1 flex-col">
           <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur print:hidden">
@@ -257,15 +282,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             )}
             <div className="ml-auto flex items-center gap-3">
               <LanguageSwitcher className="max-sm:hidden" />
-              {data?.me.isPlatformAdmin && (
-                <Link
-                  href={`/${lang}/admin`}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary-soft"
-                >
-                  <ShieldCheck aria-hidden className="size-4" />
-                  <span className="max-sm:sr-only">{t.admin.console}</span>
-                </Link>
-              )}
               {data && (
                 <Link
                   href={`/${lang}/account/email`}

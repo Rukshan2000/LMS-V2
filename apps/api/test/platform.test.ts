@@ -14,6 +14,8 @@ let appDb: Knex;
 let ownerDb: Knex;
 let admin: string;
 let adminId: string;
+/** The platform owner's app session from signup, before they were made the owner. */
+let adminApp: string;
 let owner: string;
 let tenantId: string;
 let accountId: string;
@@ -51,6 +53,15 @@ async function signup(phone: string, email?: string) {
   const sid = res.cookies.find((c) => c.name === 'sid')!;
   return { cookie: `sid=${sid.value}`, userId: res.json().user.id as string };
 }
+async function consoleLogin(password = 'correct-horse') {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/v1/admin/auth/login',
+    payload: { email: '94779999999@test.lk', password },
+  });
+  const sid = res.cookies.find((c) => c.name === 'console_sid');
+  return sid ? `console_sid=${sid.value}` : '';
+}
 const call = (method: string, url: string, payload?: unknown, cookie = admin) =>
   app.inject({
     method: method as 'GET',
@@ -87,8 +98,9 @@ afterAll(async () => {
 beforeEach(async () => {
   await ownerDb.raw('TRUNCATE tenants, users, accounts CASCADE');
   await ownerDb('price_books').whereNot({ key: 'standard' }).del();
-  ({ cookie: admin, userId: adminId } = await signup('0779999999'));
+  ({ cookie: adminApp, userId: adminId } = await signup('0779999999'));
   await ownerDb('users').where({ id: adminId }).update({ is_platform_admin: true });
+  admin = await consoleLogin();
   await provision(ownerDb, '0770000001', 'Nimal Maths');
   owner = (await signup('0770000001')).cookie;
   tenantId = (
@@ -109,25 +121,10 @@ describe('access', () => {
     expect(await auditCount()).toBe(0);
   });
 
-  it('the docs are served to platform admins and document every console route', async () => {
+  it('the docs are served to platform admins, and links between pages resolve', async () => {
     const res = await call('GET', '/docs');
     expect(res.statusCode).toBe(200);
-    const pages: { slug: string; blocks: Record<string, unknown>[] }[] = res.json().pages;
-    const documented = new Set(
-      pages.flatMap((p) =>
-        p.blocks.flatMap((b) => {
-          const e = b.endpoint as { method: string; path: string } | undefined;
-          return e ? [`${e.method} ${e.path}`] : [];
-        }),
-      ),
-    );
-    const route = ([method, url]: [string, string]) =>
-      `${method} /api/v1/admin${url
-        .split('?')[0]!
-        .replaceAll(ID, ':id')
-        .replace(/\/(overrides|price-books|settings)\/[^/]+$/, '/$1/:key')}`;
-    expect(ROUTES.map(route).filter((r) => !documented.has(r))).toEqual([]);
-    // Links between pages point at pages that exist.
+    const pages: { slug: string }[] = res.json().pages;
     const slugs = new Set(pages.map((p) => p.slug));
     const links = JSON.stringify(pages).match(/\(docs:[a-z-]+\)/g) ?? [];
     expect(links.map((l) => l.slice(6, -1)).filter((l) => !slugs.has(l))).toEqual([]);
@@ -177,10 +174,36 @@ describe('access', () => {
     }
   });
 
-  it('/auth/me says who is a platform admin', async () => {
-    const me = (cookie: string) => call('GET', '/api/v1/auth/me', undefined, cookie);
-    expect((await me(admin)).json().isPlatformAdmin).toBe(true);
-    expect((await me(owner)).json().isPlatformAdmin).toBe(false);
+  it('the platform owner has a separate login that works only on the console', async () => {
+    // Console login: wrong password and institute owners are refused alike.
+    expect(await consoleLogin('wrong-password')).toBe('');
+    const ownerLogin = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/auth/login',
+      payload: { email: '94770000001@test.lk', password: 'correct-horse' },
+    });
+    expect(ownerLogin.statusCode).toBe(401);
+    expect((await call('GET', '/auth/me')).json().user.id).toBe(adminId);
+    // The app login refuses the platform owner, and the console cookie means nothing to the app.
+    const appLogin = await call('POST', '/api/v1/auth/login', {
+      identifier: '94779999999@test.lk',
+      password: 'correct-horse',
+    });
+    expect(appLogin.statusCode).toBe(401);
+    expect((await call('GET', '/api/v1/auth/me')).statusCode).toBe(401);
+    // Their app session from before does not reach the console or the app.
+    expect((await call('GET', '/accounts', undefined, adminApp)).statusCode).toBe(404);
+    expect((await call('GET', '/api/v1/auth/me', undefined, adminApp)).statusCode).toBe(401);
+    // Logout ends the console session.
+    expect((await call('POST', '/auth/logout')).statusCode).toBe(204);
+    expect((await call('GET', '/accounts')).statusCode).toBe(404);
+  });
+
+  it('there is only one platform owner', async () => {
+    const other = (await signup('0779999997')).userId;
+    await expect(
+      ownerDb('users').where({ id: other }).update({ is_platform_admin: true }),
+    ).rejects.toThrow(/users_single_platform_admin/);
   });
 });
 

@@ -78,6 +78,12 @@ export function JoinInvite() {
     name: invite.fullName,
     role: t.roles[invite.role],
   });
+  // Logged in as someone else than the invite is for (e.g. the owner who sent it).
+  const wrongUser =
+    me !== 'anonymous' &&
+    (invite.email
+      ? !me.user.emailVerified || me.user.email?.toLowerCase() !== invite.email.toLowerCase()
+      : me.user.phone !== invite.phone);
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 bg-linear-to-b from-canvas to-accent-sky/50 px-4 py-10">
       <div className="flex max-w-sm animate-fade-in flex-col items-center text-center">
@@ -99,9 +105,7 @@ export function JoinInvite() {
             onSwitch={() => setMode((m) => (m === 'signup' ? 'login' : 'signup'))}
           />
         </>
-      ) : invite.email ? (
-        !me.user.emailVerified || me.user.email !== invite.email
-      ) : me.user.phone !== invite.phone ? (
+      ) : wrongUser ? (
         <Card>
           <p className="text-ink-muted">
             {invite.email

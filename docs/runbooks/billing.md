@@ -4,16 +4,18 @@ Per-head billing (ADR 009, SAAS_PLAN §6). Database triggers record head counts 
 
 Prices, overrides, trials and suspension: see [plans.md](plans.md).
 
-## One-time setup: the first platform admin
+## One-time setup: the platform owner
 
-The only SQL in this runbook. Only the platform owner is admin (SAAS_PLAN §14); adding admins in the console waits for 2FA.
+The only SQL in this runbook. There is exactly one platform owner (a unique index enforces it); adding admins waits for 2FA.
+
+Use a dedicated email that owns no institute. Sign it up on the normal signup page first (no institute needed), then:
 
 ```bash
 ssh root@164.68.97.187
-sudo -u postgres psql -d tuition_lms -c "UPDATE users SET is_platform_admin = true WHERE phone = '9477XXXXXXX' RETURNING id, full_name"
+sudo -u postgres psql -d tuition_lms -c "UPDATE users SET is_platform_admin = (lower(email) = 'console@example.com') RETURNING id, full_name, is_platform_admin"
 ```
 
-Then log in again. The **Console** link appears in the app header. Console logins expire after 12 hours: the console asks you to log in again (everyone who is not an admin just gets "not found").
+This also unflags any earlier admin. Log in at **/en/admin/login**: a separate login with its own cookie that works only on the console. That email can no longer use the institute app login, and institute users get "not found" from the console. Console logins expire after 12 hours.
 
 Before the first real invoice, fill in **Settings → Bank details** and **Support WhatsApp**.
 

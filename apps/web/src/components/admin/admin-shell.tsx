@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowLeft, LogOut, ShieldCheck } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/i18n/provider';
-import { api, ApiError, type Me } from '@/lib/api';
+import { api, ApiError, type User } from '@/lib/api';
 import { LanguageSwitcher } from '../language-switcher';
 import { Spinner, ToastProvider } from '../ui';
 
@@ -19,34 +19,36 @@ const NAV = [
 ] as const;
 
 /**
- * Platform console frame. Only platform admins get past it; everyone else goes to /app (the API
- * answers 404 to them anyway). A login older than 12 hours is sent to log in again.
+ * Platform console frame. The console has its own login (/admin/login, console cookie); without
+ * a console session, or with one older than 12 hours, you are sent there.
  */
 export function AdminShell({ children }: { children: ReactNode }) {
+  const { lang } = useI18n();
+  const pathname = usePathname();
+  // The login page is outside the frame.
+  if (pathname === `/${lang}/admin/login`) return children;
+  return <Frame>{children}</Frame>;
+}
+
+function Frame({ children }: { children: ReactNode }) {
   const { lang, t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
-  const [me, setMe] = useState<Me | null>(null);
+  const [me, setMe] = useState<User | null>(null);
   const [reauth, setReauth] = useState(false);
 
   useEffect(() => {
-    api<Me>('/auth/me')
-      .then(async (res) => {
-        if (!res.isPlatformAdmin || !res.user.emailVerified) return router.replace(`/${lang}/app`);
-        // Checks the 12-hour rule before any page loads.
-        await api('/admin/settings');
-        setMe(res);
-      })
+    api<{ user: User }>('/admin/auth/me')
+      .then((res) => setMe(res.user))
       .catch((err) => {
         if (err instanceof ApiError && err.code === 'reauth_required') setReauth(true);
-        else if (err instanceof ApiError && err.status === 401) router.replace(`/${lang}/login`);
-        else router.replace(`/${lang}/app`);
+        else router.replace(`/${lang}/admin/login`);
       });
   }, [lang, router]);
 
   async function logout() {
-    await api('/auth/logout', { method: 'POST' }).catch(() => {});
-    router.replace(`/${lang}/login`);
+    await api('/admin/auth/logout', { method: 'POST' }).catch(() => {});
+    router.replace(`/${lang}/admin/login`);
   }
 
   const base = `/${lang}/admin`;
@@ -61,18 +63,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="flex items-center gap-2 bg-ink px-4 py-1.5 text-sm text-white print:hidden">
           <ShieldCheck aria-hidden className="size-4 text-accent-sky" />
           <span className="font-medium">{t.admin.bar}</span>
-          {me && <span className="text-white/70 max-sm:hidden">· {me.user.fullName}</span>}
-          <Link
-            href={`/${lang}/app`}
-            className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <ArrowLeft aria-hidden className="size-4" />
-            {t.admin.backToApp}
-          </Link>
+          {me && <span className="text-white/70 max-sm:hidden">· {me.fullName}</span>}
           <button
             type="button"
             onClick={logout}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-white/80 hover:bg-white/10 hover:text-white"
+            className="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-white/80 hover:bg-white/10 hover:text-white"
           >
             <LogOut aria-hidden className="size-4" />
             <span className="max-sm:sr-only">{t.dashboard.logout}</span>

@@ -21,23 +21,6 @@ import { Table, Td } from './shared';
 // Platform documentation (GET /admin/docs, platform admins only). The content lives in
 // apps/api/src/modules/platform/docs.ts; this file only renders it.
 
-type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-interface Param {
-  name: string;
-  type: string;
-  required?: boolean;
-  description: string;
-}
-interface Endpoint {
-  method: Method;
-  path: string;
-  summary: string;
-  params?: Param[];
-  query?: Param[];
-  body?: Param[];
-  response?: string;
-  errors?: string[];
-}
 type Block =
   | { h2: string }
   | { h3: string }
@@ -46,8 +29,7 @@ type Block =
   | { steps: string[] }
   | { table: { head: string[]; rows: string[][] } }
   | { code: string; title?: string }
-  | { note: string; tone?: 'info' | 'warning' | 'danger' }
-  | { endpoint: Endpoint };
+  | { note: string; tone?: 'info' | 'warning' | 'danger' };
 interface DocPage {
   slug: string;
   group: string;
@@ -72,13 +54,6 @@ const anchor = (text: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-const METHOD_TONE: Record<Method, string> = {
-  GET: 'bg-success-soft text-success',
-  POST: 'bg-primary-soft text-primary-hover',
-  PUT: 'bg-warning-soft text-warning',
-  PATCH: 'bg-warning-soft text-warning',
-  DELETE: 'bg-danger-soft text-danger',
-};
 const NOTE: Record<'info' | 'warning' | 'danger', [string, LucideIcon]> = {
   info: ['border-primary-ring bg-primary-soft/60', Info],
   warning: ['border-warning/30 bg-warning-soft', TriangleAlert],
@@ -148,68 +123,6 @@ function CodeBlock({ code, title }: { code: string; title?: string }) {
   );
 }
 
-function Params({ title, params }: { title: string; params?: Param[] }) {
-  const { t } = useI18n();
-  if (!params?.length) return null;
-  return (
-    <div className="space-y-1">
-      <h4 className="text-xs font-semibold tracking-wide text-ink-subtle uppercase">{title}</h4>
-      <dl className="divide-y divide-line border-y border-line">
-        {params.map((p) => (
-          <div key={p.name} className="py-2 text-sm">
-            <dt className="flex flex-wrap items-baseline gap-x-2">
-              <code className="font-mono font-semibold text-ink">{p.name}</code>
-              <span className="font-mono text-xs text-ink-subtle">{p.type}</span>
-              {p.required && (
-                <span className="text-xs font-medium text-warning">{t.admin.docs.required}</span>
-              )}
-            </dt>
-            <dd className="text-ink-muted">
-              <Inline text={p.description} />
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
-function EndpointBlock({ e }: { e: Endpoint }) {
-  const d = useI18n().t.admin.docs;
-  return (
-    <section
-      id={anchor(`${e.method} ${e.path}`)}
-      className="scroll-mt-20 space-y-3 rounded-xl border border-line bg-surface p-4 shadow-card"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-md px-2 py-0.5 font-mono text-xs font-bold ${METHOD_TONE[e.method]}`}
-        >
-          {e.method}
-        </span>
-        <code className="font-mono text-sm font-medium break-all text-ink">{e.path}</code>
-      </div>
-      <p className="text-sm text-ink-muted">
-        <Inline text={e.summary} />
-      </p>
-      <Params title={d.path} params={e.params} />
-      <Params title={d.query} params={e.query} />
-      <Params title={d.body} params={e.body} />
-      {e.response && <CodeBlock code={e.response} title={d.response} />}
-      {e.errors && e.errors.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-semibold tracking-wide text-ink-subtle uppercase">{d.errors}</span>
-          {e.errors.map((err) => (
-            <code key={err} className="rounded bg-danger-soft px-1.5 py-0.5 font-mono text-danger">
-              {err}
-            </code>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Blocks({ blocks }: { blocks: Block[] }) {
   return blocks.map((b, i) => {
     if ('h2' in b)
@@ -276,18 +189,15 @@ function Blocks({ blocks }: { blocks: Block[] }) {
         </Table>
       );
     if ('code' in b) return <CodeBlock key={i} code={b.code} title={b.title} />;
-    if ('note' in b) {
-      const [cls, Icon] = NOTE[b.tone ?? 'info'];
-      return (
-        <div key={i} className={`flex gap-2.5 rounded-xl border p-3 text-sm ${cls}`}>
-          <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
-          <p className="leading-relaxed">
-            <Inline text={b.note} />
-          </p>
-        </div>
-      );
-    }
-    return <EndpointBlock key={i} e={b.endpoint} />;
+    const [cls, Icon] = NOTE[b.tone ?? 'info'];
+    return (
+      <div key={i} className={`flex gap-2.5 rounded-xl border p-3 text-sm ${cls}`}>
+        <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
+        <p className="leading-relaxed">
+          <Inline text={b.note} />
+        </p>
+      </div>
+    );
   });
 }
 
@@ -375,9 +285,7 @@ export function DocsPage() {
   const page = pages[index]!;
   const prev = pages[index - 1];
   const next = pages[index + 1];
-  const toc = page.blocks.flatMap((b) =>
-    'h2' in b ? [b.h2] : 'endpoint' in b ? [`${b.endpoint.method} ${b.endpoint.path}`] : [],
-  );
+  const toc = page.blocks.flatMap((b) => ('h2' in b ? [b.h2] : []));
   const pager = (p: DocPage | undefined, dir: 'prev' | 'next'): ReactNode =>
     p ? (
       <Link

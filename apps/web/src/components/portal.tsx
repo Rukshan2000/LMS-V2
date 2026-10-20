@@ -77,8 +77,29 @@ function Section({
   );
 }
 
-/** Home page for parents and students: one block per linked student. */
-export function Portal() {
+export type PortalSection = 'fees' | 'timetable' | 'quizzes' | 'attendance';
+
+/** Students and parents (no staff role) get the portal view of shared pages. */
+export const useIsFamily = () =>
+  useTenantData().roles.every((r) => r === 'student' || r === 'parent');
+
+/** A shared page: the portal section for students and parents, the staff page for everyone else. */
+export function FamilyOr({ section, children }: { section: PortalSection; children: ReactNode }) {
+  const { t } = useI18n();
+  if (!useIsFamily()) return children;
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">{t.nav[section]}</h1>
+      <Portal only={section} />
+    </div>
+  );
+}
+
+/**
+ * Home page for parents and students: one block per linked student. With `only`, just that
+ * section (the Fees, Timetable, Quizzes and Attendance pages of the student menu).
+ */
+export function Portal({ only }: { only?: PortalSection } = {}) {
   const { t } = useI18n();
   const p = t.portal;
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -87,7 +108,8 @@ export function Portal() {
   const canUpload = entitlements.features.bank_slips && entitlements.writable;
   const [children, setChildren] = useState<Child[] | null>(null);
   const [quizzes, setQuizzes] = useState<PortalQuiz[]>([]);
-  const withQuizzes = entitlements.features.quizzes;
+  const withQuizzes = entitlements.features.quizzes && (!only || only === 'quizzes');
+  const show = (section: PortalSection) => !only || only === section;
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -122,113 +144,123 @@ export function Portal() {
             </span>
           </h2>
 
-          <div className="grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            <Section title={t.fees.title} icon={Wallet}>
-              {cents(c.outstanding) === 0 ? (
-                <p className="flex items-center gap-2 text-success">
-                  <CircleCheck aria-hidden className="size-5" />
-                  {p.allPaid}
-                </p>
-              ) : (
-                <>
-                  <p className="font-medium text-danger">
-                    {fmt(t.fees.outstandingTotal, { amount: fmtMoney(c.outstanding) })}
+          <div
+            className={only ? 'max-w-3xl' : 'grid items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3'}
+          >
+            {show('fees') && (
+              <Section title={t.fees.title} icon={Wallet}>
+                {cents(c.outstanding) === 0 ? (
+                  <p className="flex items-center gap-2 text-success">
+                    <CircleCheck aria-hidden className="size-5" />
+                    {p.allPaid}
                   </p>
-                  <ul className="mt-2 divide-y divide-line text-sm">
-                    {c.invoices.map((i) => (
-                      <li key={i.invoiceNumber} className="flex justify-between gap-2 py-1.5">
-                        <span>
-                          {i.period
-                            ? `${t.calendar.months[Number(i.period.slice(5)) - 1]} ${i.period.slice(0, 4)}`
-                            : fmt(t.fees.invoiceNo, { number: i.invoiceNumber })}
-                          <span className="ml-2 text-ink-subtle">
-                            {t.fees.due} {i.dueDate}
+                ) : (
+                  <>
+                    <p className="font-medium text-danger">
+                      {fmt(t.fees.outstandingTotal, { amount: fmtMoney(c.outstanding) })}
+                    </p>
+                    <ul className="mt-2 divide-y divide-line text-sm">
+                      {c.invoices.map((i) => (
+                        <li key={i.invoiceNumber} className="flex justify-between gap-2 py-1.5">
+                          <span>
+                            {i.period
+                              ? `${t.calendar.months[Number(i.period.slice(5)) - 1]} ${i.period.slice(0, 4)}`
+                              : fmt(t.fees.invoiceNo, { number: i.invoiceNumber })}
+                            <span className="ml-2 text-ink-subtle">
+                              {t.fees.due} {i.dueDate}
+                            </span>
                           </span>
-                        </span>
-                        <span className="font-mono">
-                          {fmtMoney(fromCents(cents(i.total) - cents(i.paid)))}
-                        </span>
+                          <span className="font-mono">
+                            {fmtMoney(fromCents(cents(i.total) - cents(i.paid)))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {c.slips.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-sm">
+                    {c.slips.map((slip) => (
+                      <li key={slip.id} className="flex flex-wrap items-center gap-2">
+                        <Badge status={slip.status}>{t.slips.status[slip.status]}</Badge>
+                        {colomboDate(slip.submittedAt)} · LKR {fmtMoney(slip.amount)}
+                        {slip.reviewNote && (
+                          <span className="text-danger">: {slip.reviewNote}</span>
+                        )}
                       </li>
                     ))}
                   </ul>
-                </>
-              )}
-              {c.slips.length > 0 && (
-                <ul className="mt-3 space-y-1 text-sm">
-                  {c.slips.map((slip) => (
-                    <li key={slip.id} className="flex flex-wrap items-center gap-2">
-                      <Badge status={slip.status}>{t.slips.status[slip.status]}</Badge>
-                      {colomboDate(slip.submittedAt)} · LKR {fmtMoney(slip.amount)}
-                      {slip.reviewNote && <span className="text-danger">: {slip.reviewNote}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canUpload && cents(c.outstanding) > 0 && (
-                <SlipUpload studentId={c.id} outstanding={c.outstanding} onDone={load} />
-              )}
-              {c.payments.length > 0 && (
-                <>
-                  <h4 className="mt-4 text-sm text-ink-subtle">{p.recentPayments}</h4>
-                  <ul className="text-sm">
-                    {c.payments.map((pay) => (
-                      <li key={pay.receiptNumber} className="flex justify-between gap-2 py-1">
-                        <span>
-                          {colomboDate(pay.receivedAt)} ·{' '}
-                          {fmt(t.fees.receiptNo, { number: pay.receiptNumber })}
-                        </span>
-                        <span className="font-mono">{fmtMoney(pay.amount)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </Section>
+                )}
+                {canUpload && cents(c.outstanding) > 0 && (
+                  <SlipUpload studentId={c.id} outstanding={c.outstanding} onDone={load} />
+                )}
+                {c.payments.length > 0 && (
+                  <>
+                    <h4 className="mt-4 text-sm text-ink-subtle">{p.recentPayments}</h4>
+                    <ul className="text-sm">
+                      {c.payments.map((pay) => (
+                        <li key={pay.receiptNumber} className="flex justify-between gap-2 py-1">
+                          <span>
+                            {colomboDate(pay.receivedAt)} ·{' '}
+                            {fmt(t.fees.receiptNo, { number: pay.receiptNumber })}
+                          </span>
+                          <span className="font-mono">{fmtMoney(pay.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </Section>
+            )}
 
-            <Section title={p.upcoming} icon={CalendarClock}>
-              {c.sessions.length === 0 ? (
-                <p className="text-sm text-ink-subtle">{p.noUpcoming}</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {c.sessions.map((s) => (
-                    <li
-                      key={s.id}
-                      className={`py-1.5 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
-                    >
-                      {fmtDay(s.startsAt, t.calendar)} · {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)} ·{' '}
-                      {s.batchName}
-                      {s.room && <span className="text-ink-subtle"> · {s.room}</span>}
-                      {s.status === 'cancelled' && (
-                        <span className="ml-2 no-underline">({p.cancelled})</span>
-                      )}
-                      {s.status === 'scheduled' && s.liveUrl ? (
-                        <a
-                          href={s.liveUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`ml-2 ${btn('success', 'xs')}`}
-                        >
-                          <Video aria-hidden className="size-3.5" />
-                          {p.join}
-                        </a>
-                      ) : (
-                        s.status === 'scheduled' &&
-                        s.online && (
-                          <span className={`ml-2 ${s.feeDue ? 'text-danger' : 'text-ink-subtle'}`}>
-                            ({s.feeDue ? p.payToJoin : p.linkSoon})
-                          </span>
-                        )
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {c.classes.length > 0 && (
-                <p className="mt-3 text-xs text-ink-subtle">
-                  {p.classes}: {c.classes.map((b) => `${b.name} (${b.subjectName})`).join(', ')}
-                </p>
-              )}
-            </Section>
+            {show('timetable') && (
+              <Section title={p.upcoming} icon={CalendarClock}>
+                {c.sessions.length === 0 ? (
+                  <p className="text-sm text-ink-subtle">{p.noUpcoming}</p>
+                ) : (
+                  <ul className="divide-y divide-line text-sm">
+                    {c.sessions.map((s) => (
+                      <li
+                        key={s.id}
+                        className={`py-1.5 ${s.status === 'cancelled' ? 'text-ink-subtle line-through' : ''}`}
+                      >
+                        {fmtDay(s.startsAt, t.calendar)} · {fmtTime(s.startsAt)}–{fmtTime(s.endsAt)}{' '}
+                        · {s.batchName}
+                        {s.room && <span className="text-ink-subtle"> · {s.room}</span>}
+                        {s.status === 'cancelled' && (
+                          <span className="ml-2 no-underline">({p.cancelled})</span>
+                        )}
+                        {s.status === 'scheduled' && s.liveUrl ? (
+                          <a
+                            href={s.liveUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`ml-2 ${btn('success', 'xs')}`}
+                          >
+                            <Video aria-hidden className="size-3.5" />
+                            {p.join}
+                          </a>
+                        ) : (
+                          s.status === 'scheduled' &&
+                          s.online && (
+                            <span
+                              className={`ml-2 ${s.feeDue ? 'text-danger' : 'text-ink-subtle'}`}
+                            >
+                              ({s.feeDue ? p.payToJoin : p.linkSoon})
+                            </span>
+                          )
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {c.classes.length > 0 && (
+                  <p className="mt-3 text-xs text-ink-subtle">
+                    {p.classes}: {c.classes.map((b) => `${b.name} (${b.subjectName})`).join(', ')}
+                  </p>
+                )}
+              </Section>
+            )}
 
             {withQuizzes && (
               <Section title={t.quizzes.title} icon={ListChecks}>
@@ -236,25 +268,27 @@ export function Portal() {
               </Section>
             )}
 
-            <Section title={p.attendance} icon={ClipboardCheck}>
-              {c.attendance.length === 0 ? (
-                <p className="text-sm text-ink-subtle">{p.noAttendance}</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {c.attendance.map((a) => (
-                    <li
-                      key={a.startsAt + a.batchName}
-                      className="flex justify-between gap-2 py-1.5"
-                    >
-                      <span>
-                        {fmtDay(a.startsAt, t.calendar)} · {a.batchName}
-                      </span>
-                      <Badge status={a.status}>{t.attendance[a.status]}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
+            {show('attendance') && (
+              <Section title={p.attendance} icon={ClipboardCheck}>
+                {c.attendance.length === 0 ? (
+                  <p className="text-sm text-ink-subtle">{p.noAttendance}</p>
+                ) : (
+                  <ul className="divide-y divide-line text-sm">
+                    {c.attendance.map((a) => (
+                      <li
+                        key={a.startsAt + a.batchName}
+                        className="flex justify-between gap-2 py-1.5"
+                      >
+                        <span>
+                          {fmtDay(a.startsAt, t.calendar)} · {a.batchName}
+                        </span>
+                        <Badge status={a.status}>{t.attendance[a.status]}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            )}
           </div>
         </div>
       ))}

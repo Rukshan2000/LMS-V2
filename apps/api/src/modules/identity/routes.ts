@@ -76,7 +76,7 @@ export default async function identityRoutes(
     app
       .db('users')
       .whereRaw('lower(email) = ?', [email])
-      .first([...USER_COLUMNS, 'status', 'password_hash']);
+      .first([...USER_COLUMNS, 'status', 'password_hash', 'is_platform_admin']);
 
   // Step 1: mail a code. Same answer whether or not the email is registered; a registered
   // address gets "you already have an account" instead of a code.
@@ -125,10 +125,11 @@ export default async function identityRoutes(
             .db('users')
             .where({ phone })
             .where((w) => w.whereNull('email').orWhereNull('email_verified_at'))
-            .first([...USER_COLUMNS, 'status', 'password_hash'])
+            .first([...USER_COLUMNS, 'status', 'password_hash', 'is_platform_admin'])
         : undefined;
     }
-    if (user?.status !== 'active') user = undefined;
+    // The platform owner logs in only at the console (/admin/auth/login).
+    if (user?.status !== 'active' || user.is_platform_admin) user = undefined;
     // Same answer (and timing) as a wrong password.
     if (!(await verifyPassword(user?.password_hash, body.password)) || !user) {
       throw new HttpError(401, 'invalid_credentials', 'Wrong email or password');
@@ -235,6 +236,6 @@ export default async function identityRoutes(
         .orderBy('t.name')
         .select('t.id', 't.slug', 't.name', 't.status'),
     );
-    return { user, tenants, isPlatformAdmin: req.authSession!.isPlatformAdmin };
+    return { user, tenants };
   });
 }

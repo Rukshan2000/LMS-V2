@@ -2,16 +2,7 @@
 // by GET /api/v1/admin/docs, so it never ships in the public web bundle). Plain data, rendered by
 // apps/web/src/components/admin/docs.tsx. Inline text supports `code`, **bold** and [links](/path);
 // a link to "docs:<slug>" opens another page. English only for now.
-//
-// Keep it true: platform.test.ts checks that every console route is documented here.
 
-export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-export interface Param {
-  name: string;
-  type: string;
-  required?: boolean;
-  description: string;
-}
 export type Block =
   | { h2: string }
   | { h3: string }
@@ -20,19 +11,7 @@ export type Block =
   | { steps: string[] }
   | { table: { head: string[]; rows: string[][] } }
   | { code: string; title?: string }
-  | { note: string; tone?: 'info' | 'warning' | 'danger' }
-  | {
-      endpoint: {
-        method: Method;
-        path: string;
-        summary: string;
-        params?: Param[];
-        query?: Param[];
-        body?: Param[];
-        response?: string;
-        errors?: string[];
-      };
-    };
+  | { note: string; tone?: 'info' | 'warning' | 'danger' };
 export interface DocPage {
   slug: string;
   group: string;
@@ -40,14 +19,6 @@ export interface DocPage {
   summary: string;
   blocks: Block[];
 }
-
-const ADMIN = '/api/v1/admin';
-const accountId: Param = {
-  name: 'id',
-  type: 'uuid',
-  required: true,
-  description: 'Account id',
-};
 
 export const DOCS: DocPage[] = [
   // ---------------------------------------------------------------- Getting started
@@ -112,7 +83,6 @@ export const DOCS: DocPage[] = [
           '[Account states](docs:account-states): what each state allows.',
           '[Price books](docs:price-books) and [Overrides](docs:overrides): setting prices.',
           '[Monthly invoices](docs:invoices): the 1st-of-the-month routine.',
-          '[Console API](docs:api-console): every endpoint behind these screens.',
         ],
       },
     ],
@@ -129,7 +99,7 @@ export const DOCS: DocPage[] = [
           rows: [
             [
               'Who',
-              'Users with `users.is_platform_admin = true`. Being a platform admin gives no powers inside any institute.',
+              'One platform owner: the single user with `users.is_platform_admin = true` (a unique index allows only one). They log in at `/admin/login` (`POST /api/v1/admin/auth/login`) with a separate `console_sid` cookie that is sent only to `/api/v1/admin`. The app login refuses them, and their session does nothing in any institute.',
             ],
             [
               'Hidden',
@@ -137,7 +107,7 @@ export const DOCS: DocPage[] = [
             ],
             [
               'Fresh login',
-              'Console routes need a login younger than **12 hours**. Older logins get `401 reauth_required` and the console asks you to log in again.',
+              'Console sessions last **12 hours**. Older logins get `401 reauth_required` and the console asks you to log in again.',
             ],
             [
               'Rate limit',
@@ -150,19 +120,19 @@ export const DOCS: DocPage[] = [
           ],
         },
       },
-      { h2: 'Granting the first platform admin' },
+      { h2: 'Setting the platform owner' },
       {
-        p: 'There is no console screen for this until two-factor login exists. On the server, as the database owner:',
+        p: 'Use a dedicated email that owns no institute: sign it up on the normal signup page (it needs no institute), then on the server, as the database owner:',
       },
       {
-        code: "UPDATE users SET is_platform_admin = true WHERE lower(email) = 'you@example.com';",
+        code: "UPDATE users SET is_platform_admin = (lower(email) = 'console@example.com');",
         title: 'SQL (tuition_lms, owner role)',
       },
       {
-        p: 'Then log out and in again (the flag is read with the login). The **Console** link appears in the app header.',
+        p: 'This also unflags any previous owner. Then log in at `/{lang}/admin/login`. That email can no longer use the institute app.',
       },
       {
-        note: 'Keep this to the platform owner. Adding more admins waits for 2FA (SAAS_PLAN §14 decision 8).',
+        note: 'There is exactly one platform owner. Adding more admins waits for 2FA (SAAS_PLAN §14 decision 8).',
         tone: 'warning',
       },
     ],
@@ -628,499 +598,6 @@ total = max(Σ line(h), minimum.monthly)   (a top-up line shows the difference)`
         },
       },
       { p: 'Each change is audited as `setting.update` with the old and new value.' },
-    ],
-  },
-
-  // ---------------------------------------------------------------- API reference
-  {
-    slug: 'api-console',
-    group: 'API reference',
-    title: 'Console API',
-    summary: 'Every endpoint under /api/v1/admin. Platform admins only; everyone else gets 404.',
-    blocks: [
-      {
-        p: 'All requests use the session cookie of a platform admin whose login is under 12 hours old. Bodies are JSON. Money is a string with 2 decimals (`"2500.00"`). Changes are rate limited to 30 per minute per IP and each writes one audit row.',
-      },
-      { h2: 'Accounts' },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/accounts`,
-          summary: 'List accounts with state, heads now, this month’s estimate and amount due.',
-          query: [
-            { name: 'q', type: 'string', description: 'Name, owner email or owner mobile' },
-            {
-              name: 'state',
-              type: 'enum',
-              description: '`trial` `trial_ending` `active` `overdue` `restricted` `suspended`',
-            },
-          ],
-          response: `{ "unverifiedUsers": 0, "accounts": [ { "id": "…", "name": "Nimal Maths",
-  "ownerEmail": "nimal@example.com", "ownerPhone": "94771234567",
-  "ownerName": "Nimal", "claimed": true, "priceBook": "standard", "state": "trial",
-  "daysLeft": 21, "amountDue": "0.00", "institutes": 1,
-  "headsNow": { "student": 120, "teacher": 3, "parent": 40, "admin": 0, "receptionist": 1 },
-  "estimate": "18000.00" } ] }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts`,
-          summary: 'Create an account for an owner who has not signed up yet.',
-          body: [
-            { name: 'name', type: 'string', required: true, description: '1–200 characters' },
-            {
-              name: 'ownerEmail',
-              type: 'string',
-              required: true,
-              description: 'The owner signs up and claims the account with this email',
-            },
-            {
-              name: 'ownerPhone',
-              type: 'string',
-              description: 'Sri Lankan mobile, contact only',
-            },
-            { name: 'priceBook', type: 'string', required: true, description: 'Price book key' },
-            {
-              name: 'trialDays',
-              type: 'integer',
-              required: true,
-              description: '0–365 (0 = no trial)',
-            },
-          ],
-          response: `201 { "account": { "id": "…", "name": "…", "ownerEmail": "nimal@example.com",
-  "ownerPhone": null }, "emailSent": true }`,
-          errors: ['409 account_exists', '400 unknown_price_book', '400 invalid_phone'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts/:id/invite`,
-          summary:
-            'Email the owner the "account ready" link again. `emailSent: false` if the mail server failed.',
-          params: [accountId],
-          response: '{ "emailSent": true }',
-          errors: ['409 already_claimed', '409 no_owner_email', '404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/accounts/:id`,
-          summary:
-            'Everything about one account: state, values, book, overrides, institutes, invoices, payments, month so far, last 100 audit rows.',
-          params: [accountId],
-          response: `{ "account": { …, "notes": null, "suspendedReason": null }, "values": { … },
-  "book": { "key": "standard", "name": "Standard", "values": { … } }, "overrides": [ … ],
-  "institutes": [ … ], "invoices": [ … ], "payments": [ … ],
-  "month": { "period": "2026-10", "days": [ … ], "headsNow": { … }, "estimate": { "lines": [ … ], "total": "…" } },
-  "audit": [ … ] }`,
-          errors: ['404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'PATCH',
-          path: `${ADMIN}/accounts/:id`,
-          summary: 'Change name, notes, price book or owner email. Send only what changes.',
-          params: [accountId],
-          body: [
-            { name: 'name', type: 'string', description: '1–200 characters' },
-            { name: 'notes', type: 'string | null', description: 'Up to 5000 characters' },
-            { name: 'priceBook', type: 'string', description: 'Price book key' },
-            {
-              name: 'ownerEmail',
-              type: 'string',
-              description:
-                'Only while unclaimed: the email the owner signs up and claims the account with',
-            },
-          ],
-          response: '204',
-          errors: [
-            '404 not_found',
-            '400 unknown_price_book',
-            '409 already_claimed',
-            '409 account_exists',
-          ],
-        },
-      },
-      {
-        endpoint: {
-          method: 'PUT',
-          path: `${ADMIN}/accounts/:id/overrides/:key`,
-          summary: 'Set one customer value. Replaces an existing override for the key.',
-          params: [
-            accountId,
-            { name: 'key', type: 'string', required: true, description: 'Catalogue key' },
-          ],
-          body: [
-            {
-              name: 'value',
-              type: 'number | boolean | null',
-              required: true,
-              description: 'Checked against the key',
-            },
-            { name: 'expiresAt', type: 'date | null', description: 'Must be in the future' },
-            { name: 'note', type: 'string', required: true, description: 'Why, 1–300 characters' },
-          ],
-          response: '204',
-          errors: [
-            '400 unknown_key',
-            '400 expiry_in_past',
-            '400 validation_error',
-            '404 not_found',
-          ],
-        },
-      },
-      {
-        endpoint: {
-          method: 'DELETE',
-          path: `${ADMIN}/accounts/:id/overrides/:key`,
-          summary: 'Remove an override; the price book applies again.',
-          params: [
-            accountId,
-            { name: 'key', type: 'string', required: true, description: 'Catalogue key' },
-          ],
-          response: '204',
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts/:id/trial`,
-          summary: 'Extend a running trial (its caps move with it) or start a new one from now.',
-          params: [accountId],
-          body: [{ name: 'days', type: 'integer', required: true, description: '1–365' }],
-          response: `{ "trialEndsAt": "2026-11-30T10:00:00.000Z" }`,
-          errors: ['404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts/:id/recount`,
-          summary: 'Rewrite today’s usage rows from live counts. Never lowers today’s peak.',
-          params: [accountId],
-          response: `{ "day": "2026-10-17", "counts": { "student": 120, "teacher": 3, "parent": 40, "admin": 0, "receptionist": 1 } }`,
-          errors: ['404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts/:id/suspend`,
-          summary: 'Make the account read-only.',
-          params: [accountId],
-          body: [
-            { name: 'reason', type: 'string', required: true, description: '1–300 characters' },
-          ],
-          response: '204',
-          errors: ['409 already_suspended', '404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/accounts/:id/unsuspend`,
-          summary: 'Lift the suspension at once.',
-          params: [accountId],
-          response: '204',
-          errors: ['409 not_suspended', '404 not_found'],
-        },
-      },
-      { h2: 'Invoices' },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/invoices`,
-          summary: 'All subscription invoices, newest first (up to 500).',
-          query: [
-            { name: 'period', type: 'YYYY-MM', description: 'Month billed' },
-            { name: 'status', type: 'enum', description: '`open` `paid` `void`' },
-          ],
-          response: `{ "invoices": [ { "id": "…", "accountId": "…", "accountName": "…", "ownerPhone": "…",
-  "number": "S-2026-09-0001", "period": "2026-09", "lines": [ … ], "total": "2350.00",
-  "paid": "0.00", "status": "open", "dueDate": "2026-10-08", "createdAt": "…" } ] }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/invoices/preview`,
-          summary: 'What Generate would create for a finished month, without creating anything.',
-          query: [
-            { name: 'period', type: 'YYYY-MM', required: true, description: 'A finished month' },
-          ],
-          response: `{ "preview": [ { "accountId": "…", "accountName": "Nimal Maths", "total": "2350.00" } ] }`,
-          errors: ['400 invalid_period'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/invoices/generate`,
-          summary: 'Generate one invoice per account for a finished month. Safe to repeat.',
-          body: [
-            { name: 'period', type: 'YYYY-MM', required: true, description: 'A finished month' },
-          ],
-          response: `{ "invoices": [ { "id": "…", "accountId": "…", "number": "S-2026-09-0001", "total": "2350.00", "dueDate": "2026-10-08" } ] }`,
-          errors: ['400 invalid_period'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/invoices/:id/payments`,
-          summary: 'Record a bank transfer. Part payments add up.',
-          params: [{ name: 'id', type: 'uuid', required: true, description: 'Invoice id' }],
-          body: [
-            {
-              name: 'amount',
-              type: 'string',
-              required: true,
-              description: 'LKR, above 0, at most what is due',
-            },
-            {
-              name: 'reference',
-              type: 'string',
-              required: true,
-              description: 'Bank reference, 1–100 characters',
-            },
-            {
-              name: 'clientRef',
-              type: 'uuid',
-              required: true,
-              description: 'New for each payment; a retry with the same value records once',
-            },
-          ],
-          response: `{ "paymentId": "…", "status": "paid", "amountDue": "0.00" }`,
-          errors: [
-            '400 invalid_amount',
-            '400 amount_exceeds_due',
-            '409 invoice_not_open',
-            '409 client_ref_used',
-            '404 not_found',
-          ],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/invoices/:id/void`,
-          summary:
-            'Cancel an open invoice without payments. The month can then be generated again.',
-          params: [{ name: 'id', type: 'uuid', required: true, description: 'Invoice id' }],
-          body: [
-            { name: 'reason', type: 'string', required: true, description: '1–300 characters' },
-          ],
-          response: '204',
-          errors: ['409 invoice_not_open', '409 invoice_has_payments', '404 not_found'],
-        },
-      },
-      { h2: 'Price books' },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/price-books`,
-          summary: 'Every price book with the number of accounts on it, and every catalogue key.',
-          response: `{ "priceBooks": [ { "key": "standard", "name": "Standard", "values": { "price.student": 100, … },
-  "isDefault": true, "accounts": 12, "updatedAt": "…" } ], "keys": [ "price.student", … ] }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'PUT',
-          path: `${ADMIN}/price-books/:key`,
-          summary:
-            'Replace a book’s values (and optionally its name). Applies from the next invoice.',
-          params: [{ name: 'key', type: 'string', required: true, description: 'Price book key' }],
-          body: [
-            { name: 'name', type: 'string', description: '1–100 characters' },
-            {
-              name: 'values',
-              type: 'object',
-              required: true,
-              description: 'Catalogue key → value; unknown keys refused',
-            },
-          ],
-          response: `{ "affectedAccounts": 12 }`,
-          errors: ['400 validation_error', '404 not_found'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'POST',
-          path: `${ADMIN}/price-books`,
-          summary: 'Create a price book.',
-          body: [
-            {
-              name: 'key',
-              type: 'string',
-              required: true,
-              description: '`a-z 0-9 _ -`, 2–32 characters',
-            },
-            { name: 'name', type: 'string', required: true, description: '1–100 characters' },
-            {
-              name: 'values',
-              type: 'object',
-              required: true,
-              description: 'Catalogue key → value',
-            },
-          ],
-          response: '201',
-          errors: ['409 price_book_exists', '400 validation_error'],
-        },
-      },
-      { h2: 'Settings and audit' },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/settings`,
-          summary: 'Every setting the console can change, with its value or null.',
-          response: `{ "settings": { "trial_days": 30, "grace_days": 7, "invoice_due_days": 7,
-  "trial_caps": { "cap.students": 100, … }, "support_whatsapp": null, "bank_details": null } }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'PUT',
-          path: `${ADMIN}/settings/:key`,
-          summary:
-            'Change one setting. Each key has its own rules (see [Settings](docs:settings)).',
-          params: [{ name: 'key', type: 'string', required: true, description: 'Setting key' }],
-          body: [
-            { name: 'value', type: 'any', required: true, description: 'Checked against the key' },
-          ],
-          response: '204',
-          errors: ['404 not_found (unknown key)', '400 validation_error'],
-        },
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/audit`,
-          summary: 'The newest 200 audit rows.',
-          query: [
-            { name: 'accountId', type: 'uuid', description: 'One account' },
-            { name: 'actor', type: 'uuid', description: 'One admin user' },
-          ],
-          response: `{ "events": [ { "id": "…", "action": "override.set", "before": { … }, "after": { … },
-  "ip": "…", "createdAt": "…", "accountId": "…", "accountName": "…", "actor": "…" } ] }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: `${ADMIN}/docs`,
-          summary: 'This documentation.',
-          response: `{ "pages": [ { "slug": "overview", "group": "Getting started", "title": "Overview", "summary": "…", "blocks": [ … ] } ] }`,
-        },
-      },
-    ],
-  },
-  {
-    slug: 'api-customer',
-    group: 'API reference',
-    title: 'Customer API',
-    summary: 'The billing parts of the customer API: entitlements and the Billing page.',
-    blocks: [
-      {
-        p: 'These use the customer’s own session. Every write under `/api/v1/tenants/:tenantId` is also checked against the account: refused with `403 account_suspended` when suspended, and with `403 feature_locked` on routes that need a switched-off feature.',
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: '/api/v1/tenants/:tenantId',
-          summary:
-            'The institute, the user’s roles and the account’s entitlements. `used` counts only for owners and admins.',
-          params: [{ name: 'tenantId', type: 'uuid', required: true, description: 'Institute id' }],
-          response: `{ "tenant": { … }, "roles": ["owner"],
-  "entitlements": { "state": "overdue", "trialEndsAt": null, "daysLeft": null,
-    "writable": true, "canAddHeads": true, "amountDue": "2350.00",
-    "overdueInvoice": "S-2026-09-0001", "overdueDueDate": "2026-10-08",
-    "features": { "reports": true, "bank_slips": true, "live_links": true, "student_import": true, "portal": true },
-    "caps": { "students": { "limit": null, "used": 120 }, "institutes": { "limit": 3, "used": 1 }, … } } }`,
-        },
-      },
-      {
-        endpoint: {
-          method: 'GET',
-          path: '/api/v1/tenants/:tenantId/billing',
-          summary:
-            'The Billing page: prices, this month so far, invoices and where to pay. Owners and admins only.',
-          params: [{ name: 'tenantId', type: 'uuid', required: true, description: 'Institute id' }],
-          response: `{ "prices": { "student": "100.00", "teacher": "2000.00", … },
-  "included": { "student": 0, … }, "minimumMonthly": "0.00",
-  "thisMonth": { "period": "2026-10", "headsNow": { … },
-    "lines": [ { "type": "head", "head": "student", "peak": 120, "included": 0, "billable": 120,
-                 "unitPrice": "100.00", "amount": "12000.00" } ],
-    "total": "12000.00" },
-  "invoices": [ { "id": "…", "number": "S-2026-09-0001", "period": "2026-09", "total": "2350.00",
-                  "paid": "0.00", "status": "open", "dueDate": "2026-10-08", … } ],
-  "payTo": { "bankDetails": "Bank: …", "whatsapp": "94770000000" } }`,
-          errors: ['403 forbidden (not owner or admin)'],
-        },
-      },
-    ],
-  },
-  {
-    slug: 'errors',
-    group: 'API reference',
-    title: 'Errors',
-    summary: 'The error shape and every billing and console error code.',
-    blocks: [
-      { p: 'Every error has the same shape. `details` is present only for some codes.' },
-      {
-        code: `{ "code": "plan_limit", "message": "The teachers limit for this account is reached",
-  "requestId": "req-1a2b", "details": { "key": "cap.teachers", "limit": 5, "used": 5 } }`,
-        title: 'Error response',
-      },
-      { h2: 'Account and plan' },
-      {
-        table: {
-          head: ['Status', 'Code', 'Details', 'Meaning'],
-          rows: [
-            ['403', '`plan_limit`', '`{ key, limit, used }`', 'A cap is reached'],
-            ['403', '`feature_locked`', '`{ feature }`', 'The feature is off for this account'],
-            [
-              '403',
-              '`account_restricted`',
-              '`{ amountDue, invoiceNumber }`',
-              'Unpaid past grace: no new people',
-            ],
-            ['403', '`account_suspended`', '', 'Read-only account'],
-          ],
-        },
-      },
-      { h2: 'Console' },
-      {
-        table: {
-          head: ['Status', 'Code', 'Meaning'],
-          rows: [
-            ['404', '`not_found`', 'Unknown id, or you are not a platform admin'],
-            ['401', '`reauth_required`', 'Console login older than 12 hours'],
-            ['409', '`account_exists`', 'That mobile already has an account'],
-            ['400', '`unknown_key`', 'Not a catalogue key'],
-            ['400', '`unknown_price_book`', 'No such price book'],
-            ['409', '`price_book_exists`', 'Key already used'],
-            ['400', '`expiry_in_past`', 'Override expiry must be in the future'],
-            ['409', '`already_suspended` / `not_suspended`', 'Nothing to change'],
-            ['400', '`invalid_period`', 'Only a finished month (YYYY-MM)'],
-            ['409', '`invoice_not_open`', 'Paid or void invoice'],
-            ['409', '`invoice_has_payments`', 'Cannot void an invoice with payments'],
-            [
-              '400',
-              '`invalid_amount` / `amount_exceeds_due`',
-              'Amount must be above 0 and at most what is due',
-            ],
-            ['409', '`client_ref_used`', 'That payment was recorded on another invoice'],
-            ['400', '`validation_error`', 'A field is missing or invalid; `details` lists fields'],
-            ['429', '`rate_limited`', 'More than 30 changes a minute from one IP'],
-          ],
-        },
-      },
     ],
   },
 

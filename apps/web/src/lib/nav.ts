@@ -12,6 +12,8 @@ export interface NavItem {
 }
 
 const STAFF: Role[] = ['owner', 'admin'];
+/** Students and parents get their own view of these pages (the portal, one section each). */
+const FAMILY: Role[] = ['student', 'parent'];
 
 // v1 menu. Order = sidebar order. Add `path` when a feature ships.
 export const NAV: NavItem[] = [
@@ -24,13 +26,25 @@ export const NAV: NavItem[] = [
   // Teachers join in slice 2 (they will see only their own batches' students).
   { key: 'students', path: '/students', roles: [...STAFF, 'receptionist'] },
   { key: 'classes', path: '/classes', roles: [...STAFF, 'receptionist', 'teacher'] },
-  // Parents and students see classes, attendance and fees on their overview (portal).
-  { key: 'attendance', path: '/attendance', roles: [...STAFF, 'receptionist', 'teacher'] },
-  { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist'] },
+  {
+    key: 'attendance',
+    path: '/attendance',
+    roles: [...STAFF, 'receptionist', 'teacher', ...FAMILY],
+  },
+  { key: 'fees', path: '/fees', roles: [...STAFF, 'receptionist', ...FAMILY] },
   { key: 'slips', path: '/slips', roles: [...STAFF, 'receptionist'], feature: 'bank_slips' },
-  { key: 'timetable', path: '/timetable', roles: [...STAFF, 'receptionist', 'teacher'] },
-  // Students and parents find quizzes on their overview (portal).
-  { key: 'quizzes', path: '/quizzes', roles: [...STAFF, 'teacher'], feature: 'quizzes' },
+  {
+    key: 'timetable',
+    path: '/timetable',
+    roles: [...STAFF, 'receptionist', 'teacher', ...FAMILY],
+  },
+  {
+    key: 'quizzes',
+    path: '/quizzes',
+    roles: [...STAFF, 'teacher', ...FAMILY],
+    feature: 'quizzes',
+  },
+  { key: 'tutes', path: '/tutes', roles: [...STAFF, 'teacher', ...FAMILY] },
   { key: 'reports', path: '/reports', roles: STAFF, feature: 'reports' },
   { key: 'billing', path: '/billing', roles: STAFF },
   { key: 'settings', path: '/settings', roles: STAFF },

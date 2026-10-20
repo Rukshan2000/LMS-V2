@@ -77,7 +77,7 @@ export function ClassList() {
                   ))}
                 </ul>
                 <p className="mt-3 text-sm text-ink-subtle">
-                  {[b.teacherName, fmt(c.studentCount, { count: b.studentCount }), c[b.mode]]
+                  {[b.teacherName ?? c.noTeacher, fmt(c.studentCount, { count: b.studentCount }), c[b.mode]]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>

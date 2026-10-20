@@ -1,3 +1,4 @@
+import { FamilyOr } from '@/components/portal';
 import { Locked } from '@/components/locked';
 import { QuizList } from '@/components/quizzes/quiz-list';
 
@@ -7,7 +8,9 @@ export const instant = false;
 export default function Page() {
   return (
     <Locked feature="quizzes">
-      <QuizList />
+      <FamilyOr section="quizzes">
+        <QuizList />
+      </FamilyOr>
     </Locked>
   );
 }

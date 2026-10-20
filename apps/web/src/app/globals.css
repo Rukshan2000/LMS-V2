@@ -3,6 +3,8 @@
 @theme inline {
   /* Latin first, then Sinhala and Tamil: each font only downloads when its script appears. */
   --font-sans: var(--font-latin), var(--font-sinhala), var(--font-tamil), ui-sans-serif, sans-serif;
+  /* Institute public page headings only (Fraunces is loaded by that page). */
+  --font-display: var(--font-fraunces), var(--font-sinhala), var(--font-tamil), Georgia, serif;
 }
 
 /* Design tokens: blue and white pastel. Screens use these (bg-primary, text-ink-muted…), never raw palette colours. */
@@ -52,6 +54,8 @@
   --animate-slide-down: slide-down 200ms var(--ease-out) both;
   --animate-toast-in: toast-in 200ms var(--ease-out) both;
   --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-rise: rise 700ms var(--ease-out) both;
 
   @keyframes fade-in {
     from {
@@ -77,11 +81,93 @@
       transform: translateY(12px);
     }
   }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+  }
   @keyframes shimmer {
     50% {
       opacity: 0.55;
     }
   }
+}
+
+/* Institute accent colours (tenants.theme, migration 020). Blue is the default above.
+   Each overrides only the blue-tinted tokens; primary keeps at least 4.5:1 contrast with white text.
+   <html data-theme> is set by the dashboard shell; any element with data-theme previews that colour,
+   so blue is repeated here for a blue swatch inside a non-blue page. */
+[data-theme='blue'] {
+  --color-canvas: #f5f9ff;
+  --color-surface-soft: #eef5ff;
+  --color-line: #dce7f5;
+  --color-line-strong: #c3d5ec;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #e0ecff;
+  --color-primary-ring: #bfd6ff;
+  --color-accent-sky: #cfe6ff;
+}
+[data-theme='teal'] {
+  --color-canvas: #f3fbfa;
+  --color-surface-soft: #e6f6f3;
+  --color-line: #d3ebe7;
+  --color-line-strong: #b5dcd5;
+  --color-primary: #0f766e;
+  --color-primary-hover: #115e59;
+  --color-primary-soft: #d5f5f0;
+  --color-primary-ring: #99e2d8;
+  --color-accent-sky: #c3ece6;
+}
+[data-theme='green'] {
+  --color-canvas: #f4fbf6;
+  --color-surface-soft: #e9f7ee;
+  --color-line: #d5ecdc;
+  --color-line-strong: #b7dcc3;
+  --color-primary: #15803d;
+  --color-primary-hover: #166534;
+  --color-primary-soft: #dcfce7;
+  --color-primary-ring: #a7e9bd;
+  --color-accent-sky: #c9f0d5;
+}
+[data-theme='purple'] {
+  --color-canvas: #f9f6ff;
+  --color-surface-soft: #f2ecff;
+  --color-line: #e4dcf5;
+  --color-line-strong: #d0c2ec;
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-soft: #ede5ff;
+  --color-primary-ring: #d4c2fd;
+  --color-accent-sky: #e2d6fe;
+}
+[data-theme='rose'] {
+  --color-canvas: #fff7f8;
+  --color-surface-soft: #ffeef2;
+  --color-line: #f5dce2;
+  --color-line-strong: #ecc3cd;
+  --color-primary: #e11d48;
+  --color-primary-hover: #be123c;
+  --color-primary-soft: #ffe4ea;
+  --color-primary-ring: #fdc1cf;
+  --color-accent-sky: #fdd5de;
+}
+[data-theme='orange'] {
+  --color-canvas: #fffaf5;
+  --color-surface-soft: #fff3e6;
+  --color-line: #f5e3d3;
+  --color-line-strong: #ecccb3;
+  --color-primary: #c2410c;
+  --color-primary-hover: #9a3412;
+  --color-primary-soft: #ffedd5;
+  --color-primary-ring: #fed7aa;
+  --color-accent-sky: #fde2c8;
 }
 
 body {

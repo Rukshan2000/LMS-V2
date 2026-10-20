@@ -18,7 +18,6 @@ export interface TenantSummary {
 export interface Me {
   user: User;
   tenants: TenantSummary[];
-  isPlatformAdmin: boolean;
 }
 
 export class ApiError extends Error {

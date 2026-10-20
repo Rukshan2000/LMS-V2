@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n/provider';
 import { api, errorMessage } from '@/lib/api';
 import { Plus } from 'lucide-react';
 import { BackLink, Button, card, Field, FormError } from '../ui';
-import type { BatchDetail, Member } from './types';
+import { teachersOf, type BatchDetail, type Member } from './types';
 
 export function ClassNew() {
   const { lang, t } = useI18n();
@@ -59,9 +59,7 @@ export function ClassNew() {
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
-  const teachers = members.filter((m) =>
-    m.roles.some((r) => r === 'teacher' || r === 'owner' || r === 'admin'),
-  );
+  const teachers = teachersOf(members);
 
   return (
     <div className="space-y-4">

@@ -23,7 +23,7 @@ import { addDays, colomboDate, fmtDay, fmtTime, weekdayName } from '@/lib/dateti
 import { useTenantData } from '../dashboard-shell';
 import { BackLink, btn, ConfirmButton, FormError, Skeleton, Tabs } from '../ui';
 import type { StudentRow } from '../students/types';
-import type { BatchDetail, Session } from './types';
+import { teachersOf, type BatchDetail, type Member, type Session } from './types';
 import { ClassFees } from '../fees/class-fees';
 import { SessionActions } from './session-actions';
 
@@ -51,6 +51,7 @@ export function ClassDetail() {
   });
   const [q, setQ] = useState('');
   const [found, setFound] = useState<StudentRow[]>([]);
+  const [teachers, setTeachers] = useState<Member[]>([]);
 
   const fail = useCallback((err: unknown) => setError(errorMessage(t, err)), [t]);
   const loadSessions = useCallback(() => {
@@ -68,6 +69,14 @@ export function ClassDetail() {
       .catch(fail);
     loadSessions();
   }, [url, fail, loadSessions]);
+
+  // Managers can assign or change the teacher here (a class can be created without one).
+  useEffect(() => {
+    if (!manager) return;
+    api<{ members: Member[] }>(`/tenants/${tenantId}/members`)
+      .then((r) => setTeachers(teachersOf(r.members)))
+      .catch(fail);
+  }, [manager, tenantId, fail]);
 
   const searching = desk && q.trim().length >= 2;
   useEffect(() => {
@@ -112,8 +121,39 @@ export function ClassDetail() {
         <div className="mr-auto">
           <h1 className="text-2xl font-semibold">{batch.name}</h1>
           <p className="text-ink-muted">
-            {[batch.subjectName, batch.teacherName ?? c.noTeacher, c[batch.mode]].join(' · ')}
+            {[batch.subjectName, !manager && (batch.teacherName ?? c.noTeacher), c[batch.mode]]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
+          {manager && (
+            <label className="mt-2 flex items-center gap-2 text-sm">
+              <span className="font-medium text-ink-muted">{c.teacher}</span>
+              <select
+                value={batch.teacherMembershipId ?? ''}
+                onChange={(e) =>
+                  run(
+                    api(url, {
+                      method: 'PATCH',
+                      body: { teacherMembershipId: e.target.value || null },
+                    }),
+                  )
+                }
+                className={input}
+              >
+                <option value="">{c.noTeacher}</option>
+                {/* Keep the current teacher listed even if they no longer have a teaching role. */}
+                {batch.teacherMembershipId &&
+                  !teachers.some((m) => m.membershipId === batch.teacherMembershipId) && (
+                    <option value={batch.teacherMembershipId}>{batch.teacherName}</option>
+                  )}
+                {teachers.map((m) => (
+                  <option key={m.membershipId} value={m.membershipId}>
+                    {m.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         {manager && (
           <button

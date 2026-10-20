@@ -6,6 +6,11 @@ import { HttpError } from '../lib/http-error.js';
 
 export const SESSION_COOKIE = 'sid';
 export const SESSION_DAYS = 30;
+/** The platform console has its own login: own cookie, sent only to console routes. */
+export const CONSOLE_COOKIE = 'console_sid';
+export const CONSOLE_PATH = '/api/v1/admin';
+export const CONSOLE_SESSION_HOURS = 12;
+const isConsole = (req: FastifyRequest) => req.url.startsWith(CONSOLE_PATH);
 
 export interface SessionUser {
   id: string;
@@ -57,8 +62,11 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
   app.decorateRequest('user', null);
   app.decorateRequest('authSession', null);
 
+  // Console routes read only the console cookie and accept only the platform admin; every other
+  // route reads only the app cookie and never accepts the platform admin. The two never mix.
   app.addHook('onRequest', async (req) => {
-    const token = req.cookies[SESSION_COOKIE];
+    const forConsole = isConsole(req);
+    const token = req.cookies[forConsole ? CONSOLE_COOKIE : SESSION_COOKIE];
     if (!token) return;
     const row = await app
       .db('auth_sessions as s')
@@ -67,6 +75,7 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
       .whereNull('s.revoked_at')
       .where('s.expires_at', '>', app.db.fn.now())
       .where('u.status', 'active')
+      .where('u.is_platform_admin', forConsole)
       .first(
         'u.id',
         'u.email',
@@ -86,8 +95,10 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
   });
 
   app.decorate('startSession', async (req: FastifyRequest, reply: FastifyReply, userId: string) => {
+    const forConsole = isConsole(req);
     const token = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+    const hours = forConsole ? CONSOLE_SESSION_HOURS : SESSION_DAYS * 24;
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
     await app.db('auth_sessions').insert({
       user_id: userId,
       token_hash: hashToken(token),
@@ -95,11 +106,16 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
       ip: req.ip,
       user_agent: req.headers['user-agent']?.slice(0, 300) ?? null,
     });
-    reply.setCookie(SESSION_COOKIE, token, { ...cookieOptions, expires: expiresAt });
+    reply.setCookie(forConsole ? CONSOLE_COOKIE : SESSION_COOKIE, token, {
+      ...cookieOptions,
+      ...(forConsole && { path: CONSOLE_PATH, sameSite: 'strict' as const }),
+      expires: expiresAt,
+    });
   });
 
   app.decorate('endSession', async (req: FastifyRequest, reply: FastifyReply) => {
-    const token = req.cookies[SESSION_COOKIE];
+    const forConsole = isConsole(req);
+    const token = req.cookies[forConsole ? CONSOLE_COOKIE : SESSION_COOKIE];
     if (token) {
       await app
         .db('auth_sessions')
@@ -107,6 +123,7 @@ export default fp<{ secureCookies: boolean }>(async (app, { secureCookies }) => 
         .whereNull('revoked_at')
         .update({ revoked_at: app.db.fn.now() });
     }
-    reply.clearCookie(SESSION_COOKIE, cookieOptions);
+    if (forConsole) reply.clearCookie(CONSOLE_COOKIE, { ...cookieOptions, path: CONSOLE_PATH });
+    else reply.clearCookie(SESSION_COOKIE, cookieOptions);
   });
 });
